@@ -11,9 +11,9 @@ Ferret 実装タスク一覧
 - [x] ~~Supabase プロジェクトが停止していた~~ → **2026-08-09 復旧確認済み**。4テーブルとも健在、スキーマは `ideas/db仕様.md` と完全一致、`model_answer_embedding` も `vector(1536)` で生きている（pgvector 有効）
 - [ ] **`problems` テーブルが 0件** — 全テーブル空（service_role で確認）。問題データが1件もないため採点フローを通しで試せない。まず検証用に1問投入する
 - [x] ~~`npm run build` が失敗する~~ → **2026-08-09 修正済み**。`lib/ai/scorer.ts` を遅延初期化（`getOpenAI()`）に変更し、キー未設定でもビルドが通ることを確認。障害範囲が `/api/score` 内に閉じるようになった
-- [ ] **`OPENAI_API_KEY` を `.env.local` に設定する** — 上記修正でビルドは通るようになったが、値は空のまま。採点を実行するには必須（Embedding 事前計算スクリプトの実行にも必要）
+- [ ] **`OPENAI_API_KEY` を `.env.local` に設定する** — 上記修正でビルドは通るようになったが、値は空のまま。**残る唯一の手作業ブロッカー**
 - [x] ~~Next.js 16 の `params` / `searchParams` が Promise 化~~ → **2026-08-09 修正済み**。両画面を `use()` で unwrap。`?score=80` → 80点「クリア！」、`?score=40` → 40点「もう一度挑戦しよう」を実測で確認
-- [ ] **git が未初期化** — 1ヶ月分の実装がバージョン管理されていない。`git init` + 初回コミット（`.gitignore` は作成済み・`.env*` 除外済み）
+- [x] ~~git が未初期化~~ → **2026-08-10 解消**。`kotera-rikuto/ferret` に push 済み（Public）。事業系3点（仕様書・需要分析・プレゼン資料）は `.gitignore` で除外、`.env.local` も未追跡であることを確認済み
 
 ---
 
