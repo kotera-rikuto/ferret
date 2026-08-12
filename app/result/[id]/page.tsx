@@ -1,28 +1,38 @@
-"use client";
+import Link from "next/link";
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
 
-import { use } from "react";
-import { useRouter } from "next/navigation";
+// クリア判定のしきい値（採点システム仕様書 §4）
+const CLEAR_SCORE = 65;
 
-function getFeedback(score: number): string {
-  if (score >= 90)
-    return "完璧な読み取りです！コードの意図まで正確に捉えられています。";
-  if (score >= 70)
-    return "よく読めています！細かい部分まで丁寧に説明できています。";
-  if (score >= 50)
-    return "大筋は合っています。もう少し処理の流れを詳しく説明してみましょう。";
-  if (score >= 30)
-    return "ポイントには近づいています。コードを1行ずつ追って読んでみましょう。";
-  return "もう一度コードをじっくり読んでみましょう。どんな値が使われているか確認してみてください。";
-}
-
-export default function ResultPage({
-  searchParams,
+export default async function ResultPage({
+  params,
 }: {
-  searchParams: Promise<{ score?: string }>;
+  params: Promise<{ id: string }>;
 }) {
-  const router = useRouter();
-  const { score: scoreParam } = use(searchParams);
-  const score = Number(scoreParam ?? 0);
+  const { id } = await params;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  // この問題に対する自分の最新の回答を取得する。
+  // session クライアント経由なので RLS で自分の行だけに絞られる
+  const { data: attempt } = await supabase
+    .from("user_attempts")
+    .select("total_score, keyword_score, deep_score, ai_feedback")
+    .eq("problem_id", Number(id))
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  // 未回答の問題のリザルトに直接来た場合は問題画面へ戻す
+  if (!attempt) redirect(`/problems/${id}`);
+
+  const score = attempt.total_score;
+  const cleared = score >= CLEAR_SCORE;
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-6 py-12">
@@ -37,38 +47,45 @@ export default function ResultPage({
         {/* 合否 */}
         <div
           className={`px-6 py-2 rounded-full text-sm font-semibold ${
-            score >= 65
+            cleared
               ? "bg-amber-400/20 text-amber-400"
               : "bg-zinc-800 text-zinc-400"
           }`}
         >
-          {score >= 65 ? "クリア！" : "もう一度挑戦しよう"}
+          {cleared ? "クリア！" : "もう一度挑戦しよう"}
         </div>
 
-        {/* フィードバック */}
-        <div className="bg-zinc-900 rounded-xl p-5 w-full">
-          <p className="text-zinc-300 text-sm leading-relaxed">
-            {getFeedback(score)}
-          </p>
+        {/* 内訳 */}
+        <div className="flex gap-6 text-xs text-zinc-500">
+          <span>キーワード {attempt.keyword_score} / 20</span>
+          <span>説明 {attempt.deep_score} / 80</span>
         </div>
+
+        {/* AIフィードバック */}
+        {attempt.ai_feedback && (
+          <div className="bg-zinc-900 rounded-xl p-5 w-full">
+            <p className="text-zinc-300 text-sm leading-relaxed">
+              {attempt.ai_feedback}
+            </p>
+          </div>
+        )}
 
         {/* ボタン */}
         <div className="flex flex-col gap-3 w-full">
-          {/* 振り返りボタン: MVP後に追加。
-              有効化する際は引数に params: Promise<{ id: string }> を戻し、
-              const { id } = use(params) で取り出すこと */}
-          {/* <button
-            onClick={() => router.push(`/review/${id}`)}
-            className="border border-amber-400 text-amber-400 font-semibold py-3 rounded-full hover:bg-amber-400/10 transition-colors"
+          {/* 振り返りボタン: MVP後に追加
+          <Link href={`/review/${id}`} className="...">振り返る</Link> */}
+          <Link
+            href={`/problems/${id}`}
+            className="border border-amber-400 text-amber-400 font-semibold py-3 rounded-full hover:bg-amber-400/10 transition-colors text-center"
           >
-            振り返る
-          </button> */}
-          <button
-            onClick={() => router.push("/stages")}
-            className="bg-amber-400 text-zinc-950 font-semibold py-3 rounded-full hover:bg-amber-300 transition-colors"
+            もう一度挑む
+          </Link>
+          <Link
+            href="/stages"
+            className="bg-amber-400 text-zinc-950 font-semibold py-3 rounded-full hover:bg-amber-300 transition-colors text-center"
           >
             ステージに戻る
-          </button>
+          </Link>
         </div>
       </div>
     </div>
