@@ -4,11 +4,10 @@
 - **DB:** Supabase (PostgreSQL)
 - **対象:** Ferret MVP
 
-> ### ⚠️ 適用状況（2026-08-12 時点）
+> ### 適用状況
 >
-> **本書は v3 のスキーマを記述しているが、本番 DB にはまだ適用されていない。**
-> マイグレーションファイルは `supabase/migrations/20260812010000_scoring_v3.sql` に作成済み、`supabase init` も完了。残りは `supabase login` → `supabase link --project-ref pbisrsrfmhzmmdmufhsj` → `supabase db push`。
-> **適用が済んだらこのブロックを消すこと。**
+> **2026-08-16 に本番 DB へ適用済み**（`supabase db push`）。制約が実際に効くことを検証済み ── キーワード3スロット / 不正な `reading_type` / `core_reject` 1件 のいずれも `23514`（check violation）で拒否され、正しい行のみ通ることを確認した。
+> Supabase CLI はリンク済みなので、今後のマイグレーションは `supabase/migrations/` にファイルを置いて `supabase db push` だけでよい。
 
 > **v3 の変更点（2026-08-12）:** 採点システム v3 に対応。`problems` に `reading_type` / `rubric_items` を追加し、`keywords` を**4スロット固定**に制約。`user_attempts` に `axes` / `grader_version` / `answer_hash` / `is_provisional` / `contradiction` / `usage` を追加。**クリア閾値を 65 → 55 に変更し、80点以上をパーフェクト帯として新設。** 詳細は `採点システム仕様書v3草案.md`、SQL は `supabase/migrations/20260812010000_scoring_v3.sql` を参照。
 >
@@ -84,14 +83,14 @@ select
 
 | カラム | 型 | 説明 |
 |---|---|---|
-| `id` | INTEGER | 永続的な識別子。URL・リレーションに使用。変えない |
+| `id` | INTEGER | 永続的な識別子。URL・リレーションに使用。変えない。**`GENERATED ALWAYS AS IDENTITY`（自動採番）なので、insert 時に `id` を指定するとエラーになる**（`428C9`）。問題投入スクリプトでは `id` を渡さないこと |
 | `order` | INTEGER | 表示順。問題を差し込む際はここを更新する |
-| `title` | TEXT | ステージ名（例:「filter ─ 条件で絞り込む」）。ステージ選択画面・問題画面に表示。v2 で追加 |
+| `title` | TEXT | ステージ名（例:「filter ─ 条件で絞り込む」）。ステージ選択画面・問題画面に表示。**2026-08-16 に NOT NULL 化。** 画面側が `title ?? "Stage N"` でフォールバックするため、入れ忘れても見た目には正常に見えてしまい気づけないため |
 | `language` | TEXT | `js` / `ts` / `ruby` / `python` |
 | `code` | TEXT | 問題として表示するコードスニペット |
 | `question` | TEXT | 設問文 |
 | `model_answer` | TEXT | 模範回答テキスト |
-| `model_answer_embedding` | VECTOR(1536) | **【v2 で未使用】** 採点では参照しない。将来の回答傾向分析用に保留（NULL のままでよい） |
+| ~~`model_answer_embedding`~~ | ─ | **【2026-08-16 に削除】** v2 では「将来の回答傾向分析用」として保留していたが、その分析で必要になるのは `user_attempts.answer` のベクトルであって模範解答のベクトルではなく、残す理由として挙げていた用途にも使えないため削除した。コードからの参照もゼロだった。必要になれば `add column model_answer_embedding vector(1536)` の1行で戻せる |
 | `keywords` | JSONB | キーワードスロット配列（採点層1で使用）。**v3 でちょうど4個に制約** |
 | `reading_type` | TEXT | **【v3 で追加】** `トレース` / `意図` / `ズレ` / `影響` / `命名` / `仕様`。層2 `depth` 観点の判定条件を切り替える。**NOT NULL・既定値なし** |
 | `rubric_items` | JSONB | **【v3 で追加】** 4観点のルーブリック。**NOT NULL・既定値なし** |
