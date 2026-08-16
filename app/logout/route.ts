@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { appBaseUrl, isCrossSiteRequest } from "@/lib/http/origin";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
@@ -11,8 +12,15 @@ import { NextResponse, type NextRequest } from "next/server";
  *
  * GET ではなく POST 限定にしているのは、`<img src="/logout">` のような
  * 仕込みで意図せずログアウトさせられるのを防ぐため。
+ * POST でも別サイトのフォームからは送れてしまうので、送信元も確認する。
  */
 export async function POST(request: NextRequest) {
+  // 他サイトに置かれたフォームから勝手にログアウトさせられるのを防ぐ。
+  // 被害は「作業中に突然ログアウトさせられる」程度だが、止められるものは止める
+  if (isCrossSiteRequest(request)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
   const supabase = await createClient();
 
   const {
@@ -30,7 +38,9 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(new URL("/login", request.url), {
+  // 戻り先はリクエストの Host ではなく、こちらで決めた基点から組み立てる
+  // （lib/http/origin.ts の appBaseUrl 参照）
+  return NextResponse.redirect(new URL("/login", appBaseUrl(request)), {
     // 303 にしないと、リダイレクト先へ POST のまま飛んでしまう
     status: 303,
   });
