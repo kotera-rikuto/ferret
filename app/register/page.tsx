@@ -2,33 +2,45 @@
 
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { authErrorMessage, OAUTH_ENABLED } from "@/lib/auth/errors";
 
 export default function RegisterPage() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({ email, password });
+    setLoading(true);
+    setError("");
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${location.origin}/auth/callback` },
+    });
     if (error) {
-      setError("登録に失敗しました。もう一度お試しください");
+      setError(authErrorMessage(error, "登録できませんでした"));
+      setLoading(false);
       return;
     }
     setSent(true);
   }
 
   async function handleOAuth(provider: "google" | "github") {
+    if (!OAUTH_ENABLED[provider]) {
+      setError("この方法はまだ準備中です。メールアドレスでお進みください。");
+      return;
+    }
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${location.origin}/auth/callback` },
     });
+    if (error) setError(authErrorMessage(error, "登録できませんでした"));
   }
 
   if (sent) {
@@ -68,9 +80,10 @@ export default function RegisterPage() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             type="submit"
-            className="bg-amber-400 text-zinc-950 font-semibold py-3 rounded-full hover:bg-amber-300 transition-colors"
+            disabled={loading}
+            className="bg-amber-400 text-zinc-950 font-semibold py-3 rounded-full hover:bg-amber-300 transition-colors disabled:opacity-40"
           >
-            登録する
+            {loading ? "送信中..." : "登録する"}
           </button>
         </form>
 
@@ -79,13 +92,13 @@ export default function RegisterPage() {
             onClick={() => handleOAuth("google")}
             className="border border-zinc-700 text-zinc-50 py-3 rounded-full hover:bg-zinc-800 transition-colors"
           >
-            Googleで登録
+            Googleで登録{!OAUTH_ENABLED.google && "（準備中）"}
           </button>
           <button
             onClick={() => handleOAuth("github")}
             className="border border-zinc-700 text-zinc-50 py-3 rounded-full hover:bg-zinc-800 transition-colors"
           >
-            GitHubで登録
+            GitHubで登録{!OAUTH_ENABLED.github && "（準備中）"}
           </button>
         </div>
 

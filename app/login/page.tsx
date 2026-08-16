@@ -4,33 +4,49 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { authErrorMessage, OAUTH_ENABLED } from "@/lib/auth/errors";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const supabase = createClient();
+    setLoading(true);
+    setError("");
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     if (error) {
-      setError("メールアドレスまたはパスワードが間違っています");
+      setError(authErrorMessage(error, "ログインできませんでした"));
+      setLoading(false);
       return;
     }
-    router.push("/stages");
+    // middleware に付けられた行き先へ戻す。無ければステージ一覧へ。
+    // useSearchParams() を使うとページの事前生成が止まるため、
+    // 送信時に1度だけ URL から読む
+    const next = new URLSearchParams(window.location.search).get("next");
+    router.push(next && next.startsWith("/") ? next : "/stages");
+    router.refresh();
   }
 
   async function handleOAuth(provider: "google" | "github") {
+    if (!OAUTH_ENABLED[provider]) {
+      setError("この方法はまだ準備中です。メールアドレスでお進みください。");
+      return;
+    }
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    // error を握りつぶすと、押しても無反応に見えて原因が分からなくなる
+    const { error } = await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${location.origin}/auth/callback` },
     });
+    if (error) setError(authErrorMessage(error, "ログインできませんでした"));
   }
 
   return (
@@ -58,9 +74,10 @@ export default function LoginPage() {
           {error && <p className="text-red-400 text-sm">{error}</p>}
           <button
             type="submit"
-            className="bg-amber-400 text-zinc-950 font-semibold py-3 rounded-full hover:bg-amber-300 transition-colors"
+            disabled={loading}
+            className="bg-amber-400 text-zinc-950 font-semibold py-3 rounded-full hover:bg-amber-300 transition-colors disabled:opacity-40"
           >
-            ログイン
+            {loading ? "確認中..." : "ログイン"}
           </button>
         </form>
 
@@ -69,13 +86,13 @@ export default function LoginPage() {
             onClick={() => handleOAuth("google")}
             className="border border-zinc-700 text-zinc-50 py-3 rounded-full hover:bg-zinc-800 transition-colors"
           >
-            Googleでログイン
+            Googleでログイン{!OAUTH_ENABLED.google && "（準備中）"}
           </button>
           <button
             onClick={() => handleOAuth("github")}
             className="border border-zinc-700 text-zinc-50 py-3 rounded-full hover:bg-zinc-800 transition-colors"
           >
-            GitHubでログイン
+            GitHubでログイン{!OAUTH_ENABLED.github && "（準備中）"}
           </button>
         </div>
 
