@@ -3,8 +3,28 @@
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { authErrorMessage, OAUTH_ENABLED } from "@/lib/auth/errors";
+import { safeNextPath } from "@/lib/auth/redirect";
+
+/**
+ * `/auth/callback` から戻されたときの理由。
+ *
+ * URL に載る `?error=` は**この表の見出しとしか照合しない。**
+ * 文章そのものを URL 経由で受け取ると、`?error=<好きな文章>` のリンクを配るだけで
+ * 本物の画面に攻撃者の文言を出せてしまう
+ * （「セキュリティ確認のためパスワードを再入力してください」など）。
+ */
+const CALLBACK_ERRORS: Record<string, string> = {
+  auth_callback:
+    "ログインの確認を完了できませんでした。お手数ですが、もう一度お試しください。",
+};
+
+/** 初回描画時の URL から `?error=` を読む。サーバー描画時は空 */
+const subscribeNothing = () => () => {};
+const readErrorParam = () =>
+  new URLSearchParams(window.location.search).get("error") ?? "";
+const readErrorParamOnServer = () => "";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -12,11 +32,22 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // 一度でも操作したら、コールバック由来の古い案内は引っ込める
+  const [retried, setRetried] = useState(false);
+
+  // 認証コールバックからの戻りだけ、理由を拾って表示する。
+  // useSearchParams() を使うとページの事前生成が止まるため、
+  // ブラウザ側の値としてURLを読む（サーバー描画時は空を返すので表示のズレも起きない）
+  const callbackError = CALLBACK_ERRORS[
+    useSyncExternalStore(subscribeNothing, readErrorParam, readErrorParamOnServer)
+  ];
+  const shownError = error || (retried ? "" : callbackError) || "";
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
     const supabase = createClient();
     setLoading(true);
+    setRetried(true);
     setError("");
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -29,13 +60,15 @@ export default function LoginPage() {
     }
     // middleware に付けられた行き先へ戻す。無ければステージ一覧へ。
     // useSearchParams() を使うとページの事前生成が止まるため、
-    // 送信時に1度だけ URL から読む
+    // 送信時に1度だけ URL から読む。
+    // safeNextPath を通すのは、外部サイトへ飛ばす値が混ぜられるのを防ぐため
     const next = new URLSearchParams(window.location.search).get("next");
-    router.push(next && next.startsWith("/") ? next : "/stages");
+    router.push(safeNextPath(next));
     router.refresh();
   }
 
   async function handleOAuth(provider: "google" | "github") {
+    setRetried(true);
     if (!OAUTH_ENABLED[provider]) {
       setError("この方法はまだ準備中です。メールアドレスでお進みください。");
       return;
@@ -71,7 +104,7 @@ export default function LoginPage() {
             onChange={(e) => setPassword(e.target.value)}
             className="bg-zinc-800 text-zinc-50 px-4 py-3 rounded-lg outline-none"
           />
-          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {shownError && <p className="text-red-400 text-sm">{shownError}</p>}
           <button
             type="submit"
             disabled={loading}
