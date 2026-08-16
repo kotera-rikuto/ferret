@@ -6,13 +6,18 @@
  * hasJsonContentType は未使用（/api/score に未適用。結合テスト I-411）。
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import type { NextRequest } from "next/server";
-import { isCrossSiteRequest, hasJsonContentType } from "@/lib/http/origin";
+import { isCrossSiteRequest, hasJsonContentType, appBaseUrl } from "@/lib/http/origin";
 
 /** headers だけを持つ最小のリクエスト。両関数とも headers.get しか使わない */
 function req(headers: Record<string, string>): NextRequest {
   return { headers: new Headers(headers) } as unknown as NextRequest;
+}
+
+/** appBaseUrl は request.url しか見ない */
+function urlReq(url: string): NextRequest {
+  return { url } as unknown as NextRequest;
 }
 
 describe("§7 isCrossSiteRequest", () => {
@@ -109,5 +114,46 @@ describe("§7 hasJsonContentType", () => {
     expect(
       hasJsonContentType(req({ "content-type": "application/json-patch+json" })),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// appBaseUrl
+// ---------------------------------------------------------------------------
+
+describe("§7 appBaseUrl", () => {
+  const saved = process.env.NEXT_PUBLIC_APP_URL;
+
+  afterEach(() => {
+    if (saved === undefined) delete process.env.NEXT_PUBLIC_APP_URL;
+    else process.env.NEXT_PUBLIC_APP_URL = saved;
+  });
+
+  it("U-340 NEXT_PUBLIC_APP_URL が設定されていればそれを使う", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://ferret.example";
+    expect(appBaseUrl(urlReq("http://evil.example/stages"))).toBe(
+      "https://ferret.example",
+    );
+  });
+
+  it("U-341 パス付きで設定されていても origin だけを取る", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "https://ferret.example/app/";
+    expect(appBaseUrl(urlReq("http://localhost:3000/stages"))).toBe(
+      "https://ferret.example",
+    );
+  });
+
+  it("U-342 未設定ならリクエストの origin を使う", () => {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    expect(appBaseUrl(urlReq("http://localhost:3000/stages?a=1"))).toBe(
+      "http://localhost:3000",
+    );
+  });
+
+  it("U-343 設定が壊れていてもリクエスト側に落ちて動く", () => {
+    process.env.NEXT_PUBLIC_APP_URL = "壊れた値";
+    expect(appBaseUrl(urlReq("http://localhost:3000/stages"))).toBe(
+      "http://localhost:3000",
+    );
   });
 });
