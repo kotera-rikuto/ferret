@@ -92,7 +92,20 @@ export const ANSWER_MAX_CHARS = 600;
 
 /** キーワードスロットは全問4個固定。DB制約でも強制している */
 export const KEYWORD_SLOT_COUNT = 4;
-const POINT_PER_SLOT = 5;
+
+/**
+ * ヒット数ごとの層1の点。最初の1つを重くしてある（0 / 12 / 15 / 18 / 20）。
+ *
+ * 均等配分（1つ5点）だと、中核を正しく読めているのに語彙が少ない短い回答が
+ * 5点しか取れず、`core=full`(48) と足しても53点でクリア閾値55に2点届かない、
+ * という取りこぼしが実測で出た。「共通の語彙が1つも無い」から「1つある」への差が
+ * 一番大きい情報なので、そこに重みを置く。
+ *
+ * **キーワードを散りばめただけの回答には効かない。** 検証済みの引用が1つも無い場合は
+ * この後で 10点に頭打ちされるため、下駄が届くのは `full` を1つ以上取れた回答だけになる。
+ * 「中核を読めた人を救う」という下駄本来の意図と、範囲が一致している。
+ */
+const KEYWORD_POINTS = [0, 12, 15, 18, 20] as const;
 
 /** 検証済みの引用が1つも無いときの層1の上限 */
 const KEYWORD_CAP_WITHOUT_EVIDENCE = 10;
@@ -184,6 +197,8 @@ export type KeywordResult = { score: number; hits: boolean[] };
  * 合否が変わっていた（3個なら67点でクリア、5個なら64点で不合格）。
  * 除算をやめたので丸め処理も不要になった。
  *
+ * 配点は均等ではなく KEYWORD_POINTS のテーブル引き。理由はそちらのコメント参照。
+ *
  * 限界: includes による部分文字列一致なので、対義・反転（偶数↔奇数）は区別できない。
  * だから層1は20点に留め、合否は層2の core が握る設計にしてある。
  */
@@ -198,7 +213,7 @@ export function scoreKeywords(
       return k.length > 0 && a.includes(k);
     }),
   );
-  const score = hits.filter(Boolean).length * POINT_PER_SLOT;
+  const score = KEYWORD_POINTS[hits.filter(Boolean).length] ?? 0;
   return { score, hits };
 }
 

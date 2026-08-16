@@ -224,6 +224,48 @@ describe("§5-1 リクエストの組み立て", () => {
     expect(nonceOf(0)).not.toBe(nonceOf(1));
   });
 
+  it("U-210 OpenAI が使用量を返さなくても落ちない", async () => {
+    // usage は SDK の型上も任意。欠けたときに null で埋まることを確かめる。
+    // ここが例外になると、採点は成功しているのに 503 になる
+    createMock.mockReset();
+    createMock.mockResolvedValue({
+      choices: [
+        {
+          message: { content: JSON.stringify(deepOutput()), refusal: null },
+          finish_reason: "stop",
+        },
+      ],
+    });
+
+    const r = await scoreAnswer(ANSWER, PROBLEM);
+    expect(r.total).toBe(100);
+    expect(r.usage).toMatchObject({
+      prompt_tokens: null,
+      cached_tokens: null,
+      completion_tokens: null,
+      system_fingerprint: null,
+    });
+  });
+
+  it("U-211 使用量の一部だけが欠けても残りは拾う", async () => {
+    createMock.mockReset();
+    createMock.mockResolvedValue({
+      choices: [
+        {
+          message: { content: JSON.stringify(deepOutput()), refusal: null },
+          finish_reason: "stop",
+        },
+      ],
+      // prompt_tokens_details（キャッシュ命中数）だけが無いケース
+      usage: { prompt_tokens: 1650, completion_tokens: 120 },
+      system_fingerprint: "fp_test",
+    });
+
+    const r = await scoreAnswer(ANSWER, PROBLEM);
+    expect(r.usage.prompt_tokens).toBe(1650);
+    expect(r.usage.cached_tokens).toBeNull();
+  });
+
   it("U-209 結果に採点の出所が記録される", async () => {
     const r = await scoreAnswer(ANSWER, PROBLEM);
     expect(r.grader_version).toBe(GRADER_VERSION);
@@ -537,6 +579,46 @@ describe("§5-3 フィードバックの整形", () => {
       );
       expect(r.ai_feedback.trim().length).toBeGreaterThan(0);
     }
+  });
+
+  /**
+   * scorer.ts の `text || templateNextFocus(composed)` が**到達しない**ことの確認。
+   *
+   * text が空になるには praise と next_focus の両方が空である必要がある。
+   *   - next が空 → templateNextFocus が "" → perfect かつ矛盾なし のときだけ
+   *   - praise が空 → templatePraise が "" → perfect でも cleared でもなく core=none のときだけ
+   * この2つは同時に成立しない。つまり最後の `||` は構造上入れない。
+   *
+   * 全81通り（4観点 × 3段階）× 矛盾あり/なし を総当たりして、
+   * 「フィードバックが空にならない」ことを実際に確かめる。
+   * 到達不能な行を消すかどうかはオーナーの判断なので、テストは事実の記録に留める。
+   */
+  it("U-262 全帯域を総当たりしてもフィードバックが空にならない", async () => {
+    const levels: Verdicts[number][] = ["full", "partial", "none"];
+    let checked = 0;
+
+    for (const core of levels)
+      for (const ground of levels)
+        for (const depth of levels)
+          for (const articulation of levels)
+            for (const contradiction of [false, true]) {
+              const r = await feedbackOf(
+                deepOutput([core, ground, depth, articulation], {
+                  contradiction,
+                  contradictionEvidence: contradiction ? EVIDENCE_REAL : "",
+                  // AI の文章を両方空にして、必ずテンプレートに落とす
+                  praise: "",
+                  next_focus: "",
+                }),
+              );
+              expect(
+                r.ai_feedback.trim().length,
+                `core=${core} ground=${ground} depth=${depth} artic=${articulation} 矛盾=${contradiction} で空になった`,
+              ).toBeGreaterThan(0);
+              checked += 1;
+            }
+
+    expect(checked).toBe(162);
   });
 
   it("U-261 差し替え用のテンプレート自体が NG語を含まない", async () => {

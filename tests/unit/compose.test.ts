@@ -120,11 +120,24 @@ describe("§1-1 配点の検算", () => {
     expect(r.cleared).toBe(false);
   });
 
-  it("U-022 core=full で説明が短くても 62点でクリア（設計の肝）", () => {
+  it("U-022 core=full で説明が短くてもクリアする（設計の肝）", () => {
     const r = composeScore(deep(["full", "none", "none", "full"]), ANSWER, slots(2));
     expect(r.deepScore).toBe(52);
-    expect(r.keywordScore).toBe(10);
-    expect(r.total).toBe(62);
+    expect(r.keywordScore).toBe(15);
+    expect(r.total).toBe(67);
+    expect(r.cleared).toBe(true);
+  });
+
+  /**
+   * 層1の配点を前寄せ（0/12/15/18/20）にした理由そのもの。
+   * 均等配分（1つ5点）だと 48 + 5 = 53 で、クリア閾値 55 に2点届かなかった。
+   * 「中核は読めているが語彙が少ない短い回答」が救われることを固定する。
+   */
+  it("U-022b core=full でキーワードが1つだけでもクリアする", () => {
+    const r = composeScore(deep(["full", "none", "none", "none"]), ANSWER, slots(1));
+    expect(r.deepScore).toBe(48);
+    expect(r.keywordScore).toBe(12);
+    expect(r.total).toBe(60);
     expect(r.cleared).toBe(true);
   });
 
@@ -202,14 +215,31 @@ describe("§1-2 合成の分岐", () => {
     expect(r.evidenceCapped).toBe(false);
   });
 
-  it("U-032 full が無くても KW が10点以下なら切り詰めは起きない", () => {
+  it("U-032 full が無く KW も0なら切り詰めは起きない", () => {
     const r = composeScore(
       deep(["partial", "partial", "none", "none"]),
       ANSWER,
-      slots(2),
+      slots(0),
     );
-    expect(r.keywordScore).toBe(10);
+    expect(r.keywordScore).toBe(0);
     expect(r.evidenceCapped).toBe(false);
+  });
+
+  /**
+   * 配点を前寄せにした副作用。1つ当たっただけで 12点になるので、
+   * 「引用が取れていない回答」は**1つでもキーワードが当たれば必ず切り詰められる。**
+   * 均等配分の頃は 1〜2ヒット（5〜10点）が上限の下だったので、ここは挙動が変わっている。
+   * 下駄が届くのは `full` を1つ以上取れた回答だけ、という設計意図とは一致している。
+   */
+  it("U-032b full が無ければ1ヒットでも切り詰められる", () => {
+    const r = composeScore(
+      deep(["partial", "none", "none", "none"]),
+      ANSWER,
+      slots(1),
+    );
+    expect(scoreKeywords(ANSWER, slots(1)).score).toBe(12);
+    expect(r.keywordScore).toBe(10);
+    expect(r.evidenceCapped).toBe(true);
   });
 
   it("U-033 格下げ2件では捏造とみなさない", () => {
@@ -342,8 +372,20 @@ describe("§1-3 定数の不変条件", () => {
     expect(sum).toBe(80);
   });
 
-  it("U-051 キーワードは4スロット×5点で20点", () => {
-    expect(KEYWORD_SLOT_COUNT * 5).toBe(20);
+  it("U-051 層1の満点は20点で、ヒット数が増えるほど単調に上がる", () => {
+    // 配点は均等ではなくテーブル引き（0/12/15/18/20）なので、
+    // 「スロット数×5」ではなく実際の関数から確かめる
+    const points = Array.from({ length: KEYWORD_SLOT_COUNT + 1 }, (_, n) =>
+      scoreKeywords(ANSWER, slots(n)).score,
+    );
+    expect(points[0]).toBe(0);
+    expect(points[KEYWORD_SLOT_COUNT]).toBe(20);
+    for (let i = 1; i < points.length; i++) {
+      expect(points[i]).toBeGreaterThan(points[i - 1]);
+    }
+    // 最初の1つが一番大きく効く（前寄せ配点）
+    const gains = points.slice(1).map((v, i) => v - points[i]);
+    expect(gains[0]).toBe(Math.max(...gains));
   });
 
   it("U-052 partial（満点の半分）がどの観点でも整数になる", () => {
@@ -353,7 +395,8 @@ describe("§1-3 定数の不変条件", () => {
   });
 
   it("U-053 core=none の理論上の最大は閾値に届かない（中核ゲート）", () => {
-    const maxWithoutCore = 80 - AXIS_MAX.core + KEYWORD_SLOT_COUNT * 5;
+    const keywordMax = scoreKeywords(ANSWER, slots(KEYWORD_SLOT_COUNT)).score;
+    const maxWithoutCore = 80 - AXIS_MAX.core + keywordMax;
     expect(maxWithoutCore).toBeLessThan(CLEAR_THRESHOLD);
   });
 
@@ -413,9 +456,9 @@ describe("§1-3 定数の不変条件", () => {
 describe("§1-4 scoreKeywords", () => {
   it.each([
     [0, 0],
-    [1, 5],
-    [2, 10],
-    [3, 15],
+    [1, 12],
+    [2, 15],
+    [3, 18],
     [4, 20],
   ])("U-060 %i スロットヒットで %i 点", (hits, expected) => {
     expect(scoreKeywords(ANSWER, slots(hits)).score).toBe(expected);
@@ -429,7 +472,7 @@ describe("§1-4 scoreKeywords", () => {
       { match: [MISSING[3]] },
     ];
     const r = scoreKeywords(ANSWER, s);
-    expect(r.score).toBe(5);
+    expect(r.score).toBe(12);
     expect(r.hits).toEqual([true, false, false, false]);
   });
 
