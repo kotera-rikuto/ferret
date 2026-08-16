@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { loadProgress } from "@/lib/progress/unlock";
 import { ProblemForm } from "./ProblemForm";
 
 export default async function ProblemPage({
@@ -16,13 +17,25 @@ export default async function ProblemPage({
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  // 表示に必要なカラムだけ取得する。
-  // model_answer / ai_rubric を select しないことでクライアントへの流出を防ぐ
+  // URL の数字はユーザーが自由に書き換えられる。整数以外はここで落とす
+  const problemId = Number(id);
+  if (!Number.isInteger(problemId) || problemId <= 0) notFound();
+
   const admin = createAdminClient();
+
+  // まだ開いていないステージは、URL を直接打っても開かせない。
+  // マップ上の鍵アイコンはブラウザ側の見た目でしかなく、
+  // アドレスバーに /problems/42 と打てば素通りできてしまうため。
+  // 判定は採点API と同じ関数を使う（片方だけ直してズレるのを防ぐ）
+  const progress = await loadProgress(admin, supabase, user.id);
+  if (!progress.unlockedIds.has(problemId)) notFound();
+
+  // 表示に必要なカラムだけ取得する。
+  // model_answer / rubric_items を select しないことでクライアントへの流出を防ぐ
   const { data: problem } = await admin
     .from("problems")
     .select("id, order, title, code, question")
-    .eq("id", Number(id))
+    .eq("id", problemId)
     .single();
 
   if (!problem) notFound();
