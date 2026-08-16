@@ -23,8 +23,16 @@ export function authErrorMessage(
   if (code === "user_already_exists" || msg.includes("already registered")) {
     return "このメールアドレスは登録済みです。ログイン画面からお進みください。";
   }
+  // 文字数は Supabase 側の設定（supabase/config.toml の minimum_password_length）と
+  // 揃えること。片方だけ変えると、案内どおりに入力しても弾かれる状態になる
   if (code === "weak_password" || msg.includes("password should be at least")) {
-    return "パスワードをもう少し長くしてください（6文字以上）。";
+    return "パスワードをもう少し長くしてください（8文字以上）。";
+  }
+  // 流出済みパスワードの拒否（password_hibp_enabled）を有効にすると返ってくる。
+  // 「あなたのパスワードが漏れている」ではなく「このパスワードは他所で流出済み」なので、
+  // 責める言い方にならないよう文面を分けている
+  if (msg.includes("pwned") || msg.includes("compromised") || msg.includes("data breach")) {
+    return "このパスワードは過去に流出したことが確認されています。別のものをご用意ください。";
   }
   if (code === "validation_failed" || msg.includes("unable to validate email")) {
     return "メールアドレスの形式をご確認ください。";

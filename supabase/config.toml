@@ -251,8 +251,16 @@ enable_signup = true
 # addresses. If disabled, only the new email is required to confirm.
 double_confirm_changes = true
 # If enabled, users need to confirm their email address before signing in.
-enable_confirmations = false
+#
+# **本番は既に有効（mailer_autoconfirm: false）。ここを false のままにしていると、
+# `supabase config push` を実行した瞬間に本番のメール確認が切れる。**
+# 確認が切れると、実在しないメールアドレスでいくらでもアカウントを作れるようになり、
+# アカウント単位で効かせている採点のレート制限（app/api/score/route.ts）も意味を失う。
+# 実態に合わせて true にしてある。
+enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
+# パスワード変更画面を作るときに true にする。
+# 放置した端末からパスワードだけ書き換えてアカウントを乗っ取られるのを防ぐため
 secure_password_change = false
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
