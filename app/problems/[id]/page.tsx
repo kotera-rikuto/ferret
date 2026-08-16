@@ -1,7 +1,9 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
+import { IconClose } from "@/components/ui/icons";
 import { ProblemForm } from "./ProblemForm";
 
 export default async function ProblemPage({
@@ -34,30 +36,56 @@ export default async function ProblemPage({
   // model_answer / rubric_items を select しないことでクライアントへの流出を防ぐ
   const { data: problem } = await admin
     .from("problems")
-    .select("id, order, title, code, question")
+    .select("id, order, title, code, question, language, reading_type")
     .eq("id", problemId)
     .single();
 
   if (!problem) notFound();
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex flex-col">
-      <div className="flex-1 flex flex-col max-w-2xl mx-auto w-full px-6 py-12 gap-8">
-        <h1 className="text-zinc-50 text-xl font-bold">
+    <div className="min-h-screen flex flex-col">
+      {/* 上部バー: × は「中断してマップへ」。クイズ系の定石に合わせて戻る矢印ではなく × */}
+      <header className="sticky top-0 z-20 grid grid-cols-[56px_1fr_56px] items-center border-b-2 border-line bg-bg px-5 py-3.5">
+        <Link
+          href="/stages"
+          aria-label="中断してマップへ"
+          className="grid size-10 place-items-center rounded-xl text-muted hover:bg-brand-tint hover:text-ink"
+        >
+          <IconClose size={22} />
+        </Link>
+        <div className="flex items-center justify-center gap-2.5 text-sm font-extrabold">
+          <span className="text-xs font-extrabold tracking-widest text-muted">
+            STAGE {problem.order}
+          </span>
           {problem.title ?? `Stage ${problem.order}`}
-        </h1>
+          {problem.reading_type && (
+            <span className="rounded-full bg-brand-tint px-2.5 py-0.5 text-[11px] font-extrabold text-brand-deep">
+              {problem.reading_type}
+            </span>
+          )}
+        </div>
+        <span />
+      </header>
 
-        {/* コード表示（将来 Shiki に置き換え。サーバーコンポーネントなので移行可能） */}
-        <div className="bg-zinc-900 rounded-xl p-6">
-          <pre className="text-zinc-300 text-sm font-mono leading-relaxed overflow-x-auto">
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 pt-9 pb-44">
+        {/* コードパネル。画面は明色でも、コードは常にダーク（UXルール）。
+            Shiki によるハイライトは未導入で、当面は素のテキスト（design/移植残タスク.md） */}
+        <div className="overflow-hidden rounded-2xl border-b-5 border-code-edge bg-code-bg">
+          <div className="flex items-center justify-between border-b border-white/10 px-4.5 py-2.5 text-[11px] font-bold tracking-wider text-code-muted">
+            <span>{(problem.language ?? "js").toUpperCase()}</span>
+            <span>読んでみよう</span>
+          </div>
+          <pre className="overflow-x-auto p-5 font-mono text-sm leading-loose text-code-ink">
             <code>{problem.code}</code>
           </pre>
         </div>
 
         {/* 設問 */}
-        <p className="text-zinc-300 text-sm">{problem.question}</p>
+        <p className="text-base font-extrabold leading-relaxed whitespace-pre-line">
+          {problem.question}
+        </p>
 
-        {/* 回答入力 */}
+        {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
         <ProblemForm
           problem={{
             id: problem.id,
@@ -66,7 +94,7 @@ export default async function ProblemPage({
             question: problem.question,
           }}
         />
-      </div>
+      </main>
     </div>
   );
 }
