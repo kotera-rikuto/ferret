@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-
-// クリア判定のしきい値（採点システム仕様書 §4）
-const CLEAR_SCORE = 65;
+import { CLEAR_THRESHOLD, PERFECT_THRESHOLD } from "@/lib/ai/compose";
 
 export default async function ResultPage({
   params,
@@ -24,6 +22,8 @@ export default async function ResultPage({
     .from("user_attempts")
     .select("total_score, keyword_score, deep_score, ai_feedback")
     .eq("problem_id", Number(id))
+    // 判定保留（レート上限時に層1のみで採点した回）は合否を出さない
+    .eq("is_provisional", false)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -32,7 +32,8 @@ export default async function ResultPage({
   if (!attempt) redirect(`/problems/${id}`);
 
   const score = attempt.total_score;
-  const cleared = score >= CLEAR_SCORE;
+  const cleared = score >= CLEAR_THRESHOLD;
+  const perfect = score >= PERFECT_THRESHOLD;
 
   return (
     <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center px-6 py-12">
@@ -47,12 +48,14 @@ export default async function ResultPage({
         {/* 合否 */}
         <div
           className={`px-6 py-2 rounded-full text-sm font-semibold ${
-            cleared
-              ? "bg-amber-400/20 text-amber-400"
-              : "bg-zinc-800 text-zinc-400"
+            perfect
+              ? "bg-amber-400 text-zinc-950"
+              : cleared
+                ? "bg-amber-400/20 text-amber-400"
+                : "bg-zinc-800 text-zinc-400"
           }`}
         >
-          {cleared ? "クリア！" : "もう一度挑戦しよう"}
+          {perfect ? "パーフェクト！" : cleared ? "クリア！" : "もう一度挑戦しよう"}
         </div>
 
         {/* 内訳 */}
