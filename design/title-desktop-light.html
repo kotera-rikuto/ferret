@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferret — タイトル（デスクトップ・ライト）</title>
+<!--
+  タイトル画面モック。主流パターン:
+  - マスコットを主役サイズで置く（現実装は48px）
+  - primary は「はじめる」（新規獲得優先）、ログインは secondary
+  「はじめる」→ login-desktop-light.html へ
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fdf8ec;
+    --panel: #ffffff;
+    --line: #ece0c6;
+    --ink: #4a3b28;
+    --muted: #a3937a;
+    --brand: #f59e0b;
+    --brand-deep: #c47000;
+    --brand-tint: #fdeac0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    color: var(--ink);
+  }
+
+  .hero {
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 72px;
+    padding: 40px;
+  }
+  .hero img {
+    width: 280px;
+    animation: float 3s ease-in-out infinite;
+    filter: drop-shadow(0 10px 24px rgba(74, 59, 40, 0.18));
+  }
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-12px); }
+  }
+
+  .copy { display: flex; flex-direction: column; gap: 20px; max-width: 460px; }
+  .wordmark { font-size: 64px; font-weight: 800; letter-spacing: 0.02em; line-height: 1; }
+  .tagline { font-size: 22px; font-weight: 800; line-height: 1.6; }
+  .sub { font-size: 14px; font-weight: 700; color: var(--muted); line-height: 1.8; }
+
+  .actions { display: flex; flex-direction: column; gap: 12px; margin-top: 8px; width: 340px; }
+  .btn {
+    display: block;
+    padding: 15px;
+    border: none;
+    border-radius: 16px;
+    background: var(--brand);
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .btn:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .btn.secondary {
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-bottom: 5px solid var(--line);
+    color: var(--brand-deep);
+  }
+</style>
+</head>
+<body>
+  <main class="hero">
+    <img src="../public/character_nobg.png" alt="フェレット" />
+    <div class="copy">
+      <h1 class="wordmark">Ferret</h1>
+      <p class="tagline">他人のコードが読める、<br />AI時代のエンジニアに。</p>
+      <p class="sub">コードを読んで、日本語で説明する。<br />AI がフィードバックを返す、コードリーディングの訓練所。</p>
+      <div class="actions">
+        <a class="btn" href="login-desktop-light.html">はじめる</a>
+        <a class="btn secondary" href="login-desktop-light.html">アカウントをお持ちの方</a>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

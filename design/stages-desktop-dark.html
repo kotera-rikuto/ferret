@@ -1,0 +1,735 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferret — ステージ選択（デスクトップ・ダーク）</title>
+<!--
+  デスクトップ版モック（ダーク・引き締めパターン）。
+  レイアウトとJSは stages-desktop-light.html と同一で、差分はカラートークンと光らせ方のみ。
+  黒は無彩色（zinc）ではなく、マスコットのこげ茶に寄せた暖色系の黒（エスプレッソ）。
+  アンバーは面で塗らず「光」として使う（ノードのグロー、通った道の発光）。
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #191309;
+    --bg-deep: #100c06;
+    --panel: #241c10;
+    --line: #3a2f1c;
+    --ink: #f4ead2;
+    --muted: #9c8b6e;
+    --brand: #f5a316;
+    --brand-deep: #8f5400;
+    --brand-soft: #fbbf24;
+    --brand-tint: rgba(245, 163, 22, 0.14);
+    --locked: #2b2314;
+    --locked-edge: #1d1709;
+    --locked-ink: #6f6146;
+    --path-done: #f2b93e;
+    --path-todo: #3a2f1c;
+    --node-glow: 0 0 22px rgba(251, 191, 36, 0.25);
+    --current-glow: 0 0 36px rgba(245, 163, 22, 0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    color: var(--ink);
+  }
+
+  /* 左右対称レイアウト:
+     両サイドの列を同じ幅にして全体を中央寄せ。マップの列が画面の真ん中に来る。
+     縦の境界線は引かない（線があると非対称に見える） */
+  .layout {
+    max-width: 1280px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 280px minmax(0, 1fr) 280px;
+    gap: 32px;
+    padding: 0 24px;
+  }
+
+  /* ── 左: ナビサイドバー ─────────────── */
+  /* 区切り線は左右で対にする（サイドバー右端とウィジェット列左端、画面中心から等距離） */
+  .sidebar {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    padding: 28px 16px 20px 8px;
+    border-right: 2px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  /* ロゴ・ナビ・ユーザーチップの左端を同じラインに揃える
+     （ナビの実質インセット = 枠2px + padding14px = 16px に合わせる） */
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 24px;
+    font-weight: 800;
+    padding: 0 16px 22px;
+  }
+  .logo img { width: 36px; height: 36px; }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 2px solid transparent;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    cursor: pointer;
+    background: none;
+    font-family: inherit;
+    text-align: left;
+  }
+  .nav-item.active {
+    color: var(--brand-deep);
+    background: var(--brand-tint);
+    border-color: var(--brand-soft);
+  }
+  .nav-item:not(.active):hover { background: var(--bg-deep); }
+  .nav-item .soon {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--locked-ink);
+    background: var(--locked);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .sidebar .spacer { flex: 1; }
+  .user-chip {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 14px;
+    border: 2px solid var(--line);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .user-chip .avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--brand-tint);
+    display: grid;
+    place-items: center;
+    color: var(--brand-deep);
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  /* ── 中央: パス ─────────────────────── */
+  .center { padding: 20px 0 120px; min-width: 0; }
+
+  .chapter-banner {
+    position: sticky;
+    top: 16px;
+    z-index: 20;
+    padding: 18px 24px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-soft));
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 8px 30px rgba(245, 163, 22, 0.35);
+  }
+  .chapter-banner .no {
+    font-size: 12px;
+    font-weight: 800;
+    opacity: 0.9;
+    letter-spacing: 0.1em;
+  }
+  .chapter-banner .name { font-size: 20px; font-weight: 800; }
+
+  .map { position: relative; }
+
+  .chapter { position: relative; }
+  .chapter svg.path {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin: 36px 40px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+  .divider::before,
+  .divider::after {
+    content: "";
+    flex: 1;
+    height: 2px;
+    background: var(--line);
+    border-radius: 2px;
+  }
+
+  /* ── ノード ─────────────────────────── */
+  .node {
+    position: absolute;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: 150px;
+  }
+  .node button.circle {
+    width: 76px;
+    height: 76px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: transform 0.1s;
+    box-shadow: var(--node-glow);
+  }
+  .node button.circle:active { transform: translateY(3px); }
+
+  .node.cleared button.circle {
+    background: var(--brand-soft);
+    border-bottom: 6px solid #d98a06;
+    color: #fff;
+  }
+  .node.current button.circle {
+    width: 92px;
+    height: 92px;
+    background: var(--panel);
+    border: 5px solid var(--brand);
+    border-bottom-width: 10px;
+    color: var(--brand);
+    position: relative;
+    box-shadow: var(--current-glow);
+  }
+  .node.current .halo {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 4px solid var(--brand);
+    animation: halo 1.8s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes halo {
+    0%   { transform: scale(1); opacity: 0.55; }
+    100% { transform: scale(1.45); opacity: 0; }
+  }
+  .node.locked button.circle {
+    background: var(--locked);
+    border-bottom: 6px solid var(--locked-edge);
+    color: var(--locked-ink);
+    cursor: default;
+    box-shadow: none; /* 未解放は光らせない */
+  }
+
+  .node .label { text-align: center; line-height: 1.35; }
+  .node .label .stage-no {
+    display: block;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .node .label .stage-title { font-size: 14px; font-weight: 700; }
+  .node.locked .label .stage-title { color: var(--locked-ink); }
+
+  .start-bubble {
+    position: absolute;
+    top: -48px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--panel);
+    border: 2px solid var(--brand);
+    color: var(--brand);
+    font-size: 14px;
+    font-weight: 800;
+    padding: 7px 16px;
+    border-radius: 999px;
+    white-space: nowrap;
+    animation: bob 1.2s ease-in-out infinite;
+  }
+  .start-bubble::after {
+    content: "";
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background: var(--panel);
+    border-right: 2px solid var(--brand);
+    border-bottom: 2px solid var(--brand);
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(-5px); }
+  }
+
+  .mascot {
+    position: absolute;
+    width: 88px;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+  }
+
+  /* ── ポップオーバー ──────────────────── */
+  .popover {
+    position: absolute;
+    z-index: 40;
+    width: 280px;
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 20px;
+    padding: 20px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
+  }
+  .popover .arrow {
+    position: absolute;
+    bottom: -8px;
+    width: 14px;
+    height: 14px;
+    background: var(--panel);
+    border-right: 2px solid var(--line);
+    border-bottom: 2px solid var(--line);
+    transform: rotate(45deg);
+  }
+  .popover h2 { font-size: 17px; font-weight: 800; margin-bottom: 4px; }
+  .popover .meta {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 16px;
+    background: var(--brand);
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .btn:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .btn.secondary {
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-bottom: 5px solid var(--line);
+    color: var(--muted);
+  }
+
+  /* ── 右: ウィジェット ─────────────────── */
+  .rail {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    padding: 36px 0 20px 18px;
+    border-left: 2px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .widget {
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 20px;
+    padding: 20px;
+  }
+  .widget h3 {
+    font-size: 14px;
+    font-weight: 800;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .widget h3 .tag {
+    font-size: 10px;
+    font-weight: 800;
+    color: var(--brand-deep);
+    background: var(--brand-tint);
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .paws { display: flex; gap: 10px; margin-bottom: 10px; }
+  .paw-slot {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    background: var(--brand-tint);
+    color: var(--brand);
+  }
+  .paw-slot.used { background: var(--locked); color: var(--locked-ink); }
+  .widget .note { font-size: 11px; color: var(--muted); font-weight: 700; }
+
+  .widget.promo {
+    background: linear-gradient(150deg, var(--brand), var(--brand-soft));
+    border: none;
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+  }
+  .widget.promo h3 { color: #fff; margin-bottom: 6px; }
+  .widget.promo p {
+    font-size: 12px;
+    font-weight: 700;
+    opacity: 0.95;
+    margin-bottom: 14px;
+    line-height: 1.6;
+  }
+  .btn.ghost-on-brand {
+    background: #fff;
+    border-bottom: 4px solid rgba(0, 0, 0, 0.18);
+    color: var(--brand-deep);
+  }
+
+  .progress-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 8px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .progress-row strong { font-size: 20px; color: var(--ink); }
+  .bar {
+    height: 12px;
+    border-radius: 999px;
+    background: var(--bg-deep);
+    overflow: hidden;
+  }
+  .bar > span {
+    display: block;
+    height: 100%;
+    width: 30%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-soft));
+  }
+
+  /* ── FAB ────────────────────────────── */
+  .fab {
+    position: fixed;
+    bottom: 28px;
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 13px 22px;
+    border: 2px solid var(--brand);
+    border-bottom-width: 5px;
+    border-radius: 999px;
+    background: var(--panel);
+    color: var(--brand);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(245, 163, 22, 0.3);
+    transform: translateX(-50%);
+    transition: opacity 0.2s, visibility 0.2s;
+  }
+  .fab.hidden { opacity: 0; visibility: hidden; }
+  .fab:active { transform: translateX(-50%) translateY(3px); border-bottom-width: 2px; }
+
+  .backdrop { position: fixed; inset: 0; z-index: 35; display: none; }
+  .backdrop.open { display: block; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+  <!-- 左: ナビ -->
+  <aside class="sidebar">
+    <div class="logo">
+      <img src="../public/character_nobg.png" alt="" />
+      Ferret
+    </div>
+    <button class="nav-item active">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 20l-5.5-2.2V5.6L9 7.8l6-2.2 5.5 2.2v12.2L15 17.8z"/><path d="M9 7.8v12.2M15 5.6v12.2"/></svg>
+      ステージ
+    </button>
+    <button class="nav-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      ふりかえり
+      <span class="soon">準備中</span>
+    </button>
+    <button class="nav-item">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.001a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.001a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      せってい
+    </button>
+    <div class="spacer"></div>
+    <div class="user-chip">
+      <span class="avatar">D</span>
+      dev@ferret.test
+    </div>
+  </aside>
+
+  <!-- 中央: パス -->
+  <main class="center">
+    <div class="chapter-banner" id="chapterBanner">
+      <div>
+        <span class="no" id="bannerNo">第1章</span>
+        <div class="name" id="bannerName">コードの基本</div>
+      </div>
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+    </div>
+    <div class="map" id="map"></div>
+  </main>
+
+  <!-- 右: ウィジェット -->
+  <aside class="rail">
+    <div class="widget">
+      <h3>きょうの AI 採点 <span class="tag">Free</span></h3>
+      <div class="paws" id="quotaPaws"></div>
+      <p class="note">のこり 2 回 ・ 深夜 0 時にもどります</p>
+    </div>
+
+    <div class="widget">
+      <h3>すすみぐあい</h3>
+      <div class="progress-row">
+        <span>クリアしたステージ</span>
+        <strong>3 <span style="font-size:12px;color:var(--muted)">/ 10</span></strong>
+      </div>
+      <div class="bar"><span></span></div>
+    </div>
+
+    <div class="widget promo">
+      <h3>Pro で全ステージ解放</h3>
+      <p>すべてのカリキュラムと AI 採点 月200問。認定証 PDF もついてくる。</p>
+      <button class="btn ghost-on-brand">Pro をみる</button>
+    </div>
+  </aside>
+</div>
+
+<button class="fab hidden" id="fab">
+  <svg id="fabArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="6 9 12 15 18 9"/>
+  </svg>
+  現在地へ
+</button>
+
+<div class="backdrop" id="backdrop"></div>
+
+<script>
+  const CHAPTERS = [
+    {
+      no: 1,
+      title: "コードの基本",
+      stages: [
+        { order: 1, title: "変数の宣言を読む",   type: "トレース", status: "cleared" },
+        { order: 2, title: "条件分岐を追う",     type: "トレース", status: "cleared" },
+        { order: 3, title: "ループの動きを追う", type: "トレース", status: "cleared" },
+        { order: 4, title: "関数の戻り値を読む", type: "トレース", status: "current" },
+        { order: 5, title: "配列メソッドを読む", type: "意図",     status: "locked" },
+      ],
+    },
+    {
+      no: 2,
+      title: "エラー処理を読む",
+      stages: [
+        { order: 6,  title: "try/catch の流れ",   type: "トレース", status: "locked" },
+        { order: 7,  title: "エラーの伝わり方",   type: "影響",     status: "locked" },
+        { order: 8,  title: "非同期のエラー",     type: "トレース", status: "locked" },
+        { order: 9,  title: "ガード節を読む",     type: "意図",     status: "locked" },
+        { order: 10, title: "早期リターンの意図", type: "意図",     status: "locked" },
+      ],
+    },
+  ];
+
+  const ROW_H = 145;
+  const PAD_TOP = 76;
+  const XS = [50, 28, 52, 72, 48, 28, 52, 72, 48, 28];
+  const xOf = (order) => XS[(order - 1) % XS.length];
+
+  const ICONS = {
+    check: '<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    lock:  '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    paw:   '<svg width="38" height="38" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="15.5" rx="4.2" ry="3.6"/><circle cx="7" cy="10.5" r="2"/><circle cx="17" cy="10.5" r="2"/><circle cx="9.8" cy="7.4" r="2"/><circle cx="14.2" cy="7.4" r="2"/></svg>',
+    pawSm: '<svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="15.5" rx="4.2" ry="3.6"/><circle cx="7" cy="10.5" r="2"/><circle cx="17" cy="10.5" r="2"/><circle cx="9.8" cy="7.4" r="2"/><circle cx="14.2" cy="7.4" r="2"/></svg>',
+  };
+
+  // 右レール: きょうの採点残り（3枠中1つ消費）
+  document.getElementById("quotaPaws").innerHTML =
+    ['used', '', ''].map(c => `<span class="paw-slot ${c}">${ICONS.pawSm}</span>`).join("");
+
+  const map = document.getElementById("map");
+  const backdrop = document.getElementById("backdrop");
+  let openPopover = null;
+  let currentNodeEl = null;
+
+  [...CHAPTERS].reverse().forEach((chapter, ci) => {
+    const section = document.createElement("section");
+    section.className = "chapter";
+    section.dataset.no = chapter.no;
+    section.dataset.title = chapter.title;
+
+    const stages = [...chapter.stages].sort((a, b) => b.order - a.order);
+    const height = stages.length * ROW_H + PAD_TOP;
+    section.style.height = height + "px";
+
+    let lines = "";
+    stages.forEach((s, i) => {
+      const next = stages[i + 1];
+      if (!next) return;
+      const done = next.status === "cleared";
+      lines += `<line
+        x1="${xOf(next.order)}%" y1="${PAD_TOP + (i + 1) * ROW_H}"
+        x2="${xOf(s.order)}%"    y2="${PAD_TOP + i * ROW_H + 38}"
+        stroke="${done ? "var(--path-done)" : "var(--path-todo)"}"
+        stroke-width="6" stroke-linecap="round"
+        ${done ? "" : 'stroke-dasharray="1 15"'} />`;
+    });
+    section.innerHTML = `<svg class="path">${lines}</svg>`;
+
+    stages.forEach((s, i) => {
+      const node = document.createElement("div");
+      node.className = "node " + s.status;
+      node.style.top = PAD_TOP + i * ROW_H - (s.status === "current" ? 8 : 0) + "px";
+      node.style.left = xOf(s.order) + "%";
+
+      const icon =
+        s.status === "cleared" ? ICONS.check :
+        s.status === "current" ? ICONS.paw : ICONS.lock;
+
+      node.innerHTML = `
+        <button class="circle" ${s.status === "locked" ? "disabled" : ""}>
+          ${s.status === "current" ? '<span class="halo"></span>' : ""}
+          ${icon}
+        </button>
+        <span class="label">
+          <span class="stage-no">STAGE ${s.order}</span>
+          <span class="stage-title">${s.title}</span>
+        </span>
+        ${s.status === "current" ? '<span class="start-bubble">スタート</span>' : ""}`;
+
+      if (s.status === "current") {
+        currentNodeEl = node;
+        const mascot = document.createElement("img");
+        mascot.className = "mascot";
+        mascot.src = "../public/character_nobg.png";
+        mascot.style.top = "-2px";
+        if (xOf(s.order) > 50) mascot.style.right = "104px";
+        else mascot.style.left = "104px";
+        node.appendChild(mascot);
+      }
+
+      if (s.status !== "locked") {
+        node.querySelector("button").addEventListener("click", (e) => {
+          e.stopPropagation();
+          showPopover(node, s, section);
+        });
+      }
+      section.appendChild(node);
+    });
+
+    map.appendChild(section);
+
+    if (ci < CHAPTERS.length - 1) {
+      const div = document.createElement("div");
+      div.className = "divider";
+      div.textContent = `ここから 第${chapter.no}章`;
+      map.appendChild(div);
+    }
+  });
+
+  function showPopover(node, stage, section) {
+    closePopover();
+    const pop = document.createElement("div");
+    pop.className = "popover";
+    const isCleared = stage.status === "cleared";
+    pop.innerHTML = `
+      <h2>${stage.title}</h2>
+      <p class="meta">STAGE ${stage.order} ・ ${stage.type}読解 ・ クリアで +10 XP</p>
+      <button class="btn ${isCleared ? "secondary" : ""}">${isCleared ? "もう一度読む" : "挑む"}</button>`;
+
+    const nodeX = (xOf(stage.order) / 100) * section.clientWidth;
+    const left = Math.min(Math.max(nodeX - 140, 10), section.clientWidth - 290);
+    pop.style.left = left + "px";
+    pop.style.top = node.offsetTop - 136 + "px";
+    pop.insertAdjacentHTML(
+      "beforeend",
+      `<span class="arrow" style="left:${nodeX - left - 7}px"></span>`
+    );
+    section.appendChild(pop);
+    openPopover = pop;
+    backdrop.classList.add("open");
+  }
+  function closePopover() {
+    if (openPopover) openPopover.remove();
+    openPopover = null;
+    backdrop.classList.remove("open");
+  }
+  backdrop.addEventListener("click", closePopover);
+
+  const banner = document.getElementById("chapterBanner");
+  const bannerNo = document.getElementById("bannerNo");
+  const bannerName = document.getElementById("bannerName");
+  function syncBanner() {
+    const y = banner.getBoundingClientRect().bottom + 20;
+    for (const sec of document.querySelectorAll(".chapter")) {
+      const r = sec.getBoundingClientRect();
+      if (r.top <= y && r.bottom >= y) {
+        bannerNo.textContent = `第${sec.dataset.no}章`;
+        bannerName.textContent = sec.dataset.title;
+        break;
+      }
+    }
+  }
+
+  const fab = document.getElementById("fab");
+  const fabArrow = document.getElementById("fabArrow");
+  function syncFab() {
+    const r = currentNodeEl.getBoundingClientRect();
+    const out = r.bottom < 90 || r.top > innerHeight - 40;
+    fab.classList.toggle("hidden", !out);
+    fabArrow.style.transform = r.bottom < 90 ? "rotate(180deg)" : "";
+    // FAB はパス列の真ん中に置く
+    const m = map.getBoundingClientRect();
+    fab.style.left = m.left + m.width / 2 + "px";
+  }
+  fab.addEventListener("click", () =>
+    currentNodeEl.scrollIntoView({ behavior: "smooth", block: "center" })
+  );
+
+  addEventListener("scroll", () => { syncBanner(); syncFab(); }, { passive: true });
+  addEventListener("resize", syncFab);
+
+  currentNodeEl.scrollIntoView({ block: "center" });
+  syncBanner();
+  syncFab();
+</script>
+</body>
+</html>

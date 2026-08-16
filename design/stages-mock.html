@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferret — ステージ選択モック</title>
+<!--
+  ステージ選択画面のデザインモック（実装非依存・単体で開ける）。
+
+  検証したい方向性:
+  - ダーク全面 → 暖色クリーム背景 + アンバーのブランド色（コードだけダークの方針は維持）
+  - 絵文字 → SVG アイコン
+  - フラットボタン → 下辺が濃い「押し込み」ボタン
+  - 中央モーダル → ノードにアンカーされたポップオーバー
+  - 章バナー（sticky・スクロールで現在の章に追従）
+  - 起動時に現在地へ自動スクロール / 離れたら「現在地へ」FAB
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fdf8ec;          /* アプリ背景（クリーム） */
+    --bg-deep: #f1e8d2;     /* ページ余白 */
+    --line: #ece0c6;        /* 枠線 */
+    --ink: #4a3b28;         /* 本文（こげ茶） */
+    --muted: #a3937a;       /* 補助テキスト */
+    --brand: #f59e0b;       /* アンバー */
+    --brand-deep: #c47000;  /* ボタン下辺・押し込み */
+    --brand-soft: #fbbf24;  /* クリア済みノード */
+    --brand-tint: #fdeaC0;
+    --locked: #e9e0cb;
+    --locked-edge: #d4c8ab;
+    --locked-ink: #b5a88c;
+    --path-done: #f2c14e;
+    --path-todo: #ddd1b4;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg-deep);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    color: var(--ink);
+  }
+
+  /* スマホ幅のアプリ枠 */
+  .app {
+    max-width: 430px;
+    min-height: 100dvh;
+    margin: 0 auto;
+    background: var(--bg);
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+    position: relative;
+  }
+
+  /* ── ステータスバー ─────────────────── */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg);
+    border-bottom: 2px solid var(--line);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: 0.02em;
+  }
+  .brand img { width: 30px; height: 30px; }
+  .icon-btn {
+    width: 40px;
+    height: 40px;
+    border: none;
+    border-radius: 12px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+  }
+  .icon-btn:hover { background: var(--brand-tint); color: var(--ink); }
+
+  /* ── 章バナー（sticky・スクロールに追従して差し替わる） ── */
+  .chapter-banner {
+    position: sticky;
+    top: 66px;
+    z-index: 20;
+    margin: 12px 16px;
+    padding: 14px 18px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, var(--brand), var(--brand-soft));
+    border-bottom: 4px solid var(--brand-deep);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    box-shadow: 0 6px 18px rgba(196, 112, 0, 0.18);
+  }
+  .chapter-banner .no {
+    font-size: 11px;
+    font-weight: 800;
+    opacity: 0.9;
+    letter-spacing: 0.1em;
+  }
+  .chapter-banner .name { font-size: 17px; font-weight: 800; }
+
+  /* ── マップ ─────────────────────────── */
+  .map { padding: 8px 0 96px; }
+
+  .chapter { position: relative; }
+  .chapter svg.path {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    overflow: visible;
+    pointer-events: none;
+  }
+
+  /* 章の区切り帯 */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 28px 24px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+  }
+  .divider::before,
+  .divider::after {
+    content: "";
+    flex: 1;
+    height: 2px;
+    background: var(--line);
+    border-radius: 2px;
+  }
+
+  /* ── ノード ─────────────────────────── */
+  .node {
+    position: absolute;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    width: 120px;
+  }
+  .node button.circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    transition: transform 0.1s;
+  }
+  .node button.circle:active { transform: translateY(3px); }
+
+  .node.cleared button.circle {
+    background: var(--brand-soft);
+    border-bottom: 5px solid #d98a06;
+    color: #fff;
+  }
+  .node.current button.circle {
+    width: 80px;
+    height: 80px;
+    background: #fff;
+    border: 5px solid var(--brand);
+    border-bottom-width: 9px;
+    color: var(--brand);
+    position: relative;
+  }
+  /* 現在地のパルス（輪が広がる） */
+  .node.current .halo {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 4px solid var(--brand);
+    animation: halo 1.8s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes halo {
+    0%   { transform: scale(1); opacity: 0.55; }
+    100% { transform: scale(1.45); opacity: 0; }
+  }
+  .node.locked button.circle {
+    background: var(--locked);
+    border-bottom: 5px solid var(--locked-edge);
+    color: var(--locked-ink);
+    cursor: default;
+  }
+
+  .node .label {
+    text-align: center;
+    line-height: 1.3;
+  }
+  .node .label .stage-no {
+    display: block;
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+  }
+  .node .label .stage-title {
+    font-size: 12px;
+    font-weight: 700;
+  }
+  .node.locked .label .stage-title { color: var(--locked-ink); }
+
+  /* スタート吹き出し */
+  .start-bubble {
+    position: absolute;
+    top: -44px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #fff;
+    border: 2px solid var(--brand);
+    color: var(--brand);
+    font-size: 13px;
+    font-weight: 800;
+    padding: 6px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+    animation: bob 1.2s ease-in-out infinite;
+  }
+  .start-bubble::after {
+    content: "";
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 10px;
+    height: 10px;
+    background: #fff;
+    border-right: 2px solid var(--brand);
+    border-bottom: 2px solid var(--brand);
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateX(-50%) translateY(0); }
+    50%      { transform: translateX(-50%) translateY(-5px); }
+  }
+
+  /* 現在地の隣に立つフェレット */
+  .mascot {
+    position: absolute;
+    width: 76px;
+    pointer-events: none;
+    filter: drop-shadow(0 4px 6px rgba(74, 59, 40, 0.2));
+  }
+
+  /* ── ポップオーバー ──────────────────── */
+  .popover {
+    position: absolute;
+    z-index: 40;
+    width: 264px;
+    background: #fff;
+    border: 2px solid var(--line);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 12px 32px rgba(74, 59, 40, 0.16);
+  }
+  .popover .arrow {
+    position: absolute;
+    bottom: -8px;
+    width: 14px;
+    height: 14px;
+    background: #fff;
+    border-right: 2px solid var(--line);
+    border-bottom: 2px solid var(--line);
+    transform: rotate(45deg);
+  }
+  .popover h2 { font-size: 16px; font-weight: 800; margin-bottom: 4px; }
+  .popover .meta {
+    font-size: 12px;
+    color: var(--muted);
+    font-weight: 700;
+    margin-bottom: 14px;
+  }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 13px;
+    border: none;
+    border-radius: 16px;
+    background: var(--brand);
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .btn:active {
+    transform: translateY(3px);
+    border-bottom-width: 2px;
+  }
+  .btn.secondary {
+    background: #fff;
+    border: 2px solid var(--line);
+    border-bottom: 5px solid var(--line);
+    color: var(--muted);
+  }
+
+  /* ── 「現在地へ」FAB ─────────────────── */
+  .fab {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 999px;
+    background: #fff;
+    border: 2px solid var(--brand);
+    border-bottom-width: 5px;
+    color: var(--brand);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 8px 24px rgba(196, 112, 0, 0.22);
+    transition: opacity 0.2s, visibility 0.2s;
+  }
+  .fab.hidden { opacity: 0; visibility: hidden; }
+  .fab:active { transform: translateX(-50%) translateY(3px); border-bottom-width: 2px; }
+
+  .backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 35;
+    display: none;
+  }
+  .backdrop.open { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ステータスバー: 左ロゴ / 右ギア（ログアウトはこの中に格納する想定） -->
+  <header class="topbar">
+    <div class="brand">
+      <img src="../public/character_nobg.png" alt="" />
+      Ferret
+    </div>
+    <button class="icon-btn" aria-label="設定">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"/>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.001a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.001a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+      </svg>
+    </button>
+  </header>
+
+  <!-- 章バナー: スクロール位置の章に追従 -->
+  <div class="chapter-banner" id="chapterBanner">
+    <div>
+      <span class="no" id="bannerNo">第1章</span>
+      <div class="name" id="bannerName">コードの基本</div>
+    </div>
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>
+  </div>
+
+  <main class="map" id="map"></main>
+
+  <button class="fab hidden" id="fab">
+    <svg id="fabArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 12 15 18 9"/>
+    </svg>
+    現在地へ
+  </button>
+
+  <div class="backdrop" id="backdrop"></div>
+</div>
+
+<script>
+  // ── データ（実装の Stage 型に対応: order / title / status）──
+  const CHAPTERS = [
+    {
+      no: 1,
+      title: "コードの基本",
+      stages: [
+        { order: 1, title: "変数の宣言を読む",   type: "トレース", status: "cleared" },
+        { order: 2, title: "条件分岐を追う",     type: "トレース", status: "cleared" },
+        { order: 3, title: "ループの動きを追う", type: "トレース", status: "cleared" },
+        { order: 4, title: "関数の戻り値を読む", type: "トレース", status: "current" },
+        { order: 5, title: "配列メソッドを読む", type: "意図",     status: "locked" },
+      ],
+    },
+    {
+      no: 2,
+      title: "エラー処理を読む",
+      stages: [
+        { order: 6,  title: "try/catch の流れ",   type: "トレース", status: "locked" },
+        { order: 7,  title: "エラーの伝わり方",   type: "影響",     status: "locked" },
+        { order: 8,  title: "非同期のエラー",     type: "トレース", status: "locked" },
+        { order: 9,  title: "ガード節を読む",     type: "意図",     status: "locked" },
+        { order: 10, title: "早期リターンの意図", type: "意図",     status: "locked" },
+      ],
+    },
+  ];
+
+  const ROW_H = 128;
+  const PAD_TOP = 56;
+  // 蛇行（% 位置）。order-1 で引く
+  const XS = [50, 26, 52, 76, 48, 26, 52, 76, 48, 26];
+  const xOf = (order) => XS[(order - 1) % XS.length];
+
+  const ICONS = {
+    check: '<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    lock:  '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+    paw:   '<svg width="34" height="34" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="15.5" rx="4.2" ry="3.6"/><circle cx="7" cy="10.5" r="2"/><circle cx="17" cy="10.5" r="2"/><circle cx="9.8" cy="7.4" r="2"/><circle cx="14.2" cy="7.4" r="2"/></svg>',
+  };
+
+  const map = document.getElementById("map");
+  const backdrop = document.getElementById("backdrop");
+  let openPopover = null;
+  let currentNodeEl = null;
+
+  // 章は「上に登る」ので後の章から描画。章内も order 降順（上ほど先）
+  [...CHAPTERS].reverse().forEach((chapter, ci) => {
+    const section = document.createElement("section");
+    section.className = "chapter";
+    section.dataset.no = chapter.no;
+    section.dataset.title = chapter.title;
+
+    const stages = [...chapter.stages].sort((a, b) => b.order - a.order);
+    const height = stages.length * ROW_H + PAD_TOP;
+    section.style.height = height + "px";
+
+    // 道（クリア済み区間は実線・未到達は点線）
+    let lines = "";
+    stages.forEach((s, i) => {
+      const next = stages[i + 1]; // 1つ下（order が1小さい）
+      if (!next) return;
+      const done = next.status === "cleared"; // 下のステージを越えていれば「通った道」
+      lines += `<line
+        x1="${xOf(next.order)}%" y1="${PAD_TOP + (i + 1) * ROW_H}"
+        x2="${xOf(s.order)}%"    y2="${PAD_TOP + i * ROW_H + 34}"
+        stroke="${done ? "var(--path-done)" : "var(--path-todo)"}"
+        stroke-width="6" stroke-linecap="round"
+        ${done ? "" : 'stroke-dasharray="1 14"'} />`;
+    });
+    section.innerHTML = `<svg class="path">${lines}</svg>`;
+
+    stages.forEach((s, i) => {
+      const node = document.createElement("div");
+      node.className = "node " + s.status;
+      node.style.top = PAD_TOP + i * ROW_H - (s.status === "current" ? 8 : 0) + "px";
+      node.style.left = xOf(s.order) + "%";
+
+      const icon =
+        s.status === "cleared" ? ICONS.check :
+        s.status === "current" ? ICONS.paw : ICONS.lock;
+
+      node.innerHTML = `
+        <button class="circle" ${s.status === "locked" ? "disabled" : ""}>
+          ${s.status === "current" ? '<span class="halo"></span>' : ""}
+          ${icon}
+        </button>
+        <span class="label">
+          <span class="stage-no">STAGE ${s.order}</span>
+          <span class="stage-title">${s.title}</span>
+        </span>
+        ${s.status === "current" ? '<span class="start-bubble">スタート</span>' : ""}`;
+
+      if (s.status === "current") {
+        currentNodeEl = node;
+        // フェレットはノードの空いている側に立たせる
+        const mascot = document.createElement("img");
+        mascot.className = "mascot";
+        mascot.src = "../public/character_nobg.png";
+        mascot.style.top = "-6px";
+        if (xOf(s.order) > 50) mascot.style.right = "88px";
+        else mascot.style.left = "88px";
+        node.appendChild(mascot);
+      }
+
+      if (s.status !== "locked") {
+        node.querySelector("button").addEventListener("click", (e) => {
+          e.stopPropagation();
+          showPopover(node, s, section);
+        });
+      }
+      section.appendChild(node);
+    });
+
+    map.appendChild(section);
+
+    // 章の区切り帯（章と章の間にだけ入れる）
+    if (ci < CHAPTERS.length - 1) {
+      const div = document.createElement("div");
+      div.className = "divider";
+      div.textContent = `ここから 第${chapter.no}章`;
+      map.appendChild(div);
+    }
+  });
+
+  // ── ポップオーバー（ノードにアンカー・外側タップで閉じる）──
+  function showPopover(node, stage, section) {
+    closePopover();
+    const pop = document.createElement("div");
+    pop.className = "popover";
+    const isCleared = stage.status === "cleared";
+    pop.innerHTML = `
+      <h2>${stage.title}</h2>
+      <p class="meta">STAGE ${stage.order} ・ ${stage.type}読解 ・ クリアで +10 XP</p>
+      <button class="btn ${isCleared ? "secondary" : ""}">${isCleared ? "もう一度読む" : "挑む"}</button>`;
+
+    // ノードの上に出す。左右は画面からはみ出さない範囲に収める
+    const nodeX = (xOf(stage.order) / 100) * section.clientWidth;
+    const left = Math.min(Math.max(nodeX - 132, 10), section.clientWidth - 274);
+    pop.style.left = left + "px";
+    pop.style.top = node.offsetTop - 130 + "px";
+    pop.insertAdjacentHTML(
+      "beforeend",
+      `<span class="arrow" style="left:${nodeX - left - 7}px"></span>`
+    );
+    section.appendChild(pop);
+    openPopover = pop;
+    backdrop.classList.add("open");
+  }
+  function closePopover() {
+    if (openPopover) openPopover.remove();
+    openPopover = null;
+    backdrop.classList.remove("open");
+  }
+  backdrop.addEventListener("click", closePopover);
+
+  // ── 章バナーの追従: バナー位置に重なっている章を表示 ──
+  const banner = document.getElementById("chapterBanner");
+  const bannerNo = document.getElementById("bannerNo");
+  const bannerName = document.getElementById("bannerName");
+  function syncBanner() {
+    const y = banner.getBoundingClientRect().bottom + 20;
+    for (const sec of document.querySelectorAll(".chapter")) {
+      const r = sec.getBoundingClientRect();
+      if (r.top <= y && r.bottom >= y) {
+        bannerNo.textContent = `第${sec.dataset.no}章`;
+        bannerName.textContent = sec.dataset.title;
+        break;
+      }
+    }
+  }
+
+  // ── 現在地へ戻る FAB ──
+  const fab = document.getElementById("fab");
+  const fabArrow = document.getElementById("fabArrow");
+  function syncFab() {
+    const r = currentNodeEl.getBoundingClientRect();
+    const out = r.bottom < 80 || r.top > innerHeight - 40;
+    fab.classList.toggle("hidden", !out);
+    // 現在地が画面より上なら上向き矢印
+    fabArrow.style.transform = r.bottom < 80 ? "rotate(180deg)" : "";
+  }
+  fab.addEventListener("click", () =>
+    currentNodeEl.scrollIntoView({ behavior: "smooth", block: "center" })
+  );
+
+  addEventListener("scroll", () => { syncBanner(); syncFab(); }, { passive: true });
+
+  // 起動時: 現在地を画面内に
+  currentNodeEl.scrollIntoView({ block: "center" });
+  syncBanner();
+  syncFab();
+</script>
+</body>
+</html>

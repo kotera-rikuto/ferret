@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferret — 問題サンプル6型（デスクトップ・ライト）</title>
+<!--
+  読解型6種（トレース/意図/ズレ/影響/命名/仕様）の具体的な問題を
+  実際の問題画面レイアウトに流し込んで確認するモック。
+  上部のグレーの帯はモック専用の切替UI（プロダクトには存在しない）。
+
+  題材は 問題作成ガイド.md のルールに従い実務由来で自作。
+  ステージ対応は同ガイドの「6問検証」の推奨に合わせた:
+    トレース=1 / 意図=15 / ズレ=5 / 影響=59 / 命名=53 / 仕様=78
+  レイアウト上の論点:
+    - 影響型: コード + 実行ログの2パネル
+    - 命名型: 関数の中身を隠す表現
+    - 仕様型: テストコード（ファイル名ヘッダ）
+    - ズレ型: 意図コメントを含む長めのコード
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fdf8ec;
+    --panel: #ffffff;
+    --line: #ece0c6;
+    --ink: #4a3b28;
+    --muted: #a3937a;
+    --brand: #f59e0b;
+    --brand-deep: #c47000;
+    --brand-tint: #fdeac0;
+    --locked: #e9e0cb;
+    --locked-ink: #b5a88c;
+    --code-bg: #211b12;
+    --code-ink: #ece2cd;
+    --code-key: #f5a316;
+    --code-fn: #8fc1ee;
+    --code-num: #ef9e7e;
+    --code-str: #b3d68f;
+    --code-muted: #7d715a;
+    --code-err: #f08d8d;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    color: var(--ink);
+  }
+
+  /* ── モック専用: 読解型の切替帯 ── */
+  .mock-switch {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: #efe9da;
+    border-bottom: 2px dashed #cfc4a8;
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--muted);
+    flex-wrap: wrap;
+  }
+  .mock-switch .label { margin-right: 6px; }
+  .mock-switch button {
+    padding: 6px 14px;
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: transparent;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .mock-switch button.active {
+    background: var(--panel);
+    border-color: var(--brand);
+    color: var(--brand-deep);
+  }
+
+  /* ── 上部バー ── */
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: grid;
+    grid-template-columns: 56px 1fr 56px;
+    align-items: center;
+    padding: 14px 20px;
+    background: var(--bg);
+    border-bottom: 2px solid var(--line);
+  }
+  .close {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border-radius: 12px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .close:hover { background: var(--brand-tint); color: var(--ink); }
+  .topbar .title {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+  }
+  .topbar .stage-no { color: var(--muted); letter-spacing: 0.08em; font-size: 12px; }
+  .type-chip {
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--brand-tint);
+    color: var(--brand-deep);
+  }
+
+  main {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 36px 24px 160px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── コード/ログパネル ── */
+  .code-panel {
+    background: var(--code-bg);
+    border-radius: 18px;
+    border-bottom: 5px solid #120e08;
+    overflow: hidden;
+  }
+  .code-panel .code-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+    color: var(--code-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+  }
+  .code-panel .code-head .err { color: var(--code-err); }
+  .code-panel pre {
+    padding: 18px 22px 22px;
+    overflow-x: auto;
+    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-size: 14px;
+    line-height: 1.9;
+    color: var(--code-ink);
+  }
+  .k { color: var(--code-key); }
+  .f { color: var(--code-fn); }
+  .n { color: var(--code-num); }
+  .s { color: var(--code-str); }
+  .c { color: var(--code-muted); }
+  .e { color: var(--code-err); }
+
+  .question { font-size: 16px; font-weight: 800; line-height: 1.8; }
+
+  .answer { display: flex; flex-direction: column; gap: 8px; }
+  textarea {
+    min-height: 170px;
+    padding: 16px 18px;
+    border: 2px solid var(--line);
+    border-radius: 18px;
+    background: var(--panel);
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.9;
+    color: var(--ink);
+    outline: none;
+    resize: vertical;
+  }
+  textarea:focus { border-color: var(--brand); }
+  textarea::placeholder { color: var(--locked-ink); }
+  .counter { align-self: flex-end; font-size: 12px; font-weight: 700; color: var(--muted); }
+
+  /* ── 下部固定フッター ── */
+  .actionbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    background: var(--panel);
+    border-top: 2px solid var(--line);
+  }
+  .actionbar .inner {
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+  }
+  .notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .btn {
+    padding: 14px 48px;
+    border: none;
+    border-radius: 16px;
+    background: var(--brand);
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .btn:disabled {
+    background: var(--locked);
+    border-bottom-color: #d4c8ab;
+    color: var(--locked-ink);
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  /* ── 採点待ち ── */
+  .loading {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    background: rgba(253, 248, 236, 0.96);
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+  }
+  .loading.open { display: flex; }
+  .loading img { width: 150px; animation: sniff 1s ease-in-out infinite; }
+  @keyframes sniff {
+    0%, 100% { transform: rotate(-3deg) translateY(0); }
+    50%      { transform: rotate(3deg) translateY(-8px); }
+  }
+  .loading p { font-size: 16px; font-weight: 800; }
+  .dots { display: flex; gap: 8px; }
+  .dots span {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--brand);
+    animation: blink 1.2s ease-in-out infinite;
+  }
+  .dots span:nth-child(2) { animation-delay: 0.2s; }
+  .dots span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes blink {
+    0%, 100% { opacity: 0.25; transform: scale(0.9); }
+    50%      { opacity: 1; transform: scale(1.15); }
+  }
+</style>
+</head>
+<body>
+
+  <div class="mock-switch" id="mockSwitch">
+    <span class="label">モック確認用 ─ 読解型:</span>
+  </div>
+
+  <header class="topbar">
+    <a class="close" href="stages-desktop-light.html" aria-label="中断してマップへ">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </a>
+    <div class="title">
+      <span class="stage-no" id="stageNo"></span>
+      <span id="stageTitle"></span>
+      <span class="type-chip" id="typeChip"></span>
+    </div>
+    <span></span>
+  </header>
+
+  <main>
+    <div id="panels"></div>
+    <p class="question" id="questionText"></p>
+    <div class="answer">
+      <textarea id="answerInput" maxlength="600"></textarea>
+      <span class="counter"><span id="charCount">0</span> / 600</span>
+    </div>
+  </main>
+
+  <footer class="actionbar">
+    <div class="inner">
+      <p class="notice">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+        回答は採点のため OpenAI に送信されます。個人情報やひみつのコードは書かないでください。
+      </p>
+      <button class="btn" id="submitBtn" disabled>回答する</button>
+    </div>
+  </footer>
+
+  <div class="loading" id="loading">
+    <img src="../public/character_nobg.png" alt="" />
+    <p>フェレットがコードを読んでいます</p>
+    <div class="dots"><span></span><span></span><span></span></div>
+  </div>
+
+  <!-- ══ トレース / STAGE 1（問題作成ガイドの記入例そのまま） ══ -->
+  <template id="tpl-trace">
+    <div class="code-panel">
+      <div class="code-head"><span>JAVASCRIPT</span><span>読んでみよう</span></div>
+      <pre><code><span class="k">function</span> <span class="f">applyCoupon</span>(price) {
+  <span class="k">const</span> rate = <span class="n">0.9</span>;
+  <span class="k">let</span> total = price;
+  total = total * rate;
+  rate = <span class="n">0.8</span>;
+  <span class="k">return</span> total;
+}
+
+<span class="f">console</span>.<span class="f">log</span>(<span class="f">applyCoupon</span>(<span class="n">1000</span>));</code></pre>
+    </div>
+  </template>
+
+  <!-- ══ 意図 / STAGE 15 ══ -->
+  <template id="tpl-intent">
+    <div class="code-panel">
+      <div class="code-head"><span>JAVASCRIPT</span><span>読んでみよう</span></div>
+      <pre><code><span class="k">function</span> <span class="f">calcShipping</span>(subtotal, region) {
+  <span class="k">if</span> (subtotal &gt;= <span class="n">5000</span>) <span class="k">return</span> <span class="n">0</span>;
+
+  <span class="k">if</span> (region === <span class="s">"okinawa"</span> || region === <span class="s">"hokkaido"</span>) {
+    <span class="k">return</span> <span class="n">1200</span>;
+  }
+
+  <span class="k">return</span> <span class="n">700</span>;
+}</code></pre>
+    </div>
+  </template>
+
+  <!-- ══ ズレ / STAGE 5（意図コメント vs 実装） ══ -->
+  <template id="tpl-gap">
+    <div class="code-panel">
+      <div class="code-head"><span>JAVASCRIPT</span><span>読んでみよう</span></div>
+      <pre><code><span class="c">// 会員ランクごとの割引後の金額を「試算」する。</span>
+<span class="c">// 元の注文データは変更しない想定。</span>
+<span class="k">function</span> <span class="f">previewDiscount</span>(order, rate) {
+  order.total = Math.<span class="f">round</span>(order.total * (<span class="n">1</span> - rate));
+  <span class="k">return</span> order;
+}
+
+<span class="k">const</span> order = { id: <span class="n">101</span>, total: <span class="n">3000</span> };
+<span class="k">const</span> preview = <span class="f">previewDiscount</span>(order, <span class="n">0.1</span>);
+
+<span class="f">console</span>.<span class="f">log</span>(preview.total); <span class="c">// 2700</span>
+<span class="f">console</span>.<span class="f">log</span>(order.total);   <span class="c">// ← ?</span></code></pre>
+    </div>
+  </template>
+
+  <!-- ══ 影響 / STAGE 59（コード + 実行ログの2パネル） ══ -->
+  <template id="tpl-impact">
+    <div class="code-panel">
+      <div class="code-head"><span>notify.js</span><span>読んでみよう</span></div>
+      <pre><code><span class="k">function</span> <span class="f">buildMessage</span>(user) {
+  <span class="k">return</span> <span class="s">`${user.name} さんの申請が承認されました`</span>;
+}
+
+<span class="k">function</span> <span class="f">notifyApproval</span>(userId) {
+  <span class="k">const</span> user = <span class="f">findUser</span>(userId); <span class="c">// 見つからないと undefined を返す</span>
+  <span class="k">return</span> <span class="f">buildMessage</span>(user);
+}</code></pre>
+    </div>
+    <div class="code-panel" style="margin-top: 16px;">
+      <div class="code-head"><span>実行時のログ</span><span class="err">ERROR</span></div>
+      <pre><code><span class="e">TypeError: Cannot read properties of undefined (reading 'name')</span>
+    at buildMessage (<span class="f">notify.js:2:14</span>)
+    at notifyApproval (<span class="f">notify.js:7:10</span>)
+    at approve (<span class="f">approval.js:12:5</span>)</code></pre>
+    </div>
+  </template>
+
+  <!-- ══ 命名 / STAGE 53（中身を見せない） ══ -->
+  <template id="tpl-naming">
+    <div class="code-panel">
+      <div class="code-head"><span>articles.js</span><span>中身は伏せてあります</span></div>
+      <pre><code><span class="c">/** 下書き記事を公開状態に切り替える。すでに公開済みなら何もしない */</span>
+<span class="k">async function</span> <span class="f">publishArticle</span>(articleId) { <span class="c">/* …… */</span> }
+
+<span class="k">function</span> <span class="f">isPublishable</span>(article) { <span class="c">/* …… */</span> }
+
+<span class="k">function</span> <span class="f">formatPublishedAt</span>(date) { <span class="c">/* …… */</span> }</code></pre>
+    </div>
+  </template>
+
+  <!-- ══ 仕様 / STAGE 78（テストコード） ══ -->
+  <template id="tpl-spec">
+    <div class="code-panel">
+      <div class="code-head"><span>maskEmail.test.js</span><span>Vitest</span></div>
+      <pre><code><span class="k">import</span> { describe, it, expect } <span class="k">from</span> <span class="s">"vitest"</span>;
+<span class="k">import</span> { maskEmail } <span class="k">from</span> <span class="s">"./maskEmail"</span>;
+
+<span class="f">describe</span>(<span class="s">"maskEmail"</span>, () <span class="k">=&gt;</span> {
+  <span class="f">it</span>(<span class="s">"ローカル部の2文字目以降を伏せる"</span>, () <span class="k">=&gt;</span> {
+    <span class="f">expect</span>(<span class="f">maskEmail</span>(<span class="s">"taro@example.com"</span>)).<span class="f">toBe</span>(<span class="s">"t***@example.com"</span>);
+  });
+
+  <span class="f">it</span>(<span class="s">"1文字のローカル部はそのまま返す"</span>, () <span class="k">=&gt;</span> {
+    <span class="f">expect</span>(<span class="f">maskEmail</span>(<span class="s">"a@example.com"</span>)).<span class="f">toBe</span>(<span class="s">"a@example.com"</span>);
+  });
+
+  <span class="f">it</span>(<span class="s">"@ が無い文字列には null を返す"</span>, () <span class="k">=&gt;</span> {
+    <span class="f">expect</span>(<span class="f">maskEmail</span>(<span class="s">"not-an-email"</span>)).<span class="f">toBe</span>(<span class="k">null</span>);
+  });
+});</code></pre>
+    </div>
+  </template>
+
+<script>
+  const PROBLEMS = [
+    {
+      key: "トレース",
+      tpl: "tpl-trace",
+      stage: "STAGE 1",
+      title: "const と let ─ 再代入できる箱・できない箱",
+      question: "このコードを実行すると何が起きますか。",
+      placeholder: "例: ○○が起きる。なぜなら…",
+    },
+    {
+      key: "意図",
+      tpl: "tpl-intent",
+      stage: "STAGE 15",
+      title: "関数宣言 ─ 入口と出口を掴む",
+      question: "この関数を書いた人は、どういう送料のルールを実現しようとしていますか。引数と戻り値が何を表しているかにも触れて説明してください。",
+      placeholder: "例: この関数は○○のために、△△を受け取って…",
+    },
+    {
+      key: "ズレ",
+      tpl: "tpl-gap",
+      stage: "STAGE 5",
+      title: "参照が共有されたまま渡される関数を読む",
+      question: "コメントに書かれた意図と実装のあいだに食い違いがあります。どこが、どう食い違っているのか説明してください。",
+      placeholder: "例: コメントは○○のつもりだが、実装は…",
+    },
+    {
+      key: "影響",
+      tpl: "tpl-impact",
+      stage: "STAGE 59",
+      title: "スタックトレースを読む",
+      question: "エラーが「発生した箇所」と「根本の原因がある箇所」はそれぞれどこですか。ログのどの行を根拠にしたかも書いてください。",
+      placeholder: "例: 発生したのは○○だが、原因は…",
+    },
+    {
+      key: "命名",
+      tpl: "tpl-naming",
+      stage: "STAGE 53",
+      title: "命名とコメントから意図を読む",
+      question: "isPublishable は、何を受け取り、何を返し、どういう役割を担う関数だと読めますか。名前や周囲のコードのどこからそう判断したかも書いてください。",
+      placeholder: "例: 名前から○○を受け取って△△を返すと読める。根拠は…",
+    },
+    {
+      key: "仕様",
+      tpl: "tpl-spec",
+      stage: "STAGE 78",
+      title: "テストコードを読む ─ テストから仕様を答える",
+      question: "テストだけを根拠に、maskEmail がどういう契約（入力と出力のルール）を持つ関数なのか説明してください。",
+      placeholder: "例: maskEmail は○○を受け取り、△△の場合は…",
+    },
+  ];
+
+  const panels = document.getElementById("panels");
+  const stageNo = document.getElementById("stageNo");
+  const stageTitle = document.getElementById("stageTitle");
+  const typeChip = document.getElementById("typeChip");
+  const questionText = document.getElementById("questionText");
+  const input = document.getElementById("answerInput");
+  const count = document.getElementById("charCount");
+  const btn = document.getElementById("submitBtn");
+  const switchBar = document.getElementById("mockSwitch");
+
+  function show(problem, button) {
+    panels.innerHTML = "";
+    panels.appendChild(document.getElementById(problem.tpl).content.cloneNode(true));
+    stageNo.textContent = problem.stage;
+    stageTitle.textContent = problem.title;
+    typeChip.textContent = problem.key;
+    questionText.textContent = problem.question;
+    input.value = "";
+    input.placeholder = problem.placeholder;
+    count.textContent = "0";
+    btn.disabled = true;
+    switchBar.querySelectorAll("button").forEach((b) => b.classList.remove("active"));
+    button.classList.add("active");
+  }
+
+  PROBLEMS.forEach((p, i) => {
+    const b = document.createElement("button");
+    b.textContent = p.key;
+    b.addEventListener("click", () => show(p, b));
+    switchBar.appendChild(b);
+    if (i === 0) show(p, b);
+  });
+
+  input.addEventListener("input", () => {
+    count.textContent = input.value.length;
+    btn.disabled = input.value.trim().length < 10;
+  });
+
+  btn.addEventListener("click", () => {
+    document.getElementById("loading").classList.add("open");
+    setTimeout(() => (location.href = "result-desktop-light.html"), 2400);
+  });
+</script>
+</body>
+</html>

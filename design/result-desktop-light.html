@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Ferret — リザルト（デスクトップ・ライト）</title>
+<!--
+  リザルト画面モック。主流パターン:
+  - 巨大なスコア1つではなく統計チップに分散（0点でも拾える数字が並ぶ = 罰に見えない）
+  - 主ボタンは「次のステージへ」1本。もう一度/ふりかえりはテキストリンクに格下げ
+  - フィードバックは v3 の praise / next_focus の2枠で表示
+  - スコアはカウントアップ、XPバーはアニメーション
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #fdf8ec;
+    --panel: #ffffff;
+    --line: #ece0c6;
+    --ink: #4a3b28;
+    --muted: #a3937a;
+    --brand: #f59e0b;
+    --brand-deep: #c47000;
+    --brand-soft: #fbbf24;
+    --brand-tint: #fdeac0;
+    --locked: #e9e0cb;
+    --locked-ink: #b5a88c;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    font-family: "M PLUS Rounded 1c", "Hiragino Maru Gothic ProN", sans-serif;
+    color: var(--ink);
+    overflow-x: hidden;
+  }
+
+  main {
+    max-width: 620px;
+    margin: 0 auto;
+    min-height: 100dvh;
+    padding: 48px 24px 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+  }
+
+  .mascot {
+    width: 140px;
+    animation: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    filter: drop-shadow(0 8px 18px rgba(74, 59, 40, 0.18));
+  }
+  @keyframes pop {
+    from { transform: scale(0.4); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  h1 {
+    font-size: 40px;
+    font-weight: 800;
+    color: var(--brand-deep);
+    letter-spacing: 0.04em;
+  }
+
+  /* ── 統計チップ ── */
+  .chips { display: flex; gap: 14px; width: 100%; }
+  .chip {
+    flex: 1;
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-bottom-width: 5px;
+    border-radius: 18px;
+    overflow: hidden;
+    text-align: center;
+  }
+  .chip .chip-label {
+    display: block;
+    padding: 7px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    background: var(--brand);
+    color: #fff;
+  }
+  .chip.alt .chip-label { background: var(--brand-soft); }
+  .chip .chip-value {
+    display: block;
+    padding: 14px 6px 16px;
+    font-size: 28px;
+    font-weight: 800;
+  }
+  .chip .chip-value small { font-size: 13px; color: var(--muted); font-weight: 700; }
+
+  /* ── XP バー ── */
+  .xp {
+    width: 100%;
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 18px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+  .xp .paw { color: var(--brand); flex-shrink: 0; }
+  .xp .bar {
+    flex: 1;
+    height: 16px;
+    border-radius: 999px;
+    background: var(--brand-tint);
+    overflow: hidden;
+  }
+  .xp .bar span {
+    display: block;
+    height: 100%;
+    width: 0%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, var(--brand), var(--brand-soft));
+    transition: width 1s cubic-bezier(0.22, 1, 0.36, 1) 0.5s;
+  }
+  .xp .gain { font-size: 14px; font-weight: 800; color: var(--brand-deep); white-space: nowrap; }
+
+  /* ── フェレットのメモ（AIフィードバック） ── */
+  .feedback {
+    width: 100%;
+    background: var(--panel);
+    border: 2px solid var(--line);
+    border-radius: 20px;
+    padding: 22px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .feedback h2 {
+    font-size: 14px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .feedback h2 img { width: 26px; height: 26px; }
+  .fb-block { display: flex; flex-direction: column; gap: 6px; }
+  .fb-block .fb-tag {
+    align-self: flex-start;
+    font-size: 11px;
+    font-weight: 800;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: var(--brand-tint);
+    color: var(--brand-deep);
+  }
+  .fb-block p { font-size: 14px; font-weight: 500; line-height: 1.9; }
+
+  /* ── ボタン ── */
+  .actions { width: 100%; display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
+  .btn {
+    display: block;
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 16px;
+    background: var(--brand);
+    border-bottom: 5px solid var(--brand-deep);
+    color: #fff;
+    text-align: center;
+    text-decoration: none;
+    font-family: inherit;
+    font-size: 16px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+  .btn:active { transform: translateY(3px); border-bottom-width: 2px; }
+  .sub-links {
+    display: flex;
+    justify-content: center;
+    gap: 28px;
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .sub-links a { color: var(--muted); text-decoration: none; }
+  .sub-links a:hover { color: var(--ink); }
+  .sub-links .soon {
+    font-size: 10px;
+    color: var(--locked-ink);
+    background: var(--locked);
+    padding: 2px 7px;
+    border-radius: 999px;
+    margin-left: 4px;
+  }
+
+  /* ── 紙吹雪 ── */
+  .confetti { position: fixed; inset: 0; pointer-events: none; overflow: hidden; }
+  .confetti i {
+    position: absolute;
+    top: -16px;
+    width: 10px;
+    height: 14px;
+    border-radius: 3px;
+    opacity: 0;
+    animation: fall 2.6s ease-in 0.15s forwards;
+  }
+  @keyframes fall {
+    0%   { opacity: 1; transform: translateY(0) rotate(0); }
+    100% { opacity: 0; transform: translateY(105vh) rotate(560deg); }
+  }
+</style>
+</head>
+<body>
+  <div class="confetti" id="confetti"></div>
+
+  <main>
+    <img class="mascot" src="../public/character_nobg.png" alt="" />
+    <h1>クリア！</h1>
+
+    <div class="chips">
+      <div class="chip">
+        <span class="chip-label">スコア</span>
+        <span class="chip-value"><span id="scoreNum">0</span><small> / 100</small></span>
+      </div>
+      <div class="chip alt">
+        <span class="chip-label">キーワード</span>
+        <span class="chip-value">16<small> / 20</small></span>
+      </div>
+      <div class="chip alt">
+        <span class="chip-label">AI 採点</span>
+        <span class="chip-value">56<small> / 80</small></span>
+      </div>
+    </div>
+
+    <div class="xp">
+      <span class="paw">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><ellipse cx="12" cy="15.5" rx="4.2" ry="3.6"/><circle cx="7" cy="10.5" r="2"/><circle cx="17" cy="10.5" r="2"/><circle cx="9.8" cy="7.4" r="2"/><circle cx="14.2" cy="7.4" r="2"/></svg>
+      </span>
+      <div class="bar"><span id="xpFill"></span></div>
+      <span class="gain">+10 XP</span>
+    </div>
+
+    <div class="feedback">
+      <h2><img src="../public/character_nobg.png" alt="" />フェレットのメモ</h2>
+      <div class="fb-block">
+        <span class="fb-tag">よかったところ</span>
+        <p>reduce が呼ばれた時点の配列で合計が決まる、という流れを正しく読めています。あとから push しても total が変わらない理由まで、自分の言葉で説明できているのが良いです。</p>
+      </div>
+      <div class="fb-block">
+        <span class="fb-tag">つぎの一歩</span>
+        <p>reduce の第2引数（初期値 0）が結果にどう効いているかまで触れられると、説明の説得力がさらに上がります。</p>
+      </div>
+    </div>
+
+    <div class="actions">
+      <a class="btn" href="stages-desktop-light.html">次のステージへ</a>
+      <div class="sub-links">
+        <a href="problem-desktop-light.html">もう一度挑む</a>
+        <a href="#">ふりかえる<span class="soon">準備中</span></a>
+      </div>
+    </div>
+  </main>
+
+<script>
+  // スコアのカウントアップ（72点 = キーワード16 + AI採点56、クリア閾値55超え）
+  const target = 72;
+  const el = document.getElementById("scoreNum");
+  const start = performance.now();
+  (function tick(now) {
+    const t = Math.min((now - start) / 900, 1);
+    el.textContent = Math.round(target * (1 - Math.pow(1 - t, 3)));
+    if (t < 1) requestAnimationFrame(tick);
+  })(start);
+
+  // XP バー
+  requestAnimationFrame(() => (document.getElementById("xpFill").style.width = "68%"));
+
+  // 紙吹雪（ブランド系の3色）
+  const colors = ["#f59e0b", "#fbbf24", "#c47000"];
+  const box = document.getElementById("confetti");
+  for (let i = 0; i < 24; i++) {
+    const p = document.createElement("i");
+    p.style.left = (i * 4.1 + 2) % 100 + "%";
+    p.style.background = colors[i % 3];
+    p.style.animationDelay = (i % 8) * 0.12 + "s";
+    p.style.width = 8 + (i % 3) * 3 + "px";
+    box.appendChild(p);
+  }
+</script>
+</body>
+</html>
