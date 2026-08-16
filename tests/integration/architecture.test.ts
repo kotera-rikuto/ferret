@@ -146,4 +146,44 @@ describe("§11 静的検査", () => {
     const gitignore = readFileSync(join(ROOT, ".gitignore"), "utf8");
     expect(gitignore).toMatch(/^\.env\*?/m);
   });
+
+  /**
+   * ソース自体に不可視文字を残さない。
+   *
+   * `app/api/score/route.ts` が「ここを生の文字ではなくコード表記で書いているのは、
+   * ソースコード自体に不可視文字を残さないため（レビューで気づけなくなる）」と
+   * わざわざ書いている方針。テストコードにも同じことが言える
+   * ——実際、この検査を入れる前にテスト側へ生の NUL を書いてしまい、
+   * grep がファイルをバイナリ扱いして検索から消えるという形で表面化した。
+   *
+   * 検査対象にテストも含める。`\u200B` のようなエスケープ表記は文字ではないので通る。
+   */
+  it("I-397 ソースに生の不可視文字が入っていない", () => {
+    const targets = [...SOURCES];
+    for (const dir of ["tests"]) {
+      const base = join(ROOT, dir);
+      if (!existsSync(base)) continue;
+      for (const entry of readdirSync(base, { recursive: true, withFileTypes: true })) {
+        if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) continue;
+        const full = join(entry.parentPath ?? base, entry.name);
+        const text = readFileSync(full, "utf8");
+        targets.push({
+          path: relative(ROOT, full).split(sep).join("/"),
+          text,
+          code: text,
+        });
+      }
+    }
+
+    // 制御文字（タブ・改行・復帰を除く）/ 幅ゼロ・双方向制御 / BOM
+    const invisible = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/;
+    for (const f of targets) {
+      const m = invisible.exec(f.text);
+      const at = m ? f.text.slice(0, m.index).split("\n").length : 0;
+      expect(
+        m,
+        `${f.path}:${at} に生の不可視文字（U+${m?.[0].codePointAt(0)?.toString(16).toUpperCase().padStart(4, "0")}）がある。\\uXXXX 表記に直すこと`,
+      ).toBeNull();
+    }
+  });
 });

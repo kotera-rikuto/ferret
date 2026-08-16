@@ -29,6 +29,8 @@ export type DbState = {
   problemList: ProblemListRow[] | null;
   /** 解放判定に使う回答履歴（session クライアント経由） */
   attempts: AttemptRow[] | null;
+  /** リザルト画面が読む最新の回答。null なら未回答 */
+  resultAttempt: Record<string, unknown> | null;
   /** 採点に使う問題の詳細。null なら 404 */
   problemDetail: Record<string, unknown> | null;
   /** リプレイ検索が返す行。null なら新規採点 */
@@ -48,6 +50,12 @@ export type DbSpy = {
   sessionTables: string[];
   /** session 側の [列名, 値] */
   sessionFilters: Array<[string, unknown]>;
+  /** session 側の select 列 */
+  sessionSelects: string[];
+  /** order() に渡された [列名, オプション] */
+  orders: Array<[string, unknown]>;
+  /** limit() に渡された件数 */
+  limits: number[];
 };
 
 export function emptySpy(): DbSpy {
@@ -57,6 +65,9 @@ export function emptySpy(): DbSpy {
     filters: [],
     sessionTables: [],
     sessionFilters: [],
+    sessionSelects: [],
+    orders: [],
+    limits: [],
   };
 }
 
@@ -65,7 +76,11 @@ export function emptySpy(): DbSpy {
  * eq / gte / order / limit は自分を返し、single / maybeSingle / await で結果を返す。
  * これ1つで5パターンすべてのクエリを賄える。
  */
-function makeChain(result: unknown, onFilter: (column: string, value: unknown) => void) {
+function makeChain(
+  result: unknown,
+  onFilter: (column: string, value: unknown) => void,
+  spy?: DbSpy,
+) {
   const chain = {
     eq(column: string, value: unknown) {
       onFilter(column, value);
@@ -75,8 +90,14 @@ function makeChain(result: unknown, onFilter: (column: string, value: unknown) =
       onFilter(column, value);
       return chain;
     },
-    order: () => chain,
-    limit: () => chain,
+    order(column: string, options?: unknown) {
+      spy?.orders.push([column, options]);
+      return chain;
+    },
+    limit(count: number) {
+      spy?.limits.push(count);
+      return chain;
+    },
     single: () => Promise.resolve(result),
     maybeSingle: () => Promise.resolve(result),
     then(onFulfilled: (v: unknown) => unknown, onRejected?: (e: unknown) => unknown) {
@@ -96,18 +117,23 @@ function makeAdmin(state: DbState, spy: DbSpy) {
 
           let result: unknown;
           if (table === "problems") {
-            // 採点用の詳細取得か、解放判定用の一覧か
-            result = columns.includes("model_answer")
-              ? { data: state.problemDetail, error: null }
-              : { data: state.problemList, error: null };
+            // 解放判定の一覧（loadProgress）だけがこの列で引く。
+            // 採点用の詳細（model_answer 入り）と画面用の詳細（code 入り）は
+            // どちらも「1件取得」なので、一覧かどうかで振り分ける
+            result =
+              columns === "id, order, title"
+                ? { data: state.problemList, error: null }
+                : { data: state.problemDetail, error: null };
           } else if (columns === "created_at") {
             result = { data: state.rateRows, error: state.rateError };
           } else {
             result = { data: state.replay, error: null };
           }
 
-          return makeChain(result, (column, value) =>
-            spy.filters.push([table, column, value]),
+          return makeChain(
+            result,
+            (column, value) => spy.filters.push([table, column, value]),
+            spy,
           );
         },
         insert(row: Record<string, unknown>) {
@@ -130,10 +156,19 @@ function makeSession(
     from(table: string) {
       spy.sessionTables.push(table);
       return {
-        select: () =>
-          makeChain({ data: state.attempts, error: null }, (column, value) =>
-            spy.sessionFilters.push([column, value]),
-          ),
+        select(columns: string) {
+          spy.sessionSelects.push(columns);
+          // 解放判定（problem_id を引く）とリザルト画面（点数を引く）で
+          // 同じ user_attempts を別の形で読むので、列で振り分ける
+          const result = columns.includes("problem_id")
+            ? { data: state.attempts, error: null }
+            : { data: state.resultAttempt, error: null };
+          return makeChain(
+            result,
+            (column, value) => spy.sessionFilters.push([column, value]),
+            spy,
+          );
+        },
       };
     },
   };
@@ -195,6 +230,7 @@ export function defaultState(patch: Partial<DbState> = {}): DbState {
     rateError: null,
     problemList: PROBLEM_LIST,
     attempts: [],
+    resultAttempt: null,
     problemDetail: PROBLEM_DETAIL,
     replay: null,
     insertError: null,

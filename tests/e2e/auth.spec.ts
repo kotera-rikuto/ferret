@@ -102,9 +102,49 @@ test.describe("§1 ログインの失敗と案内", () => {
     await expect(page.getByRole("heading", { name: "ログイン" })).toBeVisible();
   });
 
-  test("E-112 登録済みのメールで登録しようとしたら理由が出る", async ({ userId }) => {
-    void userId;
-    // テストユーザーは ensureUser で作成済み
+  test("E-111 新規登録すると確認メールの案内が出る", async ({ page }) => {
+    // 実際にメールを送るので、毎回違うアドレスを使い捨てにする。
+    // 送信自体は Supabase 側の設定に依存するため、ここでは画面の遷移だけを見る
+    const fresh = `e2e-signup-${Date.now()}@ferret.test`;
+
+    await page.goto("/register");
+    await page.getByPlaceholder("メールアドレス").fill(fresh);
+    await page.getByPlaceholder("パスワード").fill("FerretE2E2026!");
+    await page.getByRole("button", { name: "登録する" }).click();
+
+    await expect(page.getByRole("heading", { name: "確認メールを送りました" })).toBeVisible();
+    // どのアドレス宛に送ったかが分かること
+    await expect(page.getByText(fresh)).toBeVisible();
+  });
+
+  test("E-112 登録済みのメールで登録しようとしたら理由が出る", async ({ page, userId }) => {
+    void userId; // テストユーザーを作っておく
+
+    await page.goto("/register");
+    await page.getByPlaceholder("メールアドレス").fill(TEST_USER.email);
+    await page.getByPlaceholder("パスワード").fill(TEST_USER.password);
+    await page.getByRole("button", { name: "登録する" }).click();
+
+    await expect(
+      page.getByText("このメールアドレスは登録済みです。ログイン画面からお進みください。"),
+    ).toBeVisible();
+    // 確認メールの画面へ進んでしまわないこと
+    await expect(page.getByRole("heading", { name: "確認メールを送りました" })).toHaveCount(0);
+  });
+
+  test("E-113 短すぎるパスワードは必要な文字数が示される", async ({ page }) => {
+    await page.goto("/register");
+    await page.getByPlaceholder("メールアドレス").fill(`e2e-weak-${Date.now()}@ferret.test`);
+    await page.getByPlaceholder("パスワード").fill("abc");
+    await page.getByRole("button", { name: "登録する" }).click();
+
+    await expect(page.getByText(/パスワードをもう少し長くしてください（\d+文字以上）。/)).toBeVisible();
+  });
+
+  test("E-115b 新規登録画面からログイン画面へ戻れる", async ({ page }) => {
+    await page.goto("/register");
+    await page.getByRole("link", { name: "ログイン" }).click();
+    await expect(page.getByRole("heading", { name: "ログイン" })).toBeVisible();
   });
 });
 

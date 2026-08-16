@@ -51,6 +51,17 @@ describe("§8 authErrorMessage", () => {
     expect(m).toMatch(/\d+文字以上/);
   });
 
+  it.each([
+    ["pwned", "This password has been pwned"],
+    ["compromised", "password is compromised"],
+    ["data breach", "found in a data breach"],
+  ])("U-384b 流出済みパスワード（%s）を責めない言い方で案内する", (_label, message) => {
+    const m = authErrorMessage({ message }, FALLBACK);
+    expect(m).toContain("流出");
+    // 「あなたのパスワードが漏れている」と読める言い方にしない
+    expect(m).not.toContain("あなた");
+  });
+
   it("U-385 メール形式の誤りを案内する", () => {
     const m = authErrorMessage({ code: "validation_failed" }, FALLBACK);
     expect(m).toContain("形式");

@@ -279,12 +279,12 @@ describe("§1 入力検証", () => {
   });
 
   it("I-116 制御文字・幅ゼロ文字は除去して保存する", async () => {
-    const dirty = `5行目の const​ 宣言に再代入しているため TypeError で停止します`;
+    const dirty = `5行目の const\u200B 宣言に再代入\u0007しているため TypeError で停止します`;
     const { res } = await post({ problem_id: UNLOCKED_ID, answer: dirty });
     expect(res.status).toBe(200);
     const saved = spy.inserted[0].answer as string;
-    expect(saved).not.toContain("​");
-    expect(saved).not.toContain("");
+    expect(saved).not.toContain("\u200B");
+    expect(saved).not.toContain("\u0007");
     expect(saved).toContain("const 宣言に再代入");
   });
 
@@ -618,6 +618,16 @@ describe("§4 同一回答リプレイ", () => {
     ]);
   });
 
+  it("I-176/180 検索は自分の行かつ判定保留でないものに限る", async () => {
+    setup({ replay: PREV });
+    await post(VALID);
+
+    // 他人の同じ回答や、判定保留の行を拾わないための条件。
+    // モックは条件を無視して返すので、条件が付いていること自体を見る
+    expect(spy.filters).toContainEqual(["user_attempts", "user_id", USER_ID]);
+    expect(spy.filters).toContainEqual(["user_attempts", "is_provisional", false]);
+  });
+
   it("I-177 表記だけが違う再送も同じハッシュで検索される", async () => {
     await post(VALID);
     const first = hashUsed();
@@ -713,6 +723,35 @@ describe("§5 失敗の扱い", () => {
     const logged = JSON.stringify(spies.error.mock.calls);
     expect(logged).toContain("採点不成立");
     expect(logged).toContain("gpt-4o-mini-2024-07-18");
+  });
+
+  it("I-206 タイムアウトでも 503 として扱う", async () => {
+    silenceConsole();
+    createMock.mockRejectedValue(new Error("ETIMEDOUT"));
+
+    const { res, json } = await post(VALID);
+    expect(res.status).toBe(503);
+    expect(json.code).toBe("scoring_unavailable");
+    // 一時的な失敗なので1回だけ再試行している
+    expect(createMock).toHaveBeenCalledTimes(2);
+  });
+
+  /**
+   * 採点の失敗（ScoringUnavailableError）以外の例外は 503 に混ぜず、そのまま投げ直す。
+   *
+   * 到達させるには「AI の呼び出しは成功したが、その後の計算が壊れる」状況が要る。
+   * 問題データの keywords が null だと層1の計算が例外になるので、それで再現する。
+   * つまりこのテストは **壊れた問題データを投入したときの挙動**でもある。
+   */
+  it("I-209 採点以外の例外は 503 に混ぜず、そのまま落とす", async () => {
+    silenceConsole();
+    setup({ problemDetail: { ...PROBLEM_DETAIL, keywords: null } });
+
+    const thrown = await POST(scoreRequest(VALID)).catch((e) => e);
+    expect(thrown).toBeInstanceOf(Error);
+    expect(thrown).not.toHaveProperty("code", "scoring_unavailable");
+    // 例外なので行は作られない
+    expect(spy.inserted).toHaveLength(0);
   });
 
   it("I-212 例外で抜けても並列の錠前が外れる（次の採点が通る）", async () => {

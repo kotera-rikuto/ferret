@@ -16,18 +16,48 @@ import { silenceConsole } from "./helpers";
 // モック
 // ---------------------------------------------------------------------------
 
-const { getUserMock, signOutMock, exchangeMock } = vi.hoisted(() => ({
+const { getUserMock, signOutMock, exchangeMock, ssr } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
   signOutMock: vi.fn(),
   exchangeMock: vi.fn(),
+  // createServerClient に渡された設定を掴んでおく。
+  // Cookie の書き戻し（cookies.setAll）をテスト側から起こすために要る
+  ssr: { options: null as null | Record<string, never> },
 }));
 
 // middleware は @supabase/ssr を直接使う
 vi.mock("@supabase/ssr", () => ({
-  createServerClient: () => ({
-    auth: { getUser: getUserMock },
-  }),
+  createServerClient: (_url: string, _key: string, options: Record<string, never>) => {
+    ssr.options = options;
+    return { auth: { getUser: getUserMock } };
+  },
 }));
+
+/**
+ * セッションが更新されたときの挙動を再現する。
+ *
+ * `@supabase/ssr` は期限切れのトークンを差し替えると `cookies.setAll` を呼び、
+ * 新しい Cookie と一緒に「このレスポンスをキャッシュさせない」ヘッダを渡してくる。
+ * 実物のライブラリを動かさずにこの経路へ入るには、こちらから呼んでやる必要がある。
+ */
+type CookieSink = {
+  cookies: {
+    setAll(
+      cookies: { name: string; value: string; options?: unknown }[],
+      headers: Record<string, string>,
+    ): void;
+  };
+};
+
+const NO_STORE = "private, no-cache, no-store, max-age=0, must-revalidate";
+
+function refreshSession(cookies = [{ name: "sb-test-auth-token", value: "refreshed" }]) {
+  const sink = ssr.options as unknown as CookieSink;
+  sink.cookies.setAll(
+    cookies.map((c) => ({ ...c, options: { path: "/", httpOnly: false } })),
+    { "cache-control": NO_STORE },
+  );
+}
 
 // /auth/callback と /logout は lib/supabase/server を使う
 vi.mock("@/lib/supabase/server", () => ({
@@ -131,6 +161,67 @@ describe("§7 middleware", () => {
     expect(locationOf(res).searchParams.get("next")).toBe("/problems/5");
   });
 
+  it("I-304 セッションが更新されたら、その Cookie がレスポンスに載る", async () => {
+    getUserMock.mockImplementation(async () => {
+      refreshSession();
+      return LOGGED_IN;
+    });
+
+    const res = await middleware(get("http://localhost:3000/stages"));
+    expect(res.cookies.get("sb-test-auth-token")?.value).toBe("refreshed");
+  });
+
+  /**
+   * ライブラリが渡してくる「このレスポンスを絶対にキャッシュさせない」指示。
+   * middleware.ts のコメントが「**これを捨てると、セッションが他人に配られる可能性がある**」
+   * と書いている箇所。新しいログイン用 Cookie を発行しているレスポンスなので、
+   * 途中のキャッシュに保存されると次に同じURLを開いた別の人へ Cookie ごと配られる。
+   */
+  it("I-308 キャッシュ禁止のヘッダを捨てない（通過時）", async () => {
+    getUserMock.mockImplementation(async () => {
+      refreshSession();
+      return LOGGED_IN;
+    });
+
+    const res = await middleware(get("http://localhost:3000/stages"));
+    expect(res.headers.get("cache-control")).toBe(NO_STORE);
+  });
+
+  it("I-304b 期限切れで弾かれるときも、書き換えられた Cookie を引き継ぐ", async () => {
+    // 無効になった Cookie を消す指示が来たのに捨てると、ブラウザに残り続ける
+    getUserMock.mockImplementation(async () => {
+      refreshSession([{ name: "sb-test-auth-token", value: "" }]);
+      return LOGGED_OUT;
+    });
+
+    const res = await middleware(get("http://localhost:3000/stages"));
+    expect(res.status).toBe(307);
+    expect(res.cookies.get("sb-test-auth-token")).toBeDefined();
+  });
+
+  /**
+   * 🟡 現状の挙動を固定するテスト。
+   *
+   * 未ログインで弾くとき、middleware は新しい `redirect` レスポンスを作って
+   * **Cookie だけ**を移し替えている。`setAll` が渡してきたヘッダ（キャッシュ禁止）は
+   * 移していないため、**Set-Cookie を持つのにキャッシュ禁止が付かないレスポンス**になる。
+   *
+   * 通過時（I-308）には付くので、危ないのはリダイレクト側だけ。
+   * 実際に問題になるかは経路上のキャッシュ次第だが、
+   * コメントが宣言している「捨てない」は片側でしか守れていない。
+   */
+  it("I-308b 【要判断】リダイレクトではキャッシュ禁止のヘッダが引き継がれない", async () => {
+    getUserMock.mockImplementation(async () => {
+      refreshSession([{ name: "sb-test-auth-token", value: "" }]);
+      return LOGGED_OUT;
+    });
+
+    const res = await middleware(get("http://localhost:3000/stages"));
+    expect(res.cookies.get("sb-test-auth-token")).toBeDefined();
+    // 直すならここが NO_STORE になる
+    expect(res.headers.get("cache-control")).not.toBe(NO_STORE);
+  });
+
   it("I-309 リダイレクト先は Host ヘッダではなく設定した基点から作る", async () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://ferret.example";
     getUserMock.mockResolvedValue(LOGGED_OUT);
@@ -206,6 +297,22 @@ describe("§8 GET /auth/callback", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://ferret.example";
     const res = await authCallback(get("http://localhost:3000/auth/callback?code=abc"));
     expect(locationOf(res).origin).toBe("https://ferret.example");
+  });
+
+  /**
+   * 🟡 現状を固定するテスト。
+   *
+   * `NEXT_PUBLIC_APP_URL` が未設定だと、戻り先は Host ヘッダから作られる。
+   * つまり経路上でヘッダを差し替えられる構成では、認証直後に別サイトへ飛ばせる。
+   * 対策は「本番で環境変数を必ず設定する」ことなので、コードではなく設定の問題。
+   * リリース前チェックに入れておきたい。
+   */
+  it("I-337 【要設定】環境変数が無いと Host ヘッダで戻り先が決まる", async () => {
+    delete process.env.NEXT_PUBLIC_APP_URL;
+    const res = await authCallback(
+      new NextRequest("http://evil.example/auth/callback?code=abc", { method: "GET" }),
+    );
+    expect(locationOf(res).origin).toBe("http://evil.example");
   });
 
   it("I-336 NEXT_PUBLIC_APP_URL が壊れていてもリクエスト側に落ちて動く", async () => {
