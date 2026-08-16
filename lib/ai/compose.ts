@@ -25,7 +25,10 @@ export type DeepScoreOutput = {
   articulation: AxisJudgement;
   contradiction: boolean;
   contradiction_evidence: string;
-  feedback: string;
+  /** 回答の中で実際に読めている箇所 */
+  praise: string;
+  /** 次に見るとよいコード上の箇所。場所を指す文なので判断の言葉が入りにくい */
+  next_focus: string;
 };
 
 export type KeywordSlot = { match: string[] };
@@ -96,6 +99,15 @@ const KEYWORD_CAP_WITHOUT_EVIDENCE = 10;
 
 /** 矛盾が引用付きで確認されたときの層1の上限 */
 const KEYWORD_CAP_ON_CONTRADICTION = 10;
+
+/**
+ * 矛盾が引用付きで確認されたときの層2の上限。
+ *
+ * 0 にすると「根拠も具体値も正確に書けているが結論だけ反転している」回答まで
+ * 全部消えてしまい、途中まで読めていることが伝わらない。
+ * 上限20 + 層1上限10 = 最大30点なので、合否には影響しない（クリア閾値は55）。
+ */
+const DEEP_CAP_ON_CONTRADICTION = 20;
 
 /** 矛盾の申告だけで引用が取れなかったときの層2の上限 */
 const DEEP_CAP_ON_UNVERIFIED_CONTRADICTION = 40;
@@ -270,7 +282,7 @@ export function composeScore(
   // 矛盾 veto（対義・反転、対象の入れ違い、値の断定的な誤り）
   if (out.contradiction) {
     if (quoteVerified(out.contradiction_evidence, answer)) {
-      deepScore = 0;
+      deepScore = Math.min(deepScore, DEEP_CAP_ON_CONTRADICTION);
       // 「偶数ではなく奇数」のような否定表現でキーワードが誤ヒットした分を封じる
       keywordScore = Math.min(keywordScore, KEYWORD_CAP_ON_CONTRADICTION);
     } else {

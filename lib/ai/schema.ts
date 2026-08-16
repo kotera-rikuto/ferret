@@ -8,7 +8,7 @@
 import type { DeepScoreOutput, Verdict } from "./compose";
 
 /** プロンプトと採点基準の版。変えたら grader_version が変わり、リプレイのキャッシュも切れる */
-export const PROMPT_VERSION = "p1";
+export const PROMPT_VERSION = "p2";
 
 const AXIS_SCHEMA = {
   type: "object",
@@ -35,7 +35,8 @@ export const DEEP_SCORE_SCHEMA = {
     "articulation",
     "contradiction",
     "contradiction_evidence",
-    "feedback",
+    "praise",
+    "next_focus",
   ],
   properties: {
     core: AXIS_SCHEMA,
@@ -44,7 +45,8 @@ export const DEEP_SCORE_SCHEMA = {
     articulation: AXIS_SCHEMA,
     contradiction: { type: "boolean" },
     contradiction_evidence: { type: "string" },
-    feedback: { type: "string" },
+    praise: { type: "string" },
+    next_focus: { type: "string" },
   },
 } as const;
 
@@ -94,8 +96,11 @@ export function parseDeepScore(raw: unknown): ParseResult {
   if (typeof raw.contradiction_evidence !== "string") {
     return { ok: false, error: "contradiction_evidence が文字列ではありません" };
   }
-  if (typeof raw.feedback !== "string") {
-    return { ok: false, error: "feedback が文字列ではありません" };
+  if (typeof raw.praise !== "string") {
+    return { ok: false, error: "praise が文字列ではありません" };
+  }
+  if (typeof raw.next_focus !== "string") {
+    return { ok: false, error: "next_focus が文字列ではありません" };
   }
 
   const value: DeepScoreOutput = {
@@ -105,7 +110,8 @@ export function parseDeepScore(raw: unknown): ParseResult {
     articulation,
     contradiction: raw.contradiction,
     contradiction_evidence: raw.contradiction_evidence,
-    feedback: raw.feedback,
+    praise: raw.praise,
+    next_focus: raw.next_focus,
   };
   return { ok: true, value };
 }

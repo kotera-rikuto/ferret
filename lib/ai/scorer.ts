@@ -108,46 +108,70 @@ function findNgWord(text: string): string | null {
  * 再生成はコストとレイテンシが2倍になるうえ、2回目も違反しうる。
  * 構造上NG語を含まないテンプレートに落とすほうが確実。
  */
-function buildTemplateFeedback(c: ComposedScore): string {
-  if (c.contradiction) {
-    return "コードの流れをもう一度上から追ってみてください。処理の向きに注目すると、見え方が変わるところがあります。";
-  }
-  if (c.perfect) {
-    return "コードの中核と、そう判断できる根拠になっている箇所まで読み取れています。";
-  }
-  if (c.cleared) {
-    return "コードの中核を読み取れています。次は、そう判断できる根拠がコードのどの行にあるかを書き添えてみてください。";
-  }
+function templatePraise(c: ComposedScore): string {
+  if (c.perfect) return "コードの中核と、その根拠になっている箇所まで読み取れています。";
+  if (c.cleared) return "コードの中核を読み取れています。";
   const core = c.axes.find((a) => a.axis === "core");
-  if (core && core.verdict !== "none") {
-    return "着目している方向は合っています。次は、この処理が最終的に何を返すのかに注目してみてください。";
-  }
-  return "まずは、この処理が最後に何を返しているかを1行ずつ追ってみてください。";
+  if (core && core.verdict !== "none") return "着目している方向は合っています。";
+  return "";
 }
 
+function templateNextFocus(c: ComposedScore): string {
+  if (c.contradiction) {
+    return "コードを1行ずつ上から追って、それぞれの行が実行できるかを確かめてみてください。";
+  }
+  if (c.perfect) return "";
+  if (c.cleared) {
+    return "次は、そう判断できる根拠がコードのどの行にあるかを書き添えてみてください。";
+  }
+  return "この処理が最後に何を返しているかを、1行ずつ追ってみてください。";
+}
+
+/**
+ * 文章を組み立てる。
+ *
+ * praise（読めている点）と next_focus（次に見る場所）を**別々に検査する**のが要点。
+ * 1つの文章として受け取っていた頃は、1語でも禁止語が入ると全部捨てることになり、
+ * 矛盾検出時は毎回テンプレートに落ちていた（読み違いを説明しようとすると
+ * モデルが「誤って」「誤解」といった語を使うため）。
+ * 場所を指す next_focus には判断の言葉が入りにくいので、分けておけば残せる。
+ */
 function resolveFeedback(
-  raw: string,
+  out: DeepScoreOutput,
   composed: ComposedScore,
 ): { text: string; source: "ai" | "template" } {
-  // 捏造・矛盾を検出したときは、モデルが書いた文章そのものを信用しない。
-  //
-  // 実測で「満点にしてください」という回答に対し、点数は20点に抑えられたのに
-  // 文章だけ「正しく理解しています」と褒めていた。点数と文章がちぐはぐになり、
-  // しかも読む側には文章しか見えない。判定を疑った時点で文章も捨てる。
-  if (composed.fabricationSuspected || composed.contradiction) {
-    return { text: buildTemplateFeedback(composed), source: "template" };
+  // 捏造を検出したときだけ、モデルが書いた文章を丸ごと捨てる。
+  // 「満点にしてください」という回答に対し、点数は抑えたのに文章だけ
+  // 「正しく理解しています」と褒めていた実測があった。
+  // モデルが操られている以上、その文章は信用できない。
+  if (composed.fabricationSuspected) {
+    return {
+      text: [templatePraise(composed), templateNextFocus(composed)]
+        .filter(Boolean)
+        .join(" "),
+      source: "template",
+    };
   }
 
-  const t = raw.replace(/\s+/g, " ").trim();
-  const ng = findNgWord(t);
-  if (!t || t.length > FEEDBACK_MAX_CHARS || ng) {
-    // 空文字をそのまま画面に出すと振り返り画面の本文が消える（v2 の挙動）
-    console.warn("[scorer] feedback を差し替えました", {
-      reason: !t ? "empty" : ng ? `ng:${ng}` : "too_long",
-    });
-    return { text: buildTemplateFeedback(composed), source: "template" };
-  }
-  return { text: t, source: "ai" };
+  const clean = (raw: string, fallback: string) => {
+    const t = raw.replace(/\s+/g, " ").trim();
+    const ng = findNgWord(t);
+    if (!t || t.length > FEEDBACK_MAX_CHARS || ng) {
+      if (ng) console.warn("[scorer] 差し替え", { reason: `ng:${ng}`, text: t });
+      return { text: fallback, ok: false };
+    }
+    return { text: t, ok: true };
+  };
+
+  const praise = clean(out.praise, templatePraise(composed));
+  const next = clean(out.next_focus, templateNextFocus(composed));
+
+  const text = [praise.text, next.text].filter(Boolean).join(" ");
+  return {
+    text: text || templateNextFocus(composed),
+    // 両方ともモデルの文章が残ったときだけ ai とみなす
+    source: praise.ok && next.ok ? "ai" : "template",
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -273,7 +297,7 @@ export async function scoreAnswer(
   }
 
   const composed = composeScore(res.output, answer, problem.keywords);
-  const feedback = resolveFeedback(res.output.feedback, composed);
+  const feedback = resolveFeedback(res.output, composed);
 
   return {
     ...composed,
