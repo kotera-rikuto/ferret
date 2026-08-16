@@ -190,6 +190,32 @@ problems
 
 ---
 
+## RLS ポリシー（2026-08-11 設定済み）
+
+4テーブルすべてで RLS 有効。**ユーザーには読み取りのみ許可し、書き込みポリシーは意図的に1つも作らない。**
+
+| テーブル | ポリシー | 理由 |
+|---|---|---|
+| `user_attempts` | SELECT 自分の行のみ | 書き込みを許すとブラウザから直接 `total_score: 100` を挿入でき、段位・認定証の価値が消える |
+| `users` | SELECT 自分の行のみ | `plan` の自己書き換えを防ぐ |
+| `subscriptions` | SELECT 自分の行のみ | 書き込みは Stripe Webhook（service_role）のみ |
+| `problems` | **ポリシーなし** | SELECT を許すと anon キーで `model_answer` を直接読めてしまう。サーバー経由（admin + カラム明示）でのみ読む |
+
+```sql
+create policy "自分の回答だけ閲覧できる" on public.user_attempts
+  for select to authenticated using (auth.uid() = user_id);
+
+create policy "自分のユーザー情報だけ閲覧できる" on public.users
+  for select to authenticated using (auth.uid() = id);
+
+create policy "自分の契約情報だけ閲覧できる" on public.subscriptions
+  for select to authenticated using (auth.uid() = user_id);
+```
+
+**キーの使い分け:** 採点（`problems` 読み取り・`user_attempts` 書き込み）は `lib/supabase/admin.ts` の service_role クライアントで行う。RLS をバイパスするため、呼び出し側で必ず `auth.getUser()` による本人確認を先に行うこと。
+
+---
+
 ## 未実装（将来追加）
 
 - レベルシステム（XP の閾値・レベルアップ演出）

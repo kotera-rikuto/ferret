@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { scoreAnswer } from "@/lib/ai/scorer";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -7,7 +8,9 @@ export async function POST(request: NextRequest) {
 
   const supabase = await createClient();
 
-  // ログイン確認
+  // ログイン確認。ここだけユーザーのセッション（anon キー）で行う。
+  // 以降のDB操作は admin（service_role）なので RLS が効かない。
+  // このチェックを外すと誰でも他人のスコアを書き込めるAPIになる
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -15,8 +18,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // DBから問題データを取得
-  const { data: problem } = await supabase
+  const admin = createAdminClient();
+
+  // DBから問題データを取得。
+  // model_answer / ai_rubric を含むため anon では読ませない
+  const { data: problem } = await admin
     .from("problems")
     .select("*")
     .eq("id", problem_id)
@@ -35,8 +41,9 @@ export async function POST(request: NextRequest) {
     ai_rubric: problem.ai_rubric,
   });
 
-  // 結果をDBに保存
-  const { error: insertError } = await supabase.from("user_attempts").insert({
+  // 結果をDBに保存。
+  // ユーザー自身に書かせるとスコアを偽装できるため admin で書く
+  const { error: insertError } = await admin.from("user_attempts").insert({
     user_id: user.id,
     problem_id: problem.id,
     answer,
