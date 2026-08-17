@@ -1,0 +1,72 @@
+<!--
+  確認メール（Confirm signup）の文面。
+
+  **この HTML は控えであって、実際に送られるのは Supabase 管理画面に貼った内容。**
+  Authentication → Emails → Confirm signup。
+  config.toml から参照させる（[auth.email.template.confirmation]）のは C5 で
+  site_url を本番URLに直してからにすること。いま `supabase config push` を実行すると
+  本番の確認メールのリンクが localhost を指す（tasks/C1 の注意）。
+
+  リンクは {{ .TokenHash }} 方式にしてある。既定の {{ .ConfirmationURL }} だと
+  登録したブラウザに残る控えが必要になり、**パソコンで登録してスマホでメールを開くと
+  ログインできない**（app/auth/callback/route.ts のコメント参照）。
+
+  文面の言葉は CLAUDE.md のUXルールに従う。「失敗」「間違い」「初心者」などは使わない。
+  色は app/globals.css の @theme と揃えてある。メールソフトは <style> を落とすことがあるので
+  すべて style 属性で直に書く。
+-->
+<div style="margin:0;padding:24px 12px;background-color:#fdf8ec;font-family:'Helvetica Neue',Arial,'Hiragino Kaku Gothic ProN','Yu Gothic',Meiryo,sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:520px;margin:0 auto;background-color:#ffffff;border:2px solid #ece0c6;border-radius:20px;">
+    <tr>
+      <td style="padding:32px 28px;">
+
+        <p style="margin:0 0 20px;font-size:19px;font-weight:bold;color:#c47000;letter-spacing:0.04em;">
+          Ferret
+        </p>
+
+        <h1 style="margin:0 0 16px;font-size:20px;font-weight:bold;color:#4a3b28;line-height:1.5;">
+          メールアドレスの確認をお願いします
+        </h1>
+
+        <p style="margin:0 0 24px;font-size:14px;line-height:1.9;color:#4a3b28;">
+          Ferret へのご登録ありがとうございます。<br />
+          下のボタンを押すと確認が完了して、そのままお使いいただけます。
+        </p>
+
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr>
+            <td align="center" style="padding:0 0 24px;">
+              <a
+                href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup"
+                style="display:inline-block;padding:15px 40px;background-color:#f59e0b;border-bottom:4px solid #c47000;border-radius:14px;color:#ffffff;font-size:15px;font-weight:bold;text-decoration:none;letter-spacing:0.04em;"
+              >
+                メールアドレスを確認する
+              </a>
+            </td>
+          </tr>
+        </table>
+
+        <p style="margin:0 0 8px;font-size:12px;line-height:1.8;color:#a3937a;">
+          ボタンが押せないときは、次のURLをブラウザに貼り付けてください。
+        </p>
+        <p style="margin:0 0 24px;font-size:12px;line-height:1.8;word-break:break-all;">
+          <a href="{{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup" style="color:#c47000;">
+            {{ .SiteURL }}/auth/callback?token_hash={{ .TokenHash }}&type=signup
+          </a>
+        </p>
+
+        <p style="margin:0 0 6px;padding-top:20px;border-top:2px solid #ece0c6;font-size:12px;line-height:1.9;color:#a3937a;">
+          このリンクは一定時間が過ぎると使えなくなります。使えなくなっていたときは、登録画面からもう一度お進みください。同じ内容のメールをお送りします。
+        </p>
+        <p style="margin:0;font-size:12px;line-height:1.9;color:#a3937a;">
+          このメールに心当たりがない場合は、そのまま破棄してください。何も起こりません。
+        </p>
+
+      </td>
+    </tr>
+  </table>
+
+  <p style="max-width:520px;margin:16px auto 0;font-size:11px;line-height:1.8;color:#a3937a;text-align:center;">
+    Ferret ── 他人のコードが読める、AI時代のエンジニアに。
+  </p>
+</div>
