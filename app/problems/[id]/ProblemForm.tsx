@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { ANSWER_MIN_CHARS, ANSWER_MAX_CHARS } from "@/lib/ai/compose";
 import { IconInfo } from "@/components/ui/icons";
@@ -15,11 +15,33 @@ export type ProblemForDisplay = {
   question: string;
 };
 
+/** localStorage の下書きを初回描画で読むための購読なしストア。サーバー描画時は null */
+const subscribeNothing = () => () => {};
+
 export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
   const router = useRouter();
-  const [answer, setAnswer] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // 書きかけの回答は端末に残す。×やリロードの一発で長文が消えるのは
+  // 解約級の体験なので、確認ダイアログではなく「消えない」ほうで守る。
+  // effect での setState は lint（react-hooks/set-state-in-effect）で禁止なので、
+  // 「編集前は下書き、編集し始めたら編集値」の合成で復元する
+  const draftKey = `ferret:draft:${problem.id}`;
+  const storedDraft = useSyncExternalStore(
+    subscribeNothing,
+    () => localStorage.getItem(draftKey),
+    () => null,
+  );
+  const [edited, setEdited] = useState<string | null>(null);
+  const answer = edited ?? storedDraft ?? "";
+  const restored = edited === null && Boolean(storedDraft);
+
+  function handleChange(value: string) {
+    setEdited(value);
+    if (value) localStorage.setItem(draftKey, value);
+    else localStorage.removeItem(draftKey);
+  }
 
   const length = answer.trim().length;
   const tooShort = length < ANSWER_MIN_CHARS;
@@ -49,6 +71,8 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
         return;
       }
 
+      // 採点まで終わった回答の下書きは役目を終えたので消す
+      localStorage.removeItem(draftKey);
       // スコアはリザルト画面が user_attempts から読むのでURLには載せない
       router.push(`/result/${problem.id}`);
     } catch {
@@ -62,7 +86,7 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
     <div className="flex flex-col gap-2">
       <textarea
         value={answer}
-        onChange={(e) => setAnswer(e.target.value)}
+        onChange={(e) => handleChange(e.target.value)}
         placeholder="回答を入力してください..."
         rows={7}
         className="resize-y rounded-2xl border-2 border-line bg-panel px-4.5 py-4 text-[15px] leading-loose outline-none focus:border-brand placeholder:text-locked-ink"
@@ -70,11 +94,13 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
 
       <div className="flex items-center justify-between text-xs font-bold">
         <span className="text-muted">
-          {tooShort
-            ? `あと ${ANSWER_MIN_CHARS - length} 文字`
-            : tooLong
-              ? `${length - ANSWER_MAX_CHARS} 文字オーバー`
-              : " "}
+          {restored
+            ? "前回の下書きを復元しました"
+            : tooShort
+              ? `あと ${ANSWER_MIN_CHARS - length} 文字`
+              : tooLong
+                ? `${length - ANSWER_MAX_CHARS} 文字オーバー`
+                : " "}
         </span>
         <span className={tooLong ? "text-red-600" : "text-muted"}>
           {length} / {ANSWER_MAX_CHARS}
@@ -104,7 +130,7 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
       {/* 採点待ち。実測 1.2〜4.3 秒かかるので、マスコットの演出で待ち時間を埋める */}
       {loading && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-bg/95">
-          <Mascot className="w-36 animate-sniff" />
+          <Mascot mood="thinking" className="w-36 animate-sniff" />
           <p className="text-base font-extrabold">フェレットがコードを読んでいます</p>
           <div className="flex gap-2">
             <span className="size-2.5 animate-blink rounded-full bg-brand" />
