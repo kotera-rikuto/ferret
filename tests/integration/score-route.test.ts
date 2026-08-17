@@ -541,16 +541,24 @@ describe("§3 採点の成功", () => {
   });
 
   /**
-   * 🟡 compose.ts は fabricationSuspected に「発生率を監視する」と
-   * コメントしているが、保存されているのは evidence_capped だけ。
-   * axes は JSONB なのでカラム追加なしで1行足せる。
+   * compose.ts が「発生率を監視する」としている値。
+   * 保存されていないと集計できず、監視のしようがない（2026-08-17 に追加）。
+   * 特定の問題で多発したら、その問題の文面かルーブリックが
+   * インジェクションを誘発しているサインになる。
    */
-  it("I-158 【要判断】捏造の検出結果がどこにも保存されない", async () => {
+  it("I-158 捏造の検出結果を保存する", async () => {
     createMock.mockResolvedValue(
       openAiOk(deepOutput(["full", "full", "full", "none"], { evidence: EVIDENCE_FAKE })),
     );
     await post(VALID);
-    expect(JSON.stringify(spy.inserted[0])).not.toContain("fabrication");
+    const axes = spy.inserted[0].axes as Record<string, unknown>;
+    expect(axes.fabrication_suspected).toBe(true);
+  });
+
+  it("I-158b 捏造していなければ false が入る", async () => {
+    await post(VALID);
+    const axes = spy.inserted[0].axes as Record<string, unknown>;
+    expect(axes.fabrication_suspected).toBe(false);
   });
 
   it("I-159 ai_feedback を必ず保存する", async () => {

@@ -440,6 +440,10 @@ async function handleScoring(
         axes: result.axes,
         keyword_hits: result.keywordHits,
         evidence_capped: result.evidenceCapped,
+        // compose.ts が「発生率を監視する」としている値。
+        // 保存しないと集計できないので一緒に入れる。
+        // axes は JSONB なのでカラム追加は要らない
+        fabrication_suspected: result.fabricationSuspected,
       },
       grader_version: result.grader_version,
       answer_hash: result.answer_hash,
