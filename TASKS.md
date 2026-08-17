@@ -118,7 +118,7 @@ Ferret 実装タスク一覧
 
 ### 残り
 
-- [ ] **メール送信を Resend に切り替える** — 現在 `mailer_autoconfirm: false`（確認必須）だが Supabase 標準の送信は制限が厳しく、実ユーザーが登録できない可能性が高い。`RESEND_API_KEY` は `.env.local` に用意済み。**リリース前必須**
+- [ ] **メール送信を Resend に切り替える** — 現在 `mailer_autoconfirm: false`（確認必須）だが Supabase 標準の送信は制限が厳しく、実ユーザーが登録できない可能性が高い。**`RESEND_API_KEY` は空**（キー名だけある。以前ここに「用意済み」と書いていたのは誤り）。**リリース前必須**
 - [ ] Google OAuth 設定（※クレカ登録が必要なため後回し）→ 済んだら `lib/auth/errors.ts` の `OAUTH_ENABLED.google` を `true` に
 - [ ] GitHub OAuth 設定（同上）
 - [ ] Magic Link

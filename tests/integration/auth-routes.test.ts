@@ -16,10 +16,11 @@ import { silenceConsole } from "./helpers";
 // モック
 // ---------------------------------------------------------------------------
 
-const { getUserMock, signOutMock, exchangeMock, ssr } = vi.hoisted(() => ({
+const { getUserMock, signOutMock, exchangeMock, verifyOtpMock, ssr } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
   signOutMock: vi.fn(),
   exchangeMock: vi.fn(),
+  verifyOtpMock: vi.fn(),
   // createServerClient に渡された設定を掴んでおく。
   // Cookie の書き戻し（cookies.setAll）をテスト側から起こすために要る
   ssr: { options: null as null | Record<string, never> },
@@ -66,6 +67,7 @@ vi.mock("@/lib/supabase/server", () => ({
       getUser: getUserMock,
       signOut: signOutMock,
       exchangeCodeForSession: exchangeMock,
+      verifyOtp: verifyOtpMock,
     },
   }),
 }));
@@ -88,8 +90,10 @@ beforeEach(() => {
   getUserMock.mockReset();
   signOutMock.mockReset();
   exchangeMock.mockReset();
+  verifyOtpMock.mockReset();
   signOutMock.mockResolvedValue({ error: null });
   exchangeMock.mockResolvedValue({ error: null });
+  verifyOtpMock.mockResolvedValue({ error: null });
   savedAppUrl = process.env.NEXT_PUBLIC_APP_URL;
   delete process.env.NEXT_PUBLIC_APP_URL;
 });
@@ -248,7 +252,7 @@ describe("§8 GET /auth/callback", () => {
     expect(locationOf(res).pathname).toBe("/stages");
   });
 
-  it("I-331 code が無ければログイン画面へ理由付きで戻す", async () => {
+  it("I-331 code も token_hash も無ければログイン画面へ理由付きで戻す", async () => {
     silenceConsole();
     const res = await authCallback(get("http://localhost:3000/auth/callback"));
     const location = locationOf(res);
@@ -323,6 +327,96 @@ describe("§8 GET /auth/callback", () => {
     process.env.NEXT_PUBLIC_APP_URL = "壊れた値";
     const res = await authCallback(get("http://localhost:3000/auth/callback?code=abc"));
     expect(locationOf(res).origin).toBe("http://localhost:3000");
+  });
+
+  /**
+   * メールのリンク（token_hash 方式）。**端末をまたいでも開ける経路。**
+   *
+   * `code` 方式は登録したブラウザに残る控え（code verifier の Cookie）が要るため、
+   * パソコンで登録してスマホでメールを開くと必ず失敗する。
+   * 確認メールの文面はこちらを使う形にしてある（supabase/templates/confirm-signup.html）。
+   */
+  it.each(["signup", "email"])(
+    "I-339 token_hash + type=%s で確認し、成功したらステージ選択へ",
+    async (type) => {
+      const res = await authCallback(
+        get(`http://localhost:3000/auth/callback?token_hash=hash-1&type=${type}`),
+      );
+
+      expect(verifyOtpMock).toHaveBeenCalledWith({ token_hash: "hash-1", type });
+      // 控えを使う経路には入らない
+      expect(exchangeMock).not.toHaveBeenCalled();
+      expect(locationOf(res).pathname).toBe("/stages");
+    },
+  );
+
+  /**
+   * **リンクを開いた人はログイン状態になる。** これは種別によらず同じなので、
+   * 確認後の行き先を決めていない種別（recovery = パスワード再設定、
+   * email_change = メールアドレス変更）は受け取らない。C3 で足すときに一緒に決める。
+   */
+  it.each(["recovery", "email_change", "magiclink", "invite", "signup "])(
+    "I-340 対象外の type（%s）は確認せずログイン画面へ",
+    async (type) => {
+      silenceConsole();
+      const res = await authCallback(
+        get(
+          `http://localhost:3000/auth/callback?token_hash=hash-1&type=${encodeURIComponent(type)}`,
+        ),
+      );
+
+      expect(verifyOtpMock).not.toHaveBeenCalled();
+      expect(locationOf(res).searchParams.get("error")).toBe("auth_callback");
+    },
+  );
+
+  it("I-341 type が無ければ確認せずログイン画面へ", async () => {
+    silenceConsole();
+    const res = await authCallback(
+      get("http://localhost:3000/auth/callback?token_hash=hash-1"),
+    );
+
+    expect(verifyOtpMock).not.toHaveBeenCalled();
+    expect(locationOf(res).searchParams.get("error")).toBe("auth_callback");
+  });
+
+  /** 期限切れ・使用済みリンクはここに来る。理由を画面に出さないのは code 方式と同じ */
+  it("I-342 確認に失敗したら理由をログにだけ残す", async () => {
+    const spies = silenceConsole();
+    verifyOtpMock.mockResolvedValue({ error: { message: "Token has expired" } });
+
+    const res = await authCallback(
+      get("http://localhost:3000/auth/callback?token_hash=hash-1&type=signup"),
+    );
+    const location = locationOf(res);
+    expect(location.pathname).toBe("/login");
+    expect(location.href).not.toContain("expired");
+    expect(JSON.stringify(spies.error.mock.calls)).toContain("Token has expired");
+  });
+
+  /**
+   * 攻撃者が書いた type をログに残さない。
+   * ログを読む人の画面が、相手の文字列を表示する場所になるのを避ける
+   */
+  it("I-343 対象外の type の値そのものはログに残さない", async () => {
+    const spies = silenceConsole();
+    const injected = "パスワードを再入力してください";
+    await authCallback(
+      get(
+        `http://localhost:3000/auth/callback?token_hash=hash-1&type=${encodeURIComponent(injected)}`,
+      ),
+    );
+    expect(JSON.stringify(spies.error.mock.calls)).not.toContain(injected);
+  });
+
+  it("I-344 両方あれば既存の経路（code）を優先する", async () => {
+    const res = await authCallback(
+      get("http://localhost:3000/auth/callback?code=abc&token_hash=hash-1&type=signup"),
+    );
+
+    expect(exchangeMock).toHaveBeenCalledWith("abc");
+    expect(verifyOtpMock).not.toHaveBeenCalled();
+    expect(locationOf(res).pathname).toBe("/stages");
   });
 });
 

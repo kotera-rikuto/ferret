@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { chapterOf } from "@/lib/stages/chapters";
 import {
@@ -17,10 +17,49 @@ export type Stage = {
   order: number;
   title: string;
   status: "cleared" | "current" | "locked";
+  /**
+   * 満点帯（`lib/ai/compose.ts` の `PERFECT_THRESHOLD` 以上）に到達済みか。
+   *
+   * **status の4つ目の値にはしない。** 満点のステージはクリア済みでもあるので、
+   * `status === "cleared"` で書かれている判定（道の実線・ボタンの文言・見た目）が
+   * すべて満点ノードを取りこぼす。独立した欄にして「クリア済みに一枚重ねる」形にしてある。
+   */
+  perfect: boolean;
 };
 
-const ROW_H = 145;
+/**
+ * 1行ぶんの高さ。**ノードが収まる高さ（NODE_H）を下回らせないこと。**
+ *
+ * モック（`design/stages-desktop-light.html`）は 145 だが、あれは
+ * 「try/catch の流れ」のような短いタイトル前提の値。実データのタイトルは
+ * 「スタックトレースを読む ─ ログから原因の行を特定する」のように3行へ折り返すため、
+ * 145 ではラベルが次の行の丸に重なり、章の最後では節の下端を 20px はみ出していた（実測）。
+ */
+const ROW_H = 180;
+
+/** 節の上端から先頭ノードまで。現在地の「スタート」吹き出し（丸の 53px 上）を収める高さ */
 const PAD_TOP = 76;
+
+/** 章バナーの `sticky top-4`。着地位置の計算でバナーが占める帯を出すのに使う */
+const STICKY_TOP = 16;
+
+/**
+ * 丸をバナーの下へ逃がすときに空ける余裕。
+ * 満点の縁取り（`ring-offset-2`）は丸の外へ 5px ほど出るので、
+ * 0 にすると輪の上側がバナーに切られる。
+ */
+const BANNER_CLEARANCE = 8;
+
+/**
+ * ノード1つが縦に占める高さの最大値。
+ * 内訳は 現在地の丸 92（`size-23`）+ すきま 8（`gap-2`）+ ラベル 76（`h-19`）- 持ち上げ 8。
+ *
+ * ラベルの高さを内容任せにせず固定しているのは、タイトルの行数で章の下端が動くと
+ * 章見出し（「ここから 第N章」）と直上のステージの間隔が 8〜38px でばらつくため（実測）。
+ * **下の markup のクラスと対応している値なので、片方だけ変えないこと。**
+ */
+const NODE_H = 168;
+
 /** 蛇行の横位置（%）。order で引くので、途中に問題を差し込んでも並びが崩れない */
 const XS = [50, 28, 52, 72, 48, 28, 52, 72, 48, 28];
 const xOf = (order: number) => XS[(order - 1) % XS.length];
@@ -69,9 +108,57 @@ export function StageMap({ stages }: { stages: Stage[] }) {
   const currentNodeRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<(HTMLElement | null)[]>([]);
 
+  /**
+   * 現在地を「章バナーの下の、実際に見えている範囲」の中央に置く。
+   *
+   * `scrollIntoView({ block: "center" })` だとバナーの高さを勘定に入れないため、
+   * 画面の上端から数えた中央に来る。その結果、**現在地の1つ上のノードが
+   * ちょうどバナーの裏に入り、丸だけが隠れてラベルだけが浮いて見えていた**
+   * （起動直後の既定の見た目なので、毎回それを目にすることになる）。
+   *
+   * 中央に置いただけでは足りない。バナーの帯にどの丸が来るかは**画面の高さ次第**で、
+   * 実測でも 900px 高では 14.5px かかっていた。かかっていたら下へずらして必ず全部見せる。
+   *
+   * **`ROW_H` ≥ バナーの高さ + 丸の直径（76）+ `BANNER_CLEARANCE` が前提。**
+   * これが成り立つ限り帯にかかる丸は多くても1つなので、ずらして別の丸が新たにかかることはない
+   * （行間 180 ≥ 81 + 76 + 8 = 165。バナーを高くするなら `ROW_H` も上げること）。
+   */
+  const scrollToCurrent = useCallback((behavior: ScrollBehavior) => {
+    const node = currentNodeRef.current;
+    if (!node) return;
+    const bannerHeight = bannerRef.current?.getBoundingClientRect().height ?? 0;
+    const bannerBottom = STICKY_TOP + bannerHeight;
+    const rect = node.getBoundingClientRect();
+    const visibleCenter = bannerBottom + (window.innerHeight - bannerBottom) / 2;
+
+    // **先に丸めること。** ページの端では狙った位置までスクロールできず、
+    // ブラウザ側で丸められる。丸める前の値で下の判定をすると、
+    // 実際の見た目と違う位置で判定してしまい、ずらしが効かない。
+    // 現在地が STAGE 1（マップの最下部）のとき必ずここに当たる ＝ 新規ユーザーの初回表示
+    const maxScroll = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight,
+    );
+    const clamp = (v: number) => Math.max(0, Math.min(v, maxScroll));
+
+    let top = clamp(window.scrollY + rect.top + rect.height / 2 - visibleCenter);
+
+    for (const circle of document.querySelectorAll<HTMLElement>("[data-stage-circle]")) {
+      const box = circle.getBoundingClientRect();
+      // ずらした後の画面内の位置に置き換えて判定する
+      const y = box.top + window.scrollY - top;
+      if (y < bannerBottom + BANNER_CLEARANCE && y + box.height > STICKY_TOP) {
+        top = clamp(top - (bannerBottom + BANNER_CLEARANCE - y));
+        break;
+      }
+    }
+
+    window.scrollTo({ top, behavior });
+  }, []);
+
   useEffect(() => {
     // 起動時は現在地が画面内に来るようにする（UI概要の要件）
-    currentNodeRef.current?.scrollIntoView({ block: "center" });
+    scrollToCurrent("instant");
 
     function sync() {
       // 章バナー: バナーのすぐ下に重なっている章を表示する
@@ -104,7 +191,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
     sync();
     window.addEventListener("scroll", sync, { passive: true });
     return () => window.removeEventListener("scroll", sync);
-  }, []);
+  }, [scrollToCurrent]);
 
   function handleStart() {
     if (!selected) return;
@@ -133,7 +220,9 @@ export function StageMap({ stages }: { stages: Stage[] }) {
         {displayGroups.map((group, gi) => {
           // 章の中も上ほど先のステージ（order 降順）
           const rows = [...group.stages].sort((a, b) => b.order - a.order);
-          const height = rows.length * ROW_H + PAD_TOP;
+          // 下端は「最後のノードが収まる位置」で決める。行数 × ROW_H だと
+          // ROW_H とノードの高さの差だけ余白が出たり、逆にはみ出したりする
+          const height = (rows.length - 1) * ROW_H + PAD_TOP + NODE_H;
 
           return (
             <div key={group.no ?? `extra-${gi}`}>
@@ -171,6 +260,8 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                 {rows.map((s, i) => {
                   const isCurrent = s.status === "current";
                   const isOpen = selected?.id === s.id;
+                  // 満点はクリア済みの上に重ねる装飾なので、両方が立っているときだけ出す
+                  const isPerfect = s.status === "cleared" && s.perfect;
                   return (
                     <div
                       key={s.id}
@@ -197,11 +288,20 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                       )}
 
                       <button
+                        // 着地位置の計算（scrollToCurrent）が丸の位置を引くための目印
+                        data-stage-circle
                         onClick={() => s.status !== "locked" && setSelected(s)}
                         disabled={s.status === "locked"}
                         className={`grid place-items-center rounded-full transition-transform ${
                           s.status === "cleared"
-                            ? "size-19 border-b-6 border-[#d98a06] bg-brand-soft text-white cursor-pointer active:translate-y-[3px]"
+                            ? // 満点は金の縁取りをひと重足すだけ（案A）。マークも大きさも変えない。
+                              // 目立たせすぎると 55点でクリアしたステージが見劣りし、
+                              // 「クリアしただけでは足りない」という印象になるため
+                              `size-19 border-b-6 border-[#d98a06] bg-brand-soft text-white cursor-pointer active:translate-y-[3px] ${
+                                isPerfect
+                                  ? "ring-3 ring-[#d98a06] ring-offset-2 ring-offset-bg"
+                                  : ""
+                              }`
                             : isCurrent
                               ? "relative size-23 border-5 border-b-10 border-brand bg-panel text-brand cursor-pointer active:translate-y-[3px]"
                               : "size-19 border-b-6 border-locked-edge bg-locked text-locked-ink cursor-not-allowed"
@@ -215,12 +315,14 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                         {s.status === "locked" && <IconLock size={26} />}
                       </button>
 
-                      <span className="text-center leading-snug">
+                      {/* 高さを固定する（NODE_H の内訳）。タイトルの行数でノードの高さが
+                          変わると、章の下端＝章見出しの位置が章ごとにずれる */}
+                      <span className="block h-19 text-center leading-snug">
                         <span className="block text-[11px] font-extrabold tracking-widest text-muted">
                           STAGE {s.order}
                         </span>
                         <span
-                          className={`text-sm font-bold ${
+                          className={`line-clamp-3 text-sm font-bold ${
                             s.status === "locked" ? "text-locked-ink" : ""
                           }`}
                         >
@@ -232,8 +334,13 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                       {isOpen && (
                         <div className="absolute bottom-full left-1/2 mb-3 w-66 -translate-x-1/2 rounded-2xl border-2 border-line bg-panel p-5 shadow-[0_12px_32px_rgba(74,59,40,0.16)]">
                           <h2 className="text-base font-extrabold">{s.title}</h2>
-                          <p className="mt-1 mb-3.5 text-xs font-bold text-muted">
-                            STAGE {s.order}
+                          <p className="mt-1 mb-3.5 flex items-center gap-2 text-xs font-bold text-muted">
+                            <span>STAGE {s.order}</span>
+                            {isPerfect && (
+                              <span className="rounded-full border-2 border-[#d98a06] px-2 py-0.5 text-[11px] font-extrabold text-brand-deep">
+                                満点
+                              </span>
+                            )}
                           </p>
                           <button
                             onClick={handleStart}
@@ -271,12 +378,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
       {/* 現在地へ戻る。左右対称レイアウトなので画面中央 = マップ列の中央 */}
       {fab !== "hidden" && (
         <button
-          onClick={() =>
-            currentNodeRef.current?.scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-            })
-          }
+          onClick={() => scrollToCurrent("smooth")}
           className="fixed bottom-7 left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full border-2 border-b-5 border-brand bg-panel px-5.5 py-3 text-sm font-extrabold text-brand shadow-[0_8px_24px_rgba(196,112,0,0.22)] active:translate-y-[3px] active:border-b-2"
         >
           <IconChevronDown size={16} className={fab === "up" ? "rotate-180" : ""} />

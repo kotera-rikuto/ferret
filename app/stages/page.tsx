@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
+import { PERFECT_THRESHOLD } from "@/lib/ai/compose";
 import { calcStreak, toJstDate } from "@/lib/progress/streak";
 import { StageMap, type Stage } from "@/components/stage/StageMap";
 import { IconFlame } from "@/components/ui/icons";
@@ -20,7 +21,7 @@ export default async function StagesPage() {
   // 解放状態の計算は問題画面・採点APIと共通の関数に寄せてある。
   // 表示（ここ）と実際のガードが同じ答えを出すことを保証するため
   const admin = createAdminClient();
-  const { problems, clearedFlags, currentIndex } = await loadProgress(
+  const { problems, bestScores, clearedFlags, currentIndex } = await loadProgress(
     admin,
     supabase,
     user.id,
@@ -35,6 +36,9 @@ export default async function StagesPage() {
       : i === currentIndex
         ? "current"
         : "locked",
+    // 満点の基準は採点側（lib/ai/compose.ts）から読む。画面に数字を書くと、
+    // 基準を変えたときに表示と実際がずれる（クリア閾値で同じことがあった経緯）
+    perfect: (bestScores.get(p.id) ?? 0) >= PERFECT_THRESHOLD,
   }));
 
   const clearedCount = clearedFlags.filter(Boolean).length;
