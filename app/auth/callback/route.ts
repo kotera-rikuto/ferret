@@ -20,7 +20,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   // Supabase / OAuth プロバイダは失敗時にここへエラーを付けて戻してくる。
-  // 以前はこれを見ずに /stages へ流していたため、middleware に弾かれて
+  // 以前はこれを見ずに /stages へ流していたため、proxy に弾かれて
   // ログイン画面に戻るだけになり、何が起きたのか誰にも分からなかった
   const providerError =
     searchParams.get("error_description") ?? searchParams.get("error");

@@ -4,7 +4,7 @@ import { SUPABASE_COOKIE_OPTIONS } from "@/lib/supabase/cookies";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { appBaseUrl } from "@/lib/http/origin";
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   // setAll が渡してくるヘッダを控えておく。

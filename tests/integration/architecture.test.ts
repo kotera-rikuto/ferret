@@ -6,7 +6,7 @@
  * ケース数は少ないが、壊れたときの被害が大きいものだけを置く。
  *   - service_role キーがブラウザに渡る
  *   - 模範解答がクライアントコンポーネントに渡る
- *   - 新しく作った保護画面を middleware の matcher に足し忘れる
+ *   - 新しく作った保護画面を proxy の matcher に足し忘れる
  * どれも「動くので気づけない」種類の事故で、実行時テストでは拾いにくい。
  */
 
@@ -14,7 +14,7 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, readFileSync, existsSync } from "node:fs";
 import { join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { config } from "@/middleware";
+import { config } from "@/proxy";
 
 const ROOT = fileURLToPath(new URL("../../", import.meta.url));
 const SOURCE_DIRS = ["app", "components", "lib"];
@@ -124,7 +124,7 @@ describe("§11 静的検査", () => {
   });
 
   /**
-   * 保護画面を新しく作ったとき、middleware の matcher に足し忘れると
+   * 保護画面を新しく作ったとき、proxy の matcher に足し忘れると
    * ページ側のガードだけが残る。動くので気づけないが、
    * DB へのクエリが走ってから弾かれることになる。
    */
@@ -138,7 +138,7 @@ describe("§11 静的検査", () => {
       // app/stages/page.tsx → stages / app/problems/[id]/page.tsx → problems
       const segment = f.path.split("/")[1];
       const covered = config.matcher.some((m) => m.startsWith(`/${segment}`));
-      expect(covered, `${f.path} が middleware の matcher に無い`).toBe(true);
+      expect(covered, `${f.path} が proxy の matcher に無い`).toBe(true);
     }
   });
 

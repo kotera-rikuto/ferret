@@ -60,7 +60,7 @@ export default function LoginPage() {
       setLoading(false);
       return;
     }
-    // middleware に付けられた行き先へ戻す。無ければステージ一覧へ。
+    // proxy に付けられた行き先へ戻す。無ければステージ一覧へ。
     // useSearchParams() を使うとページの事前生成が止まるため、
     // 送信時に1度だけ URL から読む。
     // safeNextPath を通すのは、外部サイトへ飛ばす値が混ぜられるのを防ぐため

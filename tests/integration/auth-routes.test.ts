@@ -2,7 +2,7 @@
  * 認証まわりのルートハンドラの結合テスト。
  * ケース定義は tests/integration/テストケース.md の §7〜§9。
  *
- * 対象: middleware.ts / GET /auth/callback / POST /logout
+ * 対象: proxy.ts / GET /auth/callback / POST /logout
  *
  * 見るのは「どこへリダイレクトするか」と「その行き先を外から動かせないか」。
  * ログイン画面へ送る処理は、行き先を乗っ取られるとそのまま偽ログイン画面になる。
@@ -25,7 +25,7 @@ const { getUserMock, signOutMock, exchangeMock, ssr } = vi.hoisted(() => ({
   ssr: { options: null as null | Record<string, never> },
 }));
 
-// middleware は @supabase/ssr を直接使う
+// proxy は @supabase/ssr を直接使う
 vi.mock("@supabase/ssr", () => ({
   createServerClient: (_url: string, _key: string, options: Record<string, never>) => {
     ssr.options = options;
@@ -73,7 +73,7 @@ vi.mock("@/lib/supabase/server", () => ({
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-key";
 
-const { middleware, config } = await import("@/middleware");
+const { proxy, config } = await import("@/proxy");
 const { GET: authCallback } = await import("@/app/auth/callback/route");
 const { POST: logout } = await import("@/app/logout/route");
 
@@ -108,10 +108,10 @@ function locationOf(res: Response) {
 }
 
 // ---------------------------------------------------------------------------
-// §7 middleware
+// §7 proxy
 // ---------------------------------------------------------------------------
 
-describe("§7 middleware", () => {
+describe("§7 proxy", () => {
   it.each([
     ["/stages", "/stages"],
     ["/problems/5", "/problems/5"],
@@ -119,7 +119,7 @@ describe("§7 middleware", () => {
     ["/review/5", "/review/5"],
   ])("I-300〜302 未ログインで %s はログイン画面へ送る", async (path, expected) => {
     getUserMock.mockResolvedValue(LOGGED_OUT);
-    const res = await middleware(get(`http://localhost:3000${path}`));
+    const res = await proxy(get(`http://localhost:3000${path}`));
 
     expect(res.status).toBe(307);
     const location = locationOf(res);
@@ -129,7 +129,7 @@ describe("§7 middleware", () => {
 
   it("I-303 ログイン済みならリダイレクトしない", async () => {
     getUserMock.mockResolvedValue(LOGGED_IN);
-    const res = await middleware(get("http://localhost:3000/stages"));
+    const res = await proxy(get("http://localhost:3000/stages"));
     expect(res.status).toBe(200);
     expect(res.headers.get("location")).toBeNull();
   });
@@ -157,7 +157,7 @@ describe("§7 middleware", () => {
    */
   it("I-307 next はパスのみで、クエリは引き継がない", async () => {
     getUserMock.mockResolvedValue(LOGGED_OUT);
-    const res = await middleware(get("http://localhost:3000/problems/5?retry=1"));
+    const res = await proxy(get("http://localhost:3000/problems/5?retry=1"));
     expect(locationOf(res).searchParams.get("next")).toBe("/problems/5");
   });
 
@@ -167,13 +167,13 @@ describe("§7 middleware", () => {
       return LOGGED_IN;
     });
 
-    const res = await middleware(get("http://localhost:3000/stages"));
+    const res = await proxy(get("http://localhost:3000/stages"));
     expect(res.cookies.get("sb-test-auth-token")?.value).toBe("refreshed");
   });
 
   /**
    * ライブラリが渡してくる「このレスポンスを絶対にキャッシュさせない」指示。
-   * middleware.ts のコメントが「**これを捨てると、セッションが他人に配られる可能性がある**」
+   * proxy.ts のコメントが「**これを捨てると、セッションが他人に配られる可能性がある**」
    * と書いている箇所。新しいログイン用 Cookie を発行しているレスポンスなので、
    * 途中のキャッシュに保存されると次に同じURLを開いた別の人へ Cookie ごと配られる。
    */
@@ -183,7 +183,7 @@ describe("§7 middleware", () => {
       return LOGGED_IN;
     });
 
-    const res = await middleware(get("http://localhost:3000/stages"));
+    const res = await proxy(get("http://localhost:3000/stages"));
     expect(res.headers.get("cache-control")).toBe(NO_STORE);
   });
 
@@ -194,7 +194,7 @@ describe("§7 middleware", () => {
       return LOGGED_OUT;
     });
 
-    const res = await middleware(get("http://localhost:3000/stages"));
+    const res = await proxy(get("http://localhost:3000/stages"));
     expect(res.status).toBe(307);
     expect(res.cookies.get("sb-test-auth-token")).toBeDefined();
   });
@@ -214,14 +214,14 @@ describe("§7 middleware", () => {
       return LOGGED_OUT;
     });
 
-    const res = await middleware(get("http://localhost:3000/stages"));
+    const res = await proxy(get("http://localhost:3000/stages"));
     expect(res.cookies.get("sb-test-auth-token")).toBeDefined();
     expect(res.headers.get("cache-control")).toBe(NO_STORE);
   });
 
   it("I-308c セッションの更新が無ければ余計なヘッダを足さない", async () => {
     getUserMock.mockResolvedValue(LOGGED_OUT);
-    const res = await middleware(get("http://localhost:3000/stages"));
+    const res = await proxy(get("http://localhost:3000/stages"));
     expect(res.status).toBe(307);
     expect(res.headers.get("cache-control")).toBeNull();
   });
@@ -230,7 +230,7 @@ describe("§7 middleware", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://ferret.example";
     getUserMock.mockResolvedValue(LOGGED_OUT);
 
-    const res = await middleware(
+    const res = await proxy(
       get("http://localhost:3000/stages", { host: "evil.example" }),
     );
     expect(locationOf(res).origin).toBe("https://ferret.example");
