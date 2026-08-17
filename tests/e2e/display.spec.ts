@@ -39,6 +39,39 @@ test.describe("§6 表示", () => {
     expect(r + g + b).toBeLessThan(200);
   });
 
+  /**
+   * 実行結果（context）と前提知識（prerequisite）は、入っている問題だけで枠が増える。
+   *
+   * 見るべきは**空の問題が今までどおり出ること**。
+   * 欄を足したときに壊れるのはこちら側で、2枠目が出ないことより気づきにくい。
+   */
+  test("E-456 実行結果と前提知識は、入っている問題だけ枠が増える", async ({
+    authedPage,
+    problems,
+    userId,
+  }) => {
+    // 1問目: どちらも空。コードの枠だけで、増えた要素は出ない
+    await authedPage.goto(`/problems/${problems[0].id}`);
+    await expect(authedPage.locator("pre")).toHaveCount(1);
+    await expect(authedPage.getByText("実行結果")).toHaveCount(0);
+    await expect(authedPage.getByText("わからない言葉があるとき")).toHaveCount(0);
+
+    // 2問目: どちらも入っている。1問目をクリアして解放する
+    await markCleared(userId, problems[0].id, 100);
+    await authedPage.goto(`/problems/${problems[1].id}`);
+
+    // 実行結果はコードと混ざらず、別のパネルとして出る
+    await expect(authedPage.locator("pre")).toHaveCount(2);
+    await expect(authedPage.getByText("実行結果")).toBeVisible();
+    await expect(authedPage.locator("pre").nth(1)).toContainText("node addTag.js");
+
+    // 前提知識は閉じた状態で置かれ、押すと開く（JS を使わない details）
+    const body = authedPage.getByText("配列の末尾に要素を足すメソッド");
+    await expect(body).toBeHidden();
+    await authedPage.getByText("わからない言葉があるとき").click();
+    await expect(body).toBeVisible();
+  });
+
   test("E-452 主要な画面に NG語が出ない", async ({ authedPage, problems }) => {
     const pages = ["/", "/login", "/register", "/stages", `/problems/${problems[0].id}`];
     for (const path of pages) {

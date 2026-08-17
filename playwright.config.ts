@@ -24,7 +24,13 @@ loadEnv({ path: ".env.local", quiet: true });
 
 const PORT = Number(process.env.E2E_PORT ?? 3100);
 const STUB_PORT = Number(process.env.OPENAI_STUB_PORT ?? 4010);
-const BASE_URL = `http://127.0.0.1:${PORT}`;
+/**
+ * ホスト名は `localhost` にする。`127.0.0.1` だと Next 16 の dev サーバーが
+ * 「別オリジンからの dev リソース要求」として **自分の JS を配らない**
+ * （allowedDevOrigins の既定に 127.0.0.1 が入っていない）。
+ * JS が来ないとログイン画面が動かず、E2E が1件も通らなくなる。
+ */
+const BASE_URL = `http://localhost:${PORT}`;
 
 /** @live を付けたテストだけ実APIに繋ぐ */
 const useLive = process.env.E2E_LIVE === "1";
