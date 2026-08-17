@@ -6,7 +6,15 @@
  * 同じテストがデスクトップ幅とスマホ幅の両方で走る。
  */
 
-import { test, expect, stub, deepOutput, markCleared, ANSWER } from "./support/fixtures";
+import {
+  test,
+  expect,
+  stub,
+  deepOutput,
+  markCleared,
+  clearPrecedingStages,
+  ANSWER,
+} from "./support/fixtures";
 
 /** lib/ai/scorer.ts の NG_WORDS のうち、画面に出てはいけないもの */
 const NG_WORDS = [
@@ -50,6 +58,10 @@ test.describe("§6 表示", () => {
     problems,
     userId,
   }) => {
+    // シードは実コンテンツの後ろ（order 9001 以降）に並ぶので、
+    // 先行するステージをクリアしないと解放されない
+    await clearPrecedingStages(userId);
+
     // 1問目: どちらも空。コードの枠だけで、増えた要素は出ない
     await authedPage.goto(`/problems/${problems[0].id}`);
     await expect(authedPage.locator("pre")).toHaveCount(1);

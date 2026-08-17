@@ -277,6 +277,21 @@ export async function markCleared(userId: string, problemId: number, score = 100
   if (error) throw new Error(`クリア状態の作成に失敗: ${error.message}`);
 }
 
+/**
+ * シード問題より前にある問題を、テストユーザーのクリア済みにする。
+ *
+ * シードは `order` 9001 以降に置いてあるので、**実コンテンツが増えるほどマップの末尾に並ぶ。**
+ * 解放判定（lib/progress/unlock.ts）は未クリアの先頭までしか開かないため、
+ * 先行する問題をクリアしないとシード問題は 404 になる。
+ * 問題が0件だった時期はシードが先頭に来ていたので、この下ごしらえは要らなかった。
+ */
+export async function clearPrecedingStages(userId: string) {
+  const db = admin();
+  const { data, error } = await db.from("problems").select("id").lt(ORDER_COL, 9000);
+  if (error) throw new Error(`先行ステージの取得に失敗: ${error.message}`);
+  for (const p of data ?? []) await markCleared(userId, p.id, 100);
+}
+
 export async function latestAttempt(userId: string, problemId: number) {
   const { data } = await admin()
     .from("user_attempts")
