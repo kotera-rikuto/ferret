@@ -301,8 +301,15 @@ export function composeScore(
       // 「偶数ではなく奇数」のような否定表現でキーワードが誤ヒットした分を封じる
       keywordScore = Math.min(keywordScore, KEYWORD_CAP_ON_CONTRADICTION);
     } else {
-      // 申告のみで裏が取れない場合。通さないが、点を潰しもしない
+      // 申告のみで裏が取れない場合。**通さない**が、層2を潰しはしない。
+      //
+      // 層1も併せて抑えるのは、上限40だけでは通ってしまうため。
+      // 層1が満点なら 40 + 20 = 60 で、クリア閾値55を超える。
+      // 「矛盾を申告しているのにクリアする」組み合わせが実在した（2026-08-17 に修正）。
+      // 矛盾が疑われている時点でキーワードの表面一致も割り引く、という
+      // 引用付きで確認できた場合と同じ考え方を適用する。
       deepScore = Math.min(deepScore, DEEP_CAP_ON_UNVERIFIED_CONTRADICTION);
+      keywordScore = Math.min(keywordScore, KEYWORD_CAP_ON_CONTRADICTION);
     }
   }
 

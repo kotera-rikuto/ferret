@@ -276,7 +276,7 @@ describe("§1-2 合成の分岐", () => {
     expect(r.keywordScore).toBeLessThanOrEqual(10);
   });
 
-  it("U-036 矛盾（引用なし）は層2だけを抑え、層1は切り詰めない", () => {
+  it("U-036 矛盾（引用なし）は層2を40点・層1を10点で抑える", () => {
     const r = composeScore(
       deep(["full", "full", "full", "full"], {
         contradiction: true,
@@ -285,23 +285,19 @@ describe("§1-2 合成の分岐", () => {
       ANSWER,
       slots(4),
     );
+    // 引用付きで確認できた場合（20 + 10）よりは緩いが、閾値には届かせない
     expect(r.deepScore).toBe(40);
-    expect(r.keywordScore).toBe(20);
+    expect(r.keywordScore).toBe(10);
   });
 
   /**
-   * 🟡 現状の挙動を固定するテスト。
+   * 矛盾を申告している回答は、引用の裏が取れなくてもクリアさせない（2026-08-17 に修正）。
    *
-   * compose.ts のコメントは「申告のみで裏が取れない場合。通さないが、点を潰しもしない」
-   * と書いているが、層2上限 40 + 層1満点 20 = 60点でクリア閾値 55 を超える。
-   * つまり「矛盾を申告しているのにクリアする」組み合わせが存在する。
-   *
-   * 潰す場合の選択肢:
-   *   (a) DEEP_CAP_ON_UNVERIFIED_CONTRADICTION を 34 以下にする
-   *   (b) 未検証の矛盾でも keywordScore を切り詰める
-   * どちらを採るかはオーナーの判断なので、ここでは現状を固定するに留める。
+   * 以前は層2だけを40点に抑えていたため、層1が満点だと 40 + 20 = 60点になり、
+   * クリア閾値55を超えていた。compose.ts のコメントは「通さない」と書いていたので、
+   * 意図と挙動が食い違っていた状態。層1も10点に抑えることで最大50点に収まる。
    */
-  it("U-037 【要判断】矛盾（引用なし）でも 60点でクリアしてしまう", () => {
+  it("U-037 矛盾（引用なし）はクリアさせない", () => {
     const r = composeScore(
       deep(["full", "full", "full", "full"], {
         contradiction: true,
@@ -310,10 +306,9 @@ describe("§1-2 合成の分岐", () => {
       ANSWER,
       slots(4),
     );
-    expect(r.total).toBe(60);
+    expect(r.total).toBe(50);
     expect(r.contradiction).toBe(true);
-    // 仕様が決まったら false に変える
-    expect(r.cleared).toBe(true);
+    expect(r.cleared).toBe(false);
   });
 
   it("U-038 demoted は「full を申告したが引用が取れなかった」観点にだけ立つ", () => {
@@ -435,8 +430,7 @@ describe("§1-3 定数の不変条件", () => {
     expect(r.total).toBeLessThan(CLEAR_THRESHOLD);
   });
 
-  /** 🟡 U-037 と同根。現状は成立しないので、成立しないことを固定する */
-  it("U-059 【要判断】矛盾（引用なし）の最大点は閾値を超える", () => {
+  it("U-059 矛盾（引用なし）の最大点も閾値に届かない", () => {
     const r = composeScore(
       deep(["full", "full", "full", "full"], {
         contradiction: true,
@@ -445,7 +439,7 @@ describe("§1-3 定数の不変条件", () => {
       ANSWER,
       slots(4),
     );
-    expect(r.total).toBeGreaterThanOrEqual(CLEAR_THRESHOLD);
+    expect(r.total).toBeLessThan(CLEAR_THRESHOLD);
   });
 });
 
