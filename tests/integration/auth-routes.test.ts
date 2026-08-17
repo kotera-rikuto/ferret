@@ -200,17 +200,15 @@ describe("§7 middleware", () => {
   });
 
   /**
-   * 🟡 現状の挙動を固定するテスト。
+   * リダイレクトのときも同じ指示を運ぶ（2026-08-17 に修正）。
    *
-   * 未ログインで弾くとき、middleware は新しい `redirect` レスポンスを作って
-   * **Cookie だけ**を移し替えている。`setAll` が渡してきたヘッダ（キャッシュ禁止）は
-   * 移していないため、**Set-Cookie を持つのにキャッシュ禁止が付かないレスポンス**になる。
-   *
-   * 通過時（I-308）には付くので、危ないのはリダイレクト側だけ。
-   * 実際に問題になるかは経路上のキャッシュ次第だが、
-   * コメントが宣言している「捨てない」は片側でしか守れていない。
+   * 以前は新しい `redirect` レスポンスへ **Cookie だけ**を移し替えていて、
+   * `setAll` が渡してきたキャッシュ禁止のヘッダが落ちていた。
+   * **Set-Cookie を持つのにキャッシュ禁止が付かないレスポンス**になるので、
+   * 経路上のキャッシュに保存されると次の人へ Cookie ごと配られうる。
+   * 通過時（I-308）だけ守られていて、弾くときに漏れていた。
    */
-  it("I-308b 【要判断】リダイレクトではキャッシュ禁止のヘッダが引き継がれない", async () => {
+  it("I-308b リダイレクトでもキャッシュ禁止のヘッダを引き継ぐ", async () => {
     getUserMock.mockImplementation(async () => {
       refreshSession([{ name: "sb-test-auth-token", value: "" }]);
       return LOGGED_OUT;
@@ -218,8 +216,14 @@ describe("§7 middleware", () => {
 
     const res = await middleware(get("http://localhost:3000/stages"));
     expect(res.cookies.get("sb-test-auth-token")).toBeDefined();
-    // 直すならここが NO_STORE になる
-    expect(res.headers.get("cache-control")).not.toBe(NO_STORE);
+    expect(res.headers.get("cache-control")).toBe(NO_STORE);
+  });
+
+  it("I-308c セッションの更新が無ければ余計なヘッダを足さない", async () => {
+    getUserMock.mockResolvedValue(LOGGED_OUT);
+    const res = await middleware(get("http://localhost:3000/stages"));
+    expect(res.status).toBe(307);
+    expect(res.headers.get("cache-control")).toBeNull();
   });
 
   it("I-309 リダイレクト先は Host ヘッダではなく設定した基点から作る", async () => {

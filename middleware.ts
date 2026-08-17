@@ -7,6 +7,11 @@ import { appBaseUrl } from "@/lib/http/origin";
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
+  // setAll が渡してくるヘッダを控えておく。
+  // 未ログインで弾くときは別のレスポンス（redirect）を作り直すので、
+  // ここに取っておかないとキャッシュ禁止の指示が落ちる
+  const cacheHeaders: Record<string, string> = {};
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -32,9 +37,10 @@ export async function middleware(request: NextRequest) {
           // 途中のキャッシュ（CDN・社内プロキシなど）に保存されてしまうと、
           // 次に同じURLを開いた別の人へ、その Cookie ごと配られてしまう。
           // @supabase/ssr の型定義にも明記されている必須の処理。
-          Object.entries(headers).forEach(([key, value]) =>
-            supabaseResponse.headers.set(key, value),
-          );
+          Object.entries(headers).forEach(([key, value]) => {
+            cacheHeaders[key] = value;
+            supabaseResponse.headers.set(key, value);
+          });
         },
       },
     },
@@ -59,6 +65,13 @@ export async function middleware(request: NextRequest) {
     // 捨てると、無効になった Cookie がブラウザに残り続ける
     supabaseResponse.cookies.getAll().forEach((cookie) => {
       redirect.cookies.set(cookie);
+    });
+    // **Cookie を載せる以上、キャッシュ禁止も一緒に運ぶ。**
+    // 上のブロックのコメントで「捨てるとセッションが他人に配られる」と書いている指示は、
+    // 通過するときだけでなくここでも要る。Set-Cookie を持つレスポンスを
+    // 途中のキャッシュに保存されると、次に同じURLを開いた別の人へ配られてしまう
+    Object.entries(cacheHeaders).forEach(([key, value]) => {
+      redirect.headers.set(key, value);
     });
     return redirect;
   }
