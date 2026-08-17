@@ -169,6 +169,13 @@ max_indexes = 5
 #   - enable_confirmations = true（本番はメール確認が必須。以前ここは false で、
 #     push した瞬間に本番のメール確認が切れる状態だった）
 #   - minimum_password_length = 8
+#   - [auth.rate_limit] email_sent = 30（2026-08-17 に本番の値を確認して合わせた。
+#     以前ここは既定の 2 で、push すると**本番の送信上限が1時間2通に戻る**状態だった。
+#     2 のままだと、同じ1時間に3人が登録した時点で3人目にメールが届かない）
+#
+# **[auth.email.smtp] は意図的に書いていない。** 送信は Resend を使っており、
+# 接続情報（APIキーを含む）は管理画面にだけ入れてある。ここに書くと push で
+# 上書きできる代わりに、キーを環境変数経由で持ち回る必要が出る（tasks/C1 の作業記録）。
 # ============================================================================
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
@@ -224,7 +231,10 @@ password_requirements = ""
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# 既定の 2 では、同じ1時間に3人が登録した時点で3人目にメールが届かない。
+# 本番は 30（2026-08-17 に管理画面で確認）。Resend の無料枠（1日100通・月3,000通）の内側。
+# **この欄は独自SMTPを有効にしないと変更できない。** 上のコメントも参照
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
