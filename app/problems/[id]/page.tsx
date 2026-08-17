@@ -3,9 +3,38 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
-import { IconClose } from "@/components/ui/icons";
+import { IconBook, IconChevronDown, IconClose } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
 import { ProblemForm } from "./ProblemForm";
+
+/**
+ * ダークなコードパネル。画面が明色でもコードは常にダーク（UXルール）。
+ * Shiki によるハイライトは未導入で、当面は素のテキスト（design/移植残タスク.md）。
+ *
+ * コードと実行結果で2回使うので、枠の見た目はここに1つだけ置く。
+ * 別々に書くと片方だけに手が入って、並べたときに揃わなくなる。
+ */
+function CodePanel({
+  label,
+  hint,
+  body,
+}: {
+  label: string;
+  hint: string;
+  body: string;
+}) {
+  return (
+    <div className="overflow-hidden rounded-2xl border-b-5 border-code-edge bg-code-bg">
+      <div className="flex items-center justify-between border-b border-white/10 px-4.5 py-2.5 text-[11px] font-bold tracking-wider text-code-muted">
+        <span>{label}</span>
+        <span>{hint}</span>
+      </div>
+      <pre className="overflow-x-auto p-5 font-mono text-sm leading-loose text-code-ink">
+        <code>{body}</code>
+      </pre>
+    </div>
+  );
+}
 
 export default async function ProblemPage({
   params,
@@ -37,7 +66,9 @@ export default async function ProblemPage({
   // model_answer / rubric_items を select しないことでクライアントへの流出を防ぐ
   const { data: problem } = await admin
     .from("problems")
-    .select("id, order, title, code, question, language, reading_type")
+    .select(
+      "id, order, title, code, question, language, reading_type, context, prerequisite",
+    )
     .eq("id", problemId)
     .single();
 
@@ -69,17 +100,18 @@ export default async function ProblemPage({
       </header>
 
       <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 pt-9 pb-44">
-        {/* コードパネル。画面は明色でも、コードは常にダーク（UXルール）。
-            Shiki によるハイライトは未導入で、当面は素のテキスト（design/移植残タスク.md） */}
-        <div className="overflow-hidden rounded-2xl border-b-5 border-code-edge bg-code-bg">
-          <div className="flex items-center justify-between border-b border-white/10 px-4.5 py-2.5 text-[11px] font-bold tracking-wider text-code-muted">
-            <span>{(problem.language ?? "js").toUpperCase()}</span>
-            <span>読んでみよう</span>
-          </div>
-          <pre className="overflow-x-auto p-5 font-mono text-sm leading-loose text-code-ink">
-            <code>{problem.code}</code>
-          </pre>
-        </div>
+        <CodePanel
+          label={(problem.language ?? "js").toUpperCase()}
+          hint="読んでみよう"
+          body={problem.code}
+        />
+
+        {/* 実行結果。影響型（エラーの出力から原因の場所を特定する読み方）で使う。
+            コードと同じ枠に混ぜるとエラー文がコードの一部に見えてしまうので、
+            必ず別のパネルに出す。空の問題では枠ごと出さない */}
+        {problem.context && (
+          <CodePanel label="実行結果" hint="実行するとこう出た" body={problem.context} />
+        )}
 
         {/* 設問。フェレットが問いかけている形にして、余白の多い画面に手がかりを置く */}
         <div className="flex items-start gap-4">
@@ -90,6 +122,28 @@ export default async function ProblemPage({
             </p>
           </div>
         </div>
+
+        {/* 前提知識。
+            既定は閉じておく。読まなくても解ける人の画面を煩雑にしないためで、
+            「不合格になってから開く」形にはしない（間違えないと助けが出ない形は
+            装備獲得型の方針と合わない）。
+            details なので JS なしで開閉でき、この画面はサーバーコンポーネントのまま。
+            ここに答えは書かない（tasks/E4-問題データに欄を足す.md の注意） */}
+        {problem.prerequisite && (
+          <details className="group rounded-2xl border-2 border-line bg-panel px-5 py-4">
+            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-extrabold text-brand-deep [&::-webkit-details-marker]:hidden">
+              <IconBook size={17} />
+              わからない言葉があるとき
+              <IconChevronDown
+                size={16}
+                className="ml-auto transition-transform group-open:rotate-180"
+              />
+            </summary>
+            <p className="mt-3 border-t-2 border-line pt-3 text-sm leading-loose whitespace-pre-line">
+              {problem.prerequisite}
+            </p>
+          </details>
+        )}
 
         {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
         <ProblemForm
