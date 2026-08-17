@@ -271,6 +271,7 @@ export function deepOutput(
     contradictionEvidence?: string;
     praise?: string;
     next_focus?: string;
+    matched_reject?: "none" | "1" | "2" | "3";
   } = {},
 ) {
   const ev = opts.evidence ?? EVIDENCE_REAL;
@@ -283,6 +284,7 @@ export function deepOutput(
     articulation: axis(articulation),
     contradiction: opts.contradiction ?? false,
     contradiction_evidence: opts.contradictionEvidence ?? "",
+    matched_reject: opts.matched_reject ?? "none",
     praise: opts.praise ?? "const の扱いまで読み取れています。",
     next_focus: opts.next_focus ?? "5行目の rate = 0.8 に注目してみてください。",
   };

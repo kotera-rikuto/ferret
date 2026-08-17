@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { parseDeepScore, DEEP_SCORE_SCHEMA, PROMPT_VERSION } from "@/lib/ai/schema";
+import {
+  parseDeepScore,
+  DEEP_SCORE_SCHEMA,
+  MATCHED_REJECT_VALUES,
+  PROMPT_VERSION,
+} from "@/lib/ai/schema";
 
 /** 検証を通る最小のオブジェクト。各テストで一部だけ壊して使う */
 function valid(): Record<string, unknown> {
@@ -20,6 +25,7 @@ function valid(): Record<string, unknown> {
     articulation: { verdict: "full", evidence: "5行目で停止" },
     contradiction: false,
     contradiction_evidence: "",
+    matched_reject: "none",
     praise: "中核まで読み取れています。",
     next_focus: "5行目の rate = 0.8 に注目してみてください。",
   };
@@ -116,20 +122,23 @@ describe("§3 parseDeepScore", () => {
 
   /**
    * 🟡 未知のキーは無視されて通る。
-   * OpenAI 側は additionalProperties: false を守るので実害は薄いが、
-   * 残課題 §3 で matched_reject を足すときに「スキーマには足したが
-   * parseDeepScore に足し忘れた」場合、静かに落ちることになる。
-   * その取りこぼしをこのテストが記録しておく。
+   * OpenAI 側は additionalProperties: false を守るので実害は薄い。
+   *
+   * このテストはもともと matched_reject を例に使っていた（スキーマに足したのに
+   * parseDeepScore へ足し忘れると静かに落ちる、という取りこぼしの記録）。
+   * 2026-08-17 に matched_reject を実装したので、例を未実装のキーに差し替えてある。
+   * **落とし穴自体は残っている**ので、次にスキーマへ項目を足すときも
+   * parseDeepScore と DeepScoreOutput の両方に足すこと。
    */
   it("U-130 【要判断】未知のキーは無視されて通る", () => {
     const raw = valid();
-    raw.matched_reject = "1";
+    raw.reviewer_note = "スキーマに存在しないキー";
     const r = parseDeepScore(raw);
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.value).not.toHaveProperty("matched_reject");
+    if (r.ok) expect(r.value).not.toHaveProperty("reviewer_note");
   });
 
-  it("U-131 スキーマの required が8項目すべてを列挙している", () => {
+  it("U-131 スキーマの required が9項目すべてを列挙している", () => {
     expect([...DEEP_SCORE_SCHEMA.required]).toEqual([
       "core",
       "ground",
@@ -137,9 +146,57 @@ describe("§3 parseDeepScore", () => {
       "articulation",
       "contradiction",
       "contradiction_evidence",
+      "matched_reject",
       "praise",
       "next_focus",
     ]);
+  });
+
+  /**
+   * matched_reject は「どの誤読に当たったか」の記録（残課題 §3）。
+   * 点数には関わらないが、**既定値で埋めない**方針はこの項目にも適用する。
+   * 埋めると「モデルが返していない」と「該当なしと判定した」が同じ値になり、
+   * 集計したときに『誰も誤読していない問題』と区別がつかなくなる。
+   */
+  it("U-134 matched_reject が欠けていたら拒否する", () => {
+    const raw = valid();
+    delete raw.matched_reject;
+    const r = parseDeepScore(raw);
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain("matched_reject");
+  });
+
+  it.each([
+    ["列挙にない番号", "4"],
+    ["0", "0"],
+    ["空文字", ""],
+    ["数値", 1],
+    ["null", null],
+    ["真偽値", false],
+  ])("U-135 matched_reject が %s だと拒否する", (_label, value) => {
+    const raw = valid();
+    raw.matched_reject = value;
+    expect(parseDeepScore(raw).ok).toBe(false);
+  });
+
+  it.each([...MATCHED_REJECT_VALUES])("U-136 matched_reject の %s は通る", (v) => {
+    const raw = valid();
+    raw.matched_reject = v;
+    const r = parseDeepScore(raw);
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.value.matched_reject).toBe(v);
+  });
+
+  /**
+   * enum と検証で同じ配列を使っていることの確認。
+   * 別々に書くと、片方だけ番号を増やしたときに
+   * 「スキーマは通るのに parseDeepScore が弾く」（＝採点が 503 になる）が起きる。
+   */
+  it("U-137 スキーマの enum と検証の許可値が一致している", () => {
+    expect(DEEP_SCORE_SCHEMA.properties.matched_reject.enum).toBe(
+      MATCHED_REJECT_VALUES,
+    );
+    expect([...MATCHED_REJECT_VALUES]).toEqual(["none", "1", "2", "3"]);
   });
 
   /**

@@ -102,6 +102,7 @@ function deepOutput(
     contradictionEvidence?: string;
     praise?: string;
     next_focus?: string;
+    matched_reject?: DeepScoreOutput["matched_reject"];
   } = {},
 ): DeepScoreOutput {
   const ev = opts.evidence ?? EVIDENCE_REAL;
@@ -117,6 +118,7 @@ function deepOutput(
     articulation: axis(articulation),
     contradiction: opts.contradiction ?? false,
     contradiction_evidence: opts.contradictionEvidence ?? "",
+    matched_reject: opts.matched_reject ?? "none",
     praise: opts.praise ?? CLEAN_PRAISE,
     next_focus: opts.next_focus ?? CLEAN_NEXT,
   };
@@ -264,6 +266,33 @@ describe("§5-1 リクエストの組み立て", () => {
     const r = await scoreAnswer(ANSWER, PROBLEM);
     expect(r.usage.prompt_tokens).toBe(1650);
     expect(r.usage.cached_tokens).toBeNull();
+  });
+
+  /**
+   * matched_reject は「どの誤読に当たったか」の記録（残課題 §3）。
+   * scorer は加工せずそのまま通す。**配点には一切関わらない。**
+   */
+  it("U-212 matched_reject をそのまま結果に載せる", async () => {
+    createMock.mockResolvedValue(
+      ok(deepOutput(["full", "full", "full", "full"], { matched_reject: "2" })),
+    );
+    const r = await scoreAnswer(ANSWER, PROBLEM);
+    expect(r.matched_reject).toBe("2");
+  });
+
+  it("U-213 matched_reject は点数を変えない", async () => {
+    createMock.mockResolvedValue(ok(deepOutput(["full", "partial", "none", "none"])));
+    const none = await scoreAnswer(ANSWER, PROBLEM);
+
+    createMock.mockResolvedValue(
+      ok(deepOutput(["full", "partial", "none", "none"], { matched_reject: "1" })),
+    );
+    const matched = await scoreAnswer(ANSWER, PROBLEM);
+
+    expect(matched.total).toBe(none.total);
+    expect(matched.deepScore).toBe(none.deepScore);
+    expect(matched.keywordScore).toBe(none.keywordScore);
+    expect(matched.cleared).toBe(none.cleared);
   });
 
   it("U-209 結果に採点の出所が記録される", async () => {

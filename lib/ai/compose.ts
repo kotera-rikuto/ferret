@@ -11,6 +11,22 @@
 export type Verdict = "full" | "partial" | "none";
 export type AxisName = "core" | "ground" | "depth" | "articulation";
 
+/**
+ * 【この問題で起きやすい、惜しいが両立しない読み方】（`problems.rubric_items.core_reject`）の
+ * 何番に当たったか。`"none"` は該当なし。
+ *
+ * **配点には一切使わない。記録のためだけの項目。**
+ * 誤読の種類ごとに集計できると「この問題は回答者の3割が同じ読み違いをしている」が分かり、
+ * 問題文を直すのか、よくある誤解として解説を足すのかを判断できる。
+ * いまはその一次データが存在しない（ideas/採点システム_残課題.md §3）。
+ *
+ * 番号を3までにしているのは、`core_reject` の実データが最大3件だから
+ * （DB制約は「2件以上」なので上限は無い）。**4件以上の問題を作るなら、
+ * ここと schema.ts の enum、prompt.ts の指示文を同時に広げること。**
+ * 広げ忘れると4件目以降に当たった回答が黙って "none" として記録される。
+ */
+export type MatchedReject = "none" | "1" | "2" | "3";
+
 export type AxisJudgement = {
   /** full と判定した根拠。ユーザー回答からの逐語引用（20字以内） */
   evidence: string;
@@ -29,6 +45,8 @@ export type DeepScoreOutput = {
   praise: string;
   /** 次に見るとよいコード上の箇所。場所を指す文なので判断の言葉が入りにくい */
   next_focus: string;
+  /** どの誤読に当たったか。**採点には使わない**（MatchedReject のコメント参照） */
+  matched_reject: MatchedReject;
 };
 
 export type KeywordSlot = { match: string[] };

@@ -88,6 +88,9 @@ function deep(
     articulation: axis(articulation),
     contradiction: opts.contradiction ?? false,
     contradiction_evidence: opts.contradictionEvidence ?? "",
+    // 記録用の項目で配点には関わらないため、ここでは固定値でよい。
+    // 点数に効かないことの確認は U-213 / I-161 が持つ
+    matched_reject: "none",
     praise: "",
     next_focus: "",
   };

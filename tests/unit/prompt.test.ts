@@ -8,6 +8,7 @@
  */
 
 import { describe, it, expect } from "vitest";
+import { MATCHED_REJECT_VALUES } from "@/lib/ai/schema";
 import {
   STATIC_PROMPT,
   problemBlock,
@@ -60,6 +61,39 @@ describe("§4 STATIC_PROMPT", () => {
     for (const type of ["トレース", "意図", "ズレ", "影響", "命名", "仕様"]) {
       expect(STATIC_PROMPT).toContain(type);
     }
+  });
+
+  /**
+   * matched_reject（残課題 §3）。番号で答えさせる指示と、
+   * 「点数は変わらない」という但し書きの両方が要る。
+   * 但し書きが無いと、当てはめること自体が減点だと解釈して
+   * モデルが none に寄る（＝集計の材料が集まらない）。
+   */
+  it("U-160 matched_reject を番号で答えさせる指示がある", () => {
+    expect(STATIC_PROMPT).toContain("matched_reject");
+    expect(STATIC_PROMPT).toContain("none");
+    expect(STATIC_PROMPT).toContain("点数を変えません");
+  });
+
+  /**
+   * プロンプトが許す番号と、スキーマが許す値は同じでなければならない。
+   * スキーマだけ広げるとプロンプトが古い範囲を案内し続け、
+   * プロンプトだけ広げるとモデルが出せない番号を案内することになる。
+   */
+  it("U-160b 案内している番号の範囲がスキーマの enum と揃っている", () => {
+    expect(STATIC_PROMPT).toContain("番号は 1〜3 のみ");
+    expect([...MATCHED_REJECT_VALUES]).toEqual(["none", "1", "2", "3"]);
+  });
+
+  /**
+   * 残課題 §4。読み違いを指摘するときに場所を示さない案内が出ていた。
+   * 「もう一度追ってみてください」を禁じる指示は元からあるが、
+   * **必ず場所を入れる**という要求は matched_reject の追加と合わせて足した。
+   */
+  it("U-161 読み違いを検出したときは場所を示すよう求めている", () => {
+    expect(STATIC_PROMPT).toContain("その読み方が成り立たなくなる箇所");
+    expect(STATIC_PROMPT).toContain("行番号");
+    expect(STATIC_PROMPT).toContain("場所を特定しない案内は書きません");
   });
 });
 

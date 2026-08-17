@@ -444,6 +444,11 @@ async function handleScoring(
         // 保存しないと集計できないので一緒に入れる。
         // axes は JSONB なのでカラム追加は要らない
         fabrication_suspected: result.fabricationSuspected,
+        // どの誤読に当たったか（"none" / "1" / "2" / "3"）。
+        // 点数には関わらないが、これを貯めないと「この問題は回答者の3割が
+        // 同じ読み違いをしている」という集計ができない（残課題 §3）。
+        // リプレイ時はこの axes をそのまま複製するので、再送でも記録が消えない
+        matched_reject: result.matched_reject,
       },
       grader_version: result.grader_version,
       answer_hash: result.answer_hash,

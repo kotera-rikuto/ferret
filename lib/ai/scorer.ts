@@ -5,6 +5,7 @@ import {
   type ComposedScore,
   type DeepScoreOutput,
   type KeywordSlot,
+  type MatchedReject,
 } from "./compose";
 import { answerHash } from "./hash";
 import { DEEP_SCORE_SCHEMA, PROMPT_VERSION, parseDeepScore } from "./schema";
@@ -80,6 +81,12 @@ export type ScoringResult = ComposedScore & {
   grader_version: string;
   scoring_method: "ai";
   usage: ScoringUsage;
+  /**
+   * どの誤読に当たったか。ComposedScore ではなくここに置くのは、
+   * **配点の計算に一切関わらないから。** compose.ts は「点がどう決まるか」だけを持つ
+   * ファイルにしてあり、記録用の値を混ぜると読む人が採点要素と誤解する。
+   */
+  matched_reject: MatchedReject;
 };
 
 // ---------------------------------------------------------------------------
@@ -305,6 +312,7 @@ export async function scoreAnswer(
     answer_hash: answerHash(problem.id, GRADER_VERSION, answer),
     grader_version: GRADER_VERSION,
     scoring_method: "ai",
+    matched_reject: res.output.matched_reject,
     usage: {
       ...res.usage,
       feedback_source: feedback.source,

@@ -565,6 +565,38 @@ describe("§3 採点の成功", () => {
     await post(VALID);
     expect(spy.inserted[0].ai_feedback).toBeTruthy();
   });
+
+  /**
+   * どの誤読に当たったか（残課題 §3）。2026-08-17 に追加。
+   * 保存していないと「この問題は回答者の3割が同じ読み違いをしている」が集計できず、
+   * 問題文を直す判断材料が一次データとして残らない。
+   * axes は JSONB なので DB のカラム追加は要らない。
+   */
+  it("I-160 誤読の番号を axes に保存する", async () => {
+    createMock.mockResolvedValue(
+      openAiOk(
+        deepOutput(["partial", "none", "none", "none"], { matched_reject: "1" }),
+      ),
+    );
+    await post(VALID);
+    const axes = spy.inserted[0].axes as Record<string, unknown>;
+    expect(axes.matched_reject).toBe("1");
+  });
+
+  it("I-160b どれにも当たらなければ none が入る（欄自体は必ず作る）", async () => {
+    await post(VALID);
+    const axes = spy.inserted[0].axes as Record<string, unknown>;
+    expect(axes.matched_reject).toBe("none");
+  });
+
+  /** 点数に影響しないことをAPIの外側からも確かめる（scorer 側は U-213） */
+  it("I-161 誤読の番号は点数を変えない", async () => {
+    createMock.mockResolvedValue(
+      openAiOk(deepOutput(["full", "full", "full", "full"], { matched_reject: "3" })),
+    );
+    const { json } = await post(VALID);
+    expect(json.score).toBe(100);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -608,6 +640,20 @@ describe("§4 同一回答リプレイ", () => {
     expect(spy.inserted).toHaveLength(1);
     expect(spy.inserted[0].total_score).toBe(73);
     expect(spy.inserted[0].usage).toEqual({ replayed: true });
+  });
+
+  /**
+   * リプレイは axes をそのまま複製するので、誤読の番号も一緒に残る。
+   * ここが欠けると「再送した回で誤読の記録だけ消える」ことになり、
+   * 集計（残課題 §3）が再送の回数だけ目減りする。
+   */
+  it("I-162 リプレイでも誤読の番号が引き継がれる", async () => {
+    setup({
+      replay: { ...PREV, axes: { ...PREV.axes, matched_reject: "2" } },
+    });
+    await post(VALID);
+    const axes = spy.inserted[0].axes as Record<string, unknown>;
+    expect(axes.matched_reject).toBe("2");
   });
 
   it("I-175 リプレイ検索は user_id・problem_id・answer_hash・判定保留で絞る", async () => {

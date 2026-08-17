@@ -27,6 +27,7 @@ const DEFAULT_OUTPUT = {
   articulation: { evidence: "const 宣言に再代入", verdict: "full" },
   contradiction: false,
   contradiction_evidence: "",
+  matched_reject: "none",
   praise: "const の扱いまで読み取れています。",
   next_focus: "5行目の rate = 0.8 に注目してみてください。",
 };
