@@ -37,11 +37,15 @@ export type DbState = {
   replay: Record<string, unknown> | null;
   /** insert が返すエラー。null なら成功 */
   insertError: { message: string } | null;
+  /** upsert が返すエラー。null なら成功 */
+  upsertError: { message: string } | null;
 };
 
 export type DbSpy = {
   /** insert された行 */
   inserted: Record<string, unknown>[];
+  /** upsert された [行, オプション] */
+  upserted: Array<[Record<string, unknown>, unknown]>;
   /** admin 側の [テーブル, 列] */
   selects: Array<[string, string]>;
   /** admin 側の [テーブル, 列名, 値] */
@@ -61,6 +65,7 @@ export type DbSpy = {
 export function emptySpy(): DbSpy {
   return {
     inserted: [],
+    upserted: [],
     selects: [],
     filters: [],
     sessionTables: [],
@@ -139,6 +144,10 @@ function makeAdmin(state: DbState, spy: DbSpy) {
         insert(row: Record<string, unknown>) {
           spy.inserted.push(row);
           return Promise.resolve({ error: state.insertError });
+        },
+        upsert(row: Record<string, unknown>, options?: unknown) {
+          spy.upserted.push([row, options]);
+          return Promise.resolve({ error: state.upsertError });
         },
       };
     },
@@ -234,6 +243,7 @@ export function defaultState(patch: Partial<DbState> = {}): DbState {
     problemDetail: PROBLEM_DETAIL,
     replay: null,
     insertError: null,
+    upsertError: null,
     ...patch,
   };
 }

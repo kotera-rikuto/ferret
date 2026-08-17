@@ -25,7 +25,7 @@ export default async function ResultPage({
   // session クライアント経由なので RLS で自分の行だけに絞られる
   const { data: attempt } = await supabase
     .from("user_attempts")
-    .select("total_score, keyword_score, deep_score, ai_feedback")
+    .select("id, total_score, keyword_score, deep_score, ai_feedback")
     .eq("problem_id", problemId)
     // 判定保留（レート上限時に層1のみで採点した回）は合否を出さない
     .eq("is_provisional", false)
@@ -39,6 +39,7 @@ export default async function ResultPage({
   return (
     <ResultView
       problemId={problemId}
+      attemptId={attempt.id}
       totalScore={attempt.total_score}
       keywordScore={attempt.keyword_score}
       deepScore={attempt.deep_score}

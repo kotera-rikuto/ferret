@@ -234,8 +234,9 @@ describe("§10-3 /result/[id]", () => {
     setup({ resultAttempt: ATTEMPT });
     await ResultPage(params(String(UNLOCKED_ID)));
     expect(spy.sessionTables).toEqual(["user_attempts"]);
+    // id は異議申し立て（/api/feedback）で attempt_id として使う
     expect(spy.sessionSelects[0]).toBe(
-      "total_score, keyword_score, deep_score, ai_feedback",
+      "id, total_score, keyword_score, deep_score, ai_feedback",
     );
   });
 

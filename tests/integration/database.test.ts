@@ -46,6 +46,30 @@ if (OPT_IN && !HAS_ENV) {
 
 const TEST_ORDER = 9500;
 
+/**
+ * `order` カラムを絞り込みに使うときは、必ず二重引用符でくくる。
+ *
+ * PostgREST は `order` を**並び替え指定の予約語**として扱う。
+ * `.gte("order", 9500)` はクエリ文字列で `order=gte.9500` になり、
+ * 「gte.9500 という順序指定」と解釈されて
+ * `failed to parse order (gte.9500)` というエラーになる。
+ *
+ * 厄介なのは、エラーを確認しないと**何も起きずに素通りして見える**こと。
+ * 実際これで後片付けが効かず、テスト用の行が本番テーブルに8件残った。
+ * だから下の cleanup はエラーを必ず投げる。
+ */
+const ORDER_COL = '"order"';
+
+/** テスト用に投入した問題を消す。**失敗したら黙って進まない** */
+async function cleanupProblems(client: SupabaseClient) {
+  const { error } = await client.from("problems").delete().gte(ORDER_COL, TEST_ORDER);
+  if (error) {
+    throw new Error(
+      `テスト用の問題を削除できませんでした（本番テーブルに残ります）: ${error.message}`,
+    );
+  }
+}
+
 /** 制約を通る最小の問題データ */
 function validProblem(patch: Record<string, unknown> = {}) {
   return {
@@ -143,7 +167,7 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
     admin = createClient(URL_!, SERVICE!, { auth: { persistSession: false } });
     anon = createClient(URL_!, ANON!, { auth: { persistSession: false } });
 
-    await admin.from("problems").delete().gte("order", TEST_ORDER);
+    await cleanupProblems(admin);
 
     userA = await ensureUser(USERS.a.email, USERS.a.password);
     userB = await ensureUser(USERS.b.email, USERS.b.password);
@@ -159,8 +183,10 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
 
   afterAll(async () => {
     if (!admin) return;
+    // problem_feedback は problems / user_attempts への外部キーを持つので先に消す
+    await admin.from("problem_feedback").delete().in("user_id", [userA, userB]);
     await admin.from("user_attempts").delete().in("user_id", [userA, userB]);
-    await admin.from("problems").delete().gte("order", TEST_ORDER);
+    await cleanupProblems(admin);
   });
 
   // -------------------------------------------------------------------------
@@ -257,6 +283,22 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
     it("I-610 title が null なら拒否する", async () => {
       const { error } = await insertProblem({ order: TEST_ORDER + 40, title: null });
       expect(error?.code).toBe("23502"); // not null violation
+    });
+
+    /**
+     * PostgREST の予約語まわりの挙動を、知識としてテストに残しておく。
+     * 引用符を付け忘れると「エラーは返るが、確認しなければ気づけない」形で失敗する。
+     */
+    it("I-612 order を絞り込みに使うには引用符が要る（予約語）", async () => {
+      // 変数に入れているのは、静的検査（I-398）に「違反」として拾わせないため。
+      // ここは違反そのものを再現するのが目的
+      const unquoted = "order";
+      const bare = await admin.from("problems").select("id").gte(unquoted, TEST_ORDER);
+      expect(bare.error).toBeTruthy();
+      expect(bare.error?.message).toContain("order");
+
+      const quoted = await admin.from("problems").select("id").gte(ORDER_COL, TEST_ORDER);
+      expect(quoted.error).toBeNull();
     });
 
     it("I-611 id を明示すると拒否する（自動採番）", async () => {
@@ -443,8 +485,125 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
     });
 
     it("I-648 service_role は制限を受けない", async () => {
-      const { data } = await admin.from("problems").select("id").gte("order", TEST_ORDER);
+      const { data, error } = await admin
+        .from("problems")
+        .select("id")
+        .gte(ORDER_COL, TEST_ORDER);
+      expect(error).toBeNull();
       expect((data ?? []).length).toBeGreaterThan(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 13-5 problem_feedback（異議申し立て・問題報告）
+  // -------------------------------------------------------------------------
+
+  describe("13-5 problem_feedback", () => {
+    function feedback(patch: Record<string, unknown> = {}) {
+      return {
+        user_id: userA,
+        problem_id: problemId,
+        kind: "score_dispute",
+        comment: "採点が厳しすぎると感じました。理由も書いています。",
+        ...patch,
+      };
+    }
+
+    beforeAll(async () => {
+      await admin.from("problem_feedback").delete().in("user_id", [userA, userB]);
+    });
+
+    it("I-670 kind が2種以外なら拒否する", async () => {
+      const { error } = await admin
+        .from("problem_feedback")
+        .insert(feedback({ kind: "spam" }));
+      expect(error?.code).toBe("23514");
+    });
+
+    it("I-671 score_dispute / problem_error は通る", async () => {
+      for (const kind of ["score_dispute", "problem_error"]) {
+        const { error } = await admin.from("problem_feedback").insert(feedback({ kind }));
+        expect(error, `${kind} が拒否された: ${error?.message}`).toBeNull();
+      }
+    });
+
+    it("I-672 コメントが500字を超えたら拒否する", async () => {
+      const { error } = await admin
+        .from("problem_feedback")
+        .insert(feedback({ user_id: userB, comment: "あ".repeat(501) }));
+      expect(error?.code).toBe("23514");
+    });
+
+    it("I-672b 500字ちょうどは通る（境界・アプリ側の上限と一致）", async () => {
+      const { error } = await admin
+        .from("problem_feedback")
+        .insert(feedback({ user_id: userB, comment: "あ".repeat(500) }));
+      expect(error).toBeNull();
+    });
+
+    /** 連打・スパムの安い歯止め。同じ問題への同種の報告は1人1件 */
+    it("I-673 同じ user / problem / kind の2件目は拒否する", async () => {
+      const row = feedback({ kind: "score_dispute", user_id: userA });
+      await admin.from("problem_feedback").delete().eq("user_id", userA);
+      const first = await admin.from("problem_feedback").insert(row);
+      expect(first.error).toBeNull();
+
+      const second = await admin.from("problem_feedback").insert(row);
+      expect(second.error?.code).toBe("23505"); // unique violation
+    });
+
+    it("I-673b upsert なら上書きできる（書き直しを捨てない）", async () => {
+      const rewritten = feedback({ comment: "書き直しました。こちらが本当の理由です。" });
+      const { error } = await admin
+        .from("problem_feedback")
+        .upsert(rewritten, { onConflict: "user_id,problem_id,kind" });
+      expect(error).toBeNull();
+
+      const { data } = await admin
+        .from("problem_feedback")
+        .select("comment")
+        .eq("user_id", userA)
+        .eq("kind", "score_dispute")
+        .single();
+      expect(data?.comment).toContain("書き直しました");
+    });
+
+    it("I-674 存在しない問題への報告は作れない", async () => {
+      const { error } = await admin
+        .from("problem_feedback")
+        .insert(feedback({ problem_id: 99999999, kind: "problem_error" }));
+      expect(error?.code).toBe("23503");
+    });
+
+    /**
+     * ポリシーを1つも作っていないテーブル。
+     * 読み書きともサーバー（service_role）経由のみ。
+     * anon に insert を許すと kind や problem_id を偽装した行を無制限に作れる。
+     */
+    it("I-675 ログインしていても読めない", async () => {
+      const { data } = await asA.from("problem_feedback").select("id");
+      expect(data).toEqual([]);
+    });
+
+    it("I-676 ログインしていても書き込めない", async () => {
+      const { error } = await asA
+        .from("problem_feedback")
+        .insert(feedback({ kind: "problem_error", comment: "ブラウザから直接入れた行" }));
+      expect(error).toBeTruthy();
+
+      const { data } = await admin
+        .from("problem_feedback")
+        .select("id")
+        .eq("comment", "ブラウザから直接入れた行");
+      expect(data).toEqual([]);
+    });
+
+    it("I-677 未ログインでも読めない・書けない", async () => {
+      const read = await anon.from("problem_feedback").select("id");
+      expect(read.data).toEqual([]);
+
+      const write = await anon.from("problem_feedback").insert(feedback());
+      expect(write.error).toBeTruthy();
     });
   });
 

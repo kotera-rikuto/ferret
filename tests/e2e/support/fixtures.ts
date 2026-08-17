@@ -190,10 +190,28 @@ function admin(): SupabaseClient {
 
 export type SeededProblem = { id: number; order: number; title: string };
 
+/**
+ * `order` を絞り込みに使うときは二重引用符でくくる。
+ * PostgREST は `order` を並び替え指定の予約語として扱うため、
+ * 素で渡すと `failed to parse order (gte.9000)` になる。
+ * エラーを見ないと素通りしたように見え、**テスト用の行が本番テーブルに残る。**
+ */
+const ORDER_COL = '"order"';
+
+/** テスト用に投入した問題を消す。失敗したら黙って進まない */
+async function deleteSeeded(db: SupabaseClient) {
+  const { error } = await db.from("problems").delete().gte(ORDER_COL, 9000);
+  if (error) {
+    throw new Error(
+      `テスト用の問題を削除できませんでした（本番テーブルに残ります）: ${error.message}`,
+    );
+  }
+}
+
 /** テスト用の問題を投入する。id は自動採番なので指定しない */
 export async function seedProblems(): Promise<SeededProblem[]> {
   const db = admin();
-  await db.from("problems").delete().gte("order", 9000);
+  await deleteSeeded(db);
   const { data, error } = await db
     .from("problems")
     .insert(SEED_PROBLEMS)
@@ -203,7 +221,7 @@ export async function seedProblems(): Promise<SeededProblem[]> {
 }
 
 export async function removeProblems() {
-  await admin().from("problems").delete().gte("order", 9000);
+  await deleteSeeded(admin());
 }
 
 /** テストユーザーを用意する。すでに居ればそのまま使う */

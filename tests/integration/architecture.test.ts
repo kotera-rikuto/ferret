@@ -34,9 +34,9 @@ function stripComments(text: string): string {
     .replace(/(^|[^:])\/\/.*$/gm, "$1");
 }
 
-function collectSources(): SourceFile[] {
+function collectFrom(...dirs: string[]): SourceFile[] {
   const files: SourceFile[] = [];
-  for (const dir of SOURCE_DIRS) {
+  for (const dir of dirs) {
     const base = join(ROOT, dir);
     if (!existsSync(base)) continue;
     for (const entry of readdirSync(base, { recursive: true, withFileTypes: true })) {
@@ -54,7 +54,7 @@ function collectSources(): SourceFile[] {
   return files;
 }
 
-const SOURCES = collectSources();
+const SOURCES = collectFrom(...SOURCE_DIRS);
 const CLIENT_FILES = SOURCES.filter((f) => /^\s*["']use client["']/.test(f.text));
 
 describe("§11 静的検査", () => {
@@ -148,6 +148,35 @@ describe("§11 静的検査", () => {
   });
 
   /**
+   * PostgREST の予約語と同名のカラムを、引用符なしで絞り込みに使わない。
+   *
+   * `order` はクエリ文字列の予約語（並び替え指定）なので、
+   * `.gte("order", 9000)` は `order=gte.9000` になり
+   * 「gte.9000 という順序指定」と解釈されてエラーを返す。
+   *
+   * **エラーを確認しないと、何も起きずに素通りして見える。**
+   * 実際これでテストの後片付けが効かず、本番テーブルに行が8件残った。
+   * `.order("order")`（並び替え）は正しい使い方なので対象外。
+   */
+  it("I-398 予約語のカラムを引用符なしで絞り込んでいない", () => {
+    const reserved = ["order", "select", "limit", "offset", "columns", "on_conflict"];
+    const filters = ["eq", "neq", "gt", "gte", "lt", "lte", "like", "ilike", "in", "is"];
+
+    const targets = [...SOURCES, ...collectFrom("tests")];
+    for (const f of targets) {
+      for (const column of reserved) {
+        for (const op of filters) {
+          const pattern = new RegExp(`\\.${op}\\(\\s*["'\`]${column}["'\`]`);
+          expect(
+            f.code,
+            `${f.path} が .${op}("${column}", …) を使っている。'"${column}"' のように引用符でくくること`,
+          ).not.toMatch(pattern);
+        }
+      }
+    }
+  });
+
+  /**
    * ソース自体に不可視文字を残さない。
    *
    * `app/api/score/route.ts` が「ここを生の文字ではなくコード表記で書いているのは、
@@ -159,21 +188,7 @@ describe("§11 静的検査", () => {
    * 検査対象にテストも含める。`\u200B` のようなエスケープ表記は文字ではないので通る。
    */
   it("I-397 ソースに生の不可視文字が入っていない", () => {
-    const targets = [...SOURCES];
-    for (const dir of ["tests"]) {
-      const base = join(ROOT, dir);
-      if (!existsSync(base)) continue;
-      for (const entry of readdirSync(base, { recursive: true, withFileTypes: true })) {
-        if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) continue;
-        const full = join(entry.parentPath ?? base, entry.name);
-        const text = readFileSync(full, "utf8");
-        targets.push({
-          path: relative(ROOT, full).split(sep).join("/"),
-          text,
-          code: text,
-        });
-      }
-    }
+    const targets = [...SOURCES, ...collectFrom("tests")];
 
     // 制御文字（タブ・改行・復帰を除く）/ 幅ゼロ・双方向制御 / BOM
     const invisible = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\uFEFF]/;
