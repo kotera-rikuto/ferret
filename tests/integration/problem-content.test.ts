@@ -46,6 +46,10 @@ type Problem = {
   question: string;
   model_answer: string;
   reading_type: string;
+  /** 実行結果。入っている問題だけコードの下に別パネルで出る */
+  context: string | null;
+  /** 前提知識。入っている問題だけ折りたたみで出る */
+  prerequisite: string | null;
   keywords: KeywordSlot[];
   rubric_items: {
     core: string;
@@ -70,7 +74,7 @@ describe.skipIf(!RUN)("§15 問題コンテンツの健全性（実DB・読み�
     const { data, error } = await db
       .from("problems")
       .select(
-        "id, order, title, language, code, question, model_answer, reading_type, keywords, rubric_items",
+        "id, order, title, language, code, question, model_answer, reading_type, context, prerequisite, keywords, rubric_items",
       )
       .order("order");
     if (error) throw new Error(`問題を読み込めません: ${error.message}`);
@@ -244,6 +248,97 @@ describe.skipIf(!RUN)("§15 問題コンテンツの健全性（実DB・読み�
     for (const p of problems) {
       expect(["js", "ts"], label(p)).toContain(p.language);
     }
+  });
+
+  /**
+   * 実行結果・前提知識は「空なら枠を出さない」で分岐している（app/problems/[id]/page.tsx）。
+   * 空文字列を入れると、入れたつもりなのに画面には出ない。
+   * **エラーにならず、画面も壊れないので気づけない。** 未使用なら NULL のままにする。
+   */
+  it("I-814 実行結果・前提知識に空文字列が入っていない", () => {
+    const blank: string[] = [];
+    for (const p of problems) {
+      for (const [field, value] of [
+        ["context", p.context],
+        ["prerequisite", p.prerequisite],
+      ] as const) {
+        if (value !== null && value.trim().length === 0) {
+          blank.push(`${label(p)} の ${field}（NULL にすること）`);
+        }
+      }
+    }
+    expect(blank, `\n${blank.join("\n")}\n`).toEqual([]);
+  });
+
+  it("I-815 前提知識が400字以内（DB制約の再確認）", () => {
+    const tooLong: string[] = [];
+    for (const p of problems) {
+      if (p.prerequisite && p.prerequisite.length > 400) {
+        tooLong.push(`${label(p)} → ${p.prerequisite.length}字`);
+      }
+    }
+    expect(tooLong, `\n${tooLong.join("\n")}\n`).toEqual([]);
+  });
+
+  /**
+   * 前提知識に答えを書くと、その問題は読解訓練として成立しなくなる
+   * （tasks/E4-問題データに欄を足す.md の注意）。
+   * 「const は入れ替えられない」は前提知識だが、
+   * 「だからこのコードはエラーになる」は答え。
+   *
+   * **これは目安の検査。** 模範解答と長めに一致する部分があるかを見るだけなので、
+   * 言い換えて答えを書いた場合は捕まえられない。それでも、
+   * 模範解答から文をコピーして貼るという一番ありがちな崩れ方は止まる。
+   */
+  it("I-816 前提知識が模範解答の文をそのまま写していない", () => {
+    const WINDOW = 14;
+    const leaked: string[] = [];
+    for (const p of problems) {
+      if (!p.prerequisite) continue;
+      const pre = normalizeForMatch(p.prerequisite);
+      const ans = normalizeForMatch(p.model_answer);
+      for (let i = 0; i + WINDOW <= ans.length; i++) {
+        const chunk = ans.slice(i, i + WINDOW);
+        if (pre.includes(chunk)) {
+          leaked.push(`${label(p)} 模範解答と一致「${chunk}」`);
+          break;
+        }
+      }
+    }
+    expect(leaked, `\n${leaked.join("\n")}\n`).toEqual([]);
+  });
+
+  /**
+   * 前提知識に採点キーワードを書くと、それを写すだけで層1が取れる。
+   * I-802（キーワードを設問文に入れない）と同じ理屈で、
+   * 前提知識も**全員が読める場所**なので同じ制限がかかる。
+   *
+   * ただし禁じるのは**コード本文に出てこない語だけ。**
+   * `const` や `push` のようにコードに書かれている語は、
+   * 前提知識を開かなくても画面から読めるので、ここで隠しても意味がない。
+   * 逆に「コードに無い語」（`undefined` / `キー` / `参照` など）は
+   * 結論そのものの語彙になりやすく、渡すと層1が「写したか」の検査に変わる。
+   *
+   * `context`（実行結果）はこの検査の対象にしない。
+   * 影響型は「ログのどの行を根拠にしたか」を答えさせる問題なので、
+   * ログに答えの語が出るのは設計どおり。
+   */
+  it("I-817 前提知識に、コードに無い採点キーワードが入っていない", () => {
+    const leaked: string[] = [];
+    for (const p of problems) {
+      if (!p.prerequisite) continue;
+      const pre = normalizeForMatch(p.prerequisite);
+      const code = normalizeForMatch(p.code);
+      p.keywords.forEach((slot, i) => {
+        for (const kw of slot.match) {
+          const k = normalizeForMatch(kw);
+          if (k.length >= 2 && pre.includes(k) && !code.includes(k)) {
+            leaked.push(`${label(p)} スロット#${i + 1} の「${kw}」が前提知識にある`);
+          }
+        }
+      });
+    }
+    expect(leaked, `\n${leaked.join("\n")}\n`).toEqual([]);
   });
 
   /**

@@ -126,6 +126,8 @@ export const SEED_PROBLEMS = [
     difficulty: 1,
     reading_type: "トレース",
     code: "function applyCoupon(price) {\n  const rate = 0.9;\n  let total = price;\n  total = total * rate;\n  rate = 0.8;\n  return total;\n}",
+    context: null,
+    prerequisite: null,
     question: "このコードを実行すると何が起きますか。",
     model_answer:
       "5行目で const で宣言された rate に再代入しているため、TypeError が発生して実行が止まります。",
@@ -152,6 +154,10 @@ export const SEED_PROBLEMS = [
     difficulty: 2,
     reading_type: "ズレ",
     code: "function addTag(profile, tag) {\n  profile.tags.push(tag);\n  return profile;\n}",
+    // 2問目にだけ実行結果と前提知識を入れる。
+    // 1問目（どちらも null）と見比べて「入っている問題だけ枠が増える」を確かめられる
+    context: "> node addTag.js\n{ userId: 'u-1', tags: [ 'signup', 'newsletter' ] }",
+    prerequisite: "push は配列の末尾に要素を足すメソッドです。読み方は「プッシュ」。",
     question: "この関数の呼び出し元にはどんな影響がありますか。",
     model_answer:
       "引数のオブジェクトをそのまま書き換えているため、呼び出し元の profile も変わります。",
@@ -271,6 +277,21 @@ export async function markCleared(userId: string, problemId: number, score = 100
   if (error) throw new Error(`クリア状態の作成に失敗: ${error.message}`);
 }
 
+/**
+ * シード問題より前にある問題を、テストユーザーのクリア済みにする。
+ *
+ * シードは `order` 9001 以降に置いてあるので、**実コンテンツが増えるほどマップの末尾に並ぶ。**
+ * 解放判定（lib/progress/unlock.ts）は未クリアの先頭までしか開かないため、
+ * 先行する問題をクリアしないとシード問題は 404 になる。
+ * 問題が0件だった時期はシードが先頭に来ていたので、この下ごしらえは要らなかった。
+ */
+export async function clearPrecedingStages(userId: string) {
+  const db = admin();
+  const { data, error } = await db.from("problems").select("id").lt(ORDER_COL, 9000);
+  if (error) throw new Error(`先行ステージの取得に失敗: ${error.message}`);
+  for (const p of data ?? []) await markCleared(userId, p.id, 100);
+}
+
 export async function latestAttempt(userId: string, problemId: number) {
   const { data } = await admin()
     .from("user_attempts")
@@ -298,8 +319,12 @@ export async function countAttempts(userId: string, problemId: number) {
 
 export async function login(page: Page, next?: string) {
   await page.goto(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
-  await page.getByPlaceholder("メールアドレス").fill(TEST_USER.email);
-  await page.getByPlaceholder("パスワード").fill(TEST_USER.password);
+  // 入力欄は placeholder ではなく見出し（label）で引く。
+  // デザイン移植で placeholder が「メールアドレス」→「you@example.com」に変わり、
+  // ここが追従できずに**ログイン自体が通らなくなっていた**（E2E 全体が落ちる原因）。
+  // 見出しの文言のほうが変わりにくいので、そちらに寄せる
+  await page.getByLabel("メールアドレス").fill(TEST_USER.email);
+  await page.getByLabel("パスワード").fill(TEST_USER.password);
   await page.getByRole("button", { name: "ログイン", exact: true }).click();
 }
 

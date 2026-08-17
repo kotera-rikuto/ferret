@@ -600,3 +600,78 @@ describe("§1-6 正規化", () => {
     expect(normalizeAnswer("a、b。")).toBe("a、b。");
   });
 });
+
+/**
+ * 層1の前寄せ配点（下駄）と、証拠ゼロのときの頭打ちは対になっている。
+ *
+ * 「中核は読めているが語彙が少ない短い回答」が 48 + 5 = 53点で
+ * クリア閾値55に2点届かない取りこぼしが実測で出たため、1ヒット目を厚くした。
+ * ただし厚くしただけだと、キーワードを散りばめただけの回答まで底上げしてしまう。
+ * それを防いでいるのが「検証済みの引用が1つも無ければ層1は10点で頭打ち」という既存の規則で、
+ * **下駄が届く範囲が「中核を読めた人」と一致するのは、この2つが噛み合っているから。**
+ *
+ * どちらか一方だけを動かすとこの性質が静かに壊れるので、関係そのものを固定しておく。
+ */
+describe("§1-7 下駄と頭打ちの関係", () => {
+  it("U-090 同じ1ヒットでも、full の有無で層1の点が変わる", () => {
+    const withFull = composeScore(deep(["full", "none", "none", "none"]), ANSWER, slots(1));
+    const withoutFull = composeScore(
+      deep(["partial", "none", "none", "none"]),
+      ANSWER,
+      slots(1),
+    );
+
+    // full あり: 下駄がそのまま乗る
+    expect(withFull.keywordScore).toBe(12);
+    expect(withFull.evidenceCapped).toBe(false);
+
+    // full なし: 頭打ちが効いて下駄が削られる
+    expect(withoutFull.keywordScore).toBe(10);
+    expect(withoutFull.evidenceCapped).toBe(true);
+
+    expect(withFull.keywordScore).toBeGreaterThan(withoutFull.keywordScore);
+  });
+
+  it("U-091 1ヒットの下駄は頭打ちより大きい（そうでないと下駄が無意味になる）", () => {
+    // ここが逆転すると U-070 の差が消え、下駄の適用範囲を絞る仕組みが働かなくなる
+    const gearedUp = scoreKeywords(ANSWER, slots(1)).score;
+    const capped = composeScore(
+      deep(["partial", "none", "none", "none"]),
+      ANSWER,
+      slots(1),
+    ).keywordScore;
+    expect(gearedUp).toBeGreaterThan(capped);
+  });
+
+  it("U-092 下駄を入れても、中核を外した回答は全ヒットでもクリアしない", () => {
+    const r = composeScore(
+      deep(["none", "full", "full", "full"]),
+      ANSWER,
+      slots(KEYWORD_SLOT_COUNT),
+    );
+    expect(r.cleared).toBe(false);
+  });
+
+  it("U-093 下駄を入れても、core=partial は全ヒットでもクリアしない", () => {
+    // 「方向は合っているが曖昧」を下駄で通してしまうと、閾値を下げた意味が薄れる
+    const r = composeScore(
+      deep(["partial", "none", "none", "none"]),
+      ANSWER,
+      slots(KEYWORD_SLOT_COUNT),
+    );
+    expect(r.keywordScore).toBe(10); // full が無いので頭打ち
+    expect(r.total).toBe(34);
+    expect(r.cleared).toBe(false);
+  });
+
+  it("U-094 実測の回帰: core=full・1ヒットの回答は 60点でクリアする", () => {
+    // 本番DBの問題id=9（var / ズレ型）で「集計に入っていない A-3 がログに出ます」が
+    // 53点で落ちていた事例。下駄の導入で 60点に上がりクリアするようになった。
+    const r = composeScore(deep(["full", "none", "none", "none"]), ANSWER, slots(1));
+    expect(r.keywordScore).toBe(12);
+    expect(r.deepScore).toBe(48);
+    expect(r.total).toBe(60);
+    expect(r.cleared).toBe(true);
+    expect(r.perfect).toBe(false);
+  });
+});

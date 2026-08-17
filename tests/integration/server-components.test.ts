@@ -184,13 +184,23 @@ describe("§10-2 /problems/[id]", () => {
     const detail = spy.selects.find(
       ([t, c]) => t === "problems" && c.includes("code"),
     );
-    // language / reading_type は画面のバッジ表示に使う（app/problems/[id]/page.tsx）
+    // language / reading_type は画面のバッジ表示に使う。
+    // context（実行結果）と prerequisite（前提知識）は入っている問題だけ枠を出す
+    // （app/problems/[id]/page.tsx）
     expect(detail?.[1]).toBe(
-      "id, order, title, code, question, language, reading_type",
+      "id, order, title, code, question, language, reading_type, context, prerequisite",
     );
     expect(detail?.[1]).not.toContain("model_answer");
     expect(detail?.[1]).not.toContain("rubric_items");
     expect(detail?.[1]).not.toContain("keywords");
+  });
+
+  it("I-376c 実行結果・前提知識が空でも描画できる", async () => {
+    // 既存の問題は2欄とも NULL。ここで落ちると、欄を足した瞬間に
+    // 全問が 404 になる（PROBLEM_DETAIL は2欄を持たないので undefined で入る）
+    expect(await outcome(() => ProblemPage(params(String(UNLOCKED_ID))))).toBe(
+      "RENDERED",
+    );
   });
 
   it("I-376b 未解放なら問題の詳細を引きにすらいかない", async () => {
