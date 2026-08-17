@@ -49,7 +49,7 @@ export default function RegisterPage() {
     return (
       <div className="min-h-screen flex items-center justify-center px-6">
         <div className="w-full max-w-sm bg-panel border-2 border-line rounded-3xl p-8 flex flex-col items-center gap-4 text-center">
-          <Mascot className="w-20 animate-pop" />
+          <Mascot mood="happy" className="w-20 animate-pop" />
           <h1 className="text-xl font-extrabold">確認メールを送りました</h1>
           <p className="text-muted text-sm font-bold leading-relaxed">
             {email} に確認メールを送りました。メール内のリンクをクリックするとログインできます。

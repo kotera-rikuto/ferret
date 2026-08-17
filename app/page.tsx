@@ -8,6 +8,7 @@ export default function Home() {
     <div className="min-h-screen flex flex-col lg:flex-row items-center justify-center gap-10 lg:gap-18 px-10 py-16">
       <Mascot
         alt="フェレット"
+        priority
         className="w-52 lg:w-70 animate-float drop-shadow-[0_10px_24px_rgba(74,59,40,0.18)]"
       />
       <div className="flex flex-col gap-5 max-w-md">

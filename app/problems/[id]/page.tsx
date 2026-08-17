@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
 import { IconClose } from "@/components/ui/icons";
+import { Mascot } from "@/components/ui/Mascot";
 import { ProblemForm } from "./ProblemForm";
 
 export default async function ProblemPage({
@@ -80,10 +81,15 @@ export default async function ProblemPage({
           </pre>
         </div>
 
-        {/* 設問 */}
-        <p className="text-base font-extrabold leading-relaxed whitespace-pre-line">
-          {problem.question}
-        </p>
+        {/* 設問。フェレットが問いかけている形にして、余白の多い画面に手がかりを置く */}
+        <div className="flex items-start gap-4">
+          <Mascot mood="thinking" className="hidden w-20 shrink-0 sm:block" />
+          <div className="relative flex-1 rounded-2xl border-2 border-line bg-panel px-5 py-4 sm:before:absolute sm:before:top-6 sm:before:-left-2.5 sm:before:size-4 sm:before:rotate-45 sm:before:border-b-2 sm:before:border-l-2 sm:before:border-line sm:before:bg-panel">
+            <p className="text-base font-extrabold leading-relaxed whitespace-pre-line">
+              {problem.question}
+            </p>
+          </div>
+        </div>
 
         {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
         <ProblemForm
