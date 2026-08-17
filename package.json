@@ -13,7 +13,7 @@
     "test:integration": "vitest run tests/integration",
     "test:e2e": "playwright test",
     "test:e2e:live": "E2E_LIVE=1 playwright test --grep @live",
-    "test:db": "RUN_DB_TESTS=1 vitest run tests/integration/database.test.ts"
+    "test:db": "RUN_DB_TESTS=1 vitest run tests/integration/database.test.ts tests/integration/problem-content.test.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.10.3",
