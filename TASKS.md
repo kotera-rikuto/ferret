@@ -197,7 +197,7 @@ Ferret 実装タスク一覧
 
 ## その他
 
-- [ ] `middleware.ts` → `proxy.ts` への移行（Next.js 16 が非推奨警告を出している）
+- [x] `middleware.ts` → `proxy.ts` への移行（**2026-08-17 完了・F1**）
 - [ ] shadcn/ui セットアップ（未導入。現状は Tailwind 直書き）
 - [ ] Lottie マスコットアニメーション
 - [ ] XP・レベルシステム
