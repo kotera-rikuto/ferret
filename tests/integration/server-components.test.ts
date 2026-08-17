@@ -102,7 +102,17 @@ describe("§10-1 /stages", () => {
   it("I-370 problems は admin、回答履歴は session クライアントで読む", async () => {
     await StagesPage();
     expect(spy.selects).toContainEqual(["problems", "id, order, title"]);
-    expect(spy.sessionTables).toEqual(["user_attempts"]);
+    // 解放判定とストリークで user_attempts を2回読む。どちらも session 側
+    expect(spy.sessionTables).toEqual(["user_attempts", "user_attempts"]);
+  });
+
+  it("I-383 ストリークは回答ログから導出する（カウンタを持たない）", async () => {
+    await StagesPage();
+    // 直近1年ぶんを新しい順に取る
+    expect(spy.sessionSelects).toContain("created_at");
+    expect(spy.orders).toContainEqual(["created_at", { ascending: false }]);
+    expect(spy.limits).toContain(366);
+    expect(spy.sessionFilters).toContainEqual(["user_id", USER_ID]);
   });
 
   it("I-371 一覧に model_answer / rubric_items を含めない", async () => {
