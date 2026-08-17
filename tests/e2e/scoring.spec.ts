@@ -15,6 +15,8 @@ import {
   markCleared,
   latestAttempt,
   countAttempts,
+  statChip,
+  stageState,
   ANSWER,
   EVIDENCE_REAL,
   EVIDENCE_FAKE,
@@ -27,6 +29,16 @@ async function answer(page: import("@playwright/test").Page, problemId: number, 
   await page.getByRole("button", { name: "回答する" }).click();
 }
 
+/**
+ * 合否の文言は見出し（h1）で引く。
+ *
+ * 文字として引くと、Next.js の読み上げ用の領域（`role="alert"`。遷移のたびに
+ * 見出しの文字を複製する）にも当たって2件になり、テストが落ちる。
+ */
+function verdict(page: import("@playwright/test").Page, text: string) {
+  return page.getByRole("heading", { name: text });
+}
+
 test.describe("§4 採点結果の表示", () => {
   test("E-260 4観点すべて満たせば 100点・パーフェクト", async ({
     authedPage,
@@ -36,19 +48,29 @@ test.describe("§4 採点結果の表示", () => {
     await answer(authedPage, problems[0].id);
 
     await expect(authedPage).toHaveURL(new RegExp(`/result/${problems[0].id}`));
-    await expect(authedPage.getByText("100", { exact: true })).toBeVisible();
-    await expect(authedPage.getByText("パーフェクト！")).toBeVisible();
+    // 点数は統計チップ3枚に分かれた（巨大なスコア1つをやめた）ので、枠ごと引く
+    await expect(statChip(authedPage, "スコア")).toContainText("100 / 100");
+    await expect(verdict(authedPage, "パーフェクト！")).toBeVisible();
   });
 
   test("E-261 中核だけ読めていれば短くてもクリアする", async ({
     authedPage,
     problems,
   }) => {
-    // core=full + articulation=full = 52点。キーワードが2つ当たれば 62点
-    await stub.setOutput(deepOutput(["full", "none", "none", "full"]));
-    await answer(authedPage, problems[0].id, "const だから再代入でエラーになります");
+    // core=full(48) + articulation=full(4) + キーワード3ヒット(18) = 70点。
+    //
+    // **引用は回答の中に実在する文字列でなければならない。** 既定の evidence は
+    // 長い模範解答向けの文で、この短い回答には含まれないため、そのまま使うと
+    // 引用照合（compose.ts）が本当に働いて full が partial に落ち、不合格になる。
+    // スタブを使っていても採点の中身は本物、という前提がここで効く
+    const short = "const だから再代入でエラーになります";
+    await stub.setOutput(
+      deepOutput(["full", "none", "none", "full"], { evidence: "const だから再代入" }),
+    );
+    await answer(authedPage, problems[0].id, short);
 
-    await expect(authedPage.getByText("クリア！")).toBeVisible();
+    await expect(verdict(authedPage, "クリア！")).toBeVisible();
+    await expect(statChip(authedPage, "スコア")).toContainText("70 / 100");
   });
 
   test("E-262 中核を外していれば他が満点でも通らない", async ({
@@ -58,8 +80,8 @@ test.describe("§4 採点結果の表示", () => {
     await stub.setOutput(deepOutput(["none", "full", "full", "full"]));
     await answer(authedPage, problems[0].id);
 
-    await expect(authedPage.getByText("もう一度挑戦しよう")).toBeVisible();
-    await expect(authedPage.getByText("52", { exact: true })).toBeVisible();
+    await expect(verdict(authedPage, "もう一度挑戦しよう")).toBeVisible();
+    await expect(statChip(authedPage, "スコア")).toContainText("52 / 100");
   });
 
   test("E-263/266 矛盾を検出しても、次に見る場所が文章で示される", async ({
@@ -77,7 +99,7 @@ test.describe("§4 採点結果の表示", () => {
     );
     await answer(authedPage, problems[0].id);
 
-    await expect(authedPage.getByText("もう一度挑戦しよう")).toBeVisible();
+    await expect(verdict(authedPage, "もう一度挑戦しよう")).toBeVisible();
 
     // 残課題 §1 の修正が画面まで届いていること。
     // 以前は場所を示さない定型文しか出なかった
@@ -99,7 +121,7 @@ test.describe("§4 採点結果の表示", () => {
     );
     await answer(authedPage, problems[0].id);
 
-    await expect(authedPage.getByText("もう一度挑戦しよう")).toBeVisible();
+    await expect(verdict(authedPage, "もう一度挑戦しよう")).toBeVisible();
     await expect(authedPage.getByText("完璧に正しく理解しています")).toHaveCount(0);
   });
 
@@ -107,8 +129,9 @@ test.describe("§4 採点結果の表示", () => {
     await stub.setOutput(deepOutput());
     await answer(authedPage, problems[0].id);
 
-    await expect(authedPage.getByText(/キーワード \d+ \/ 20/)).toBeVisible();
-    await expect(authedPage.getByText(/説明 \d+ \/ 80/)).toBeVisible();
+    // 見出しは「説明」から「AI 採点」に変わり、数値は別の枠に分かれた
+    await expect(statChip(authedPage, "キーワード")).toContainText(/\d+ \/ 20/);
+    await expect(statChip(authedPage, "AI 採点")).toContainText(/\d+ \/ 80/);
   });
 
   test("E-268 画面の点数と DB の行が一致する", async ({
@@ -121,9 +144,9 @@ test.describe("§4 採点結果の表示", () => {
     await authedPage.waitForURL(new RegExp(`/result/${problems[0].id}`));
 
     const row = await latestAttempt(userId, problems[0].id);
-    await expect(
-      authedPage.getByText(String(row!.total_score), { exact: true }),
-    ).toBeVisible();
+    await expect(statChip(authedPage, "スコア")).toContainText(
+      `${row!.total_score} / 100`,
+    );
   });
 
   test("E-269/270 クリア後にステージへ戻るとマップが更新される", async ({
@@ -134,9 +157,14 @@ test.describe("§4 採点結果の表示", () => {
     await answer(authedPage, problems[0].id);
     await authedPage.waitForURL(/\/result\//);
 
-    await authedPage.getByRole("link", { name: "ステージに戻る" }).click();
+    // クリアしたときの主ボタンは「つぎのステージへ」。
+    // 「もう一度挑む」はテキストリンクに格下げされた（主ボタン1本の方針）
+    await expect(authedPage.getByRole("link", { name: "もう一度挑む" })).toBeVisible();
+    await authedPage.getByRole("link", { name: "つぎのステージへ" }).click();
+
     await expect(authedPage).toHaveURL(/\/stages/);
-    await expect(authedPage.getByText("✅")).toHaveCount(1);
+    expect(await stageState(authedPage, problems[0].order)).toBe("cleared");
+    expect(await stageState(authedPage, problems[1].order)).toBe("current");
   });
 
   test("E-271 未回答のリザルトに直接来たら問題画面へ戻される", async ({
@@ -161,11 +189,11 @@ test.describe("§4 リプレイ", () => {
 
     await answer(authedPage, problems[0].id);
     await authedPage.waitForURL(/\/result\//);
-    await expect(authedPage.getByText("100", { exact: true })).toBeVisible();
+    await expect(statChip(authedPage, "スコア")).toContainText("100 / 100");
 
     await answer(authedPage, problems[0].id);
     await authedPage.waitForURL(/\/result\//);
-    await expect(authedPage.getByText("100", { exact: true })).toBeVisible();
+    await expect(statChip(authedPage, "スコア")).toContainText("100 / 100");
 
     // OpenAI は1回しか呼ばれていない
     const { calls } = await stub.inspect();
@@ -260,11 +288,11 @@ test.describe("§4 クリア判定の非対称性", () => {
     await authedPage.waitForURL(/\/result\//);
 
     // リザルトは最新の回答なので不合格の表示
-    await expect(authedPage.getByText("もう一度挑戦しよう")).toBeVisible();
+    await expect(verdict(authedPage, "もう一度挑戦しよう")).toBeVisible();
 
     // マップは最高点なのでクリアのまま
     await authedPage.goto("/stages");
-    await expect(authedPage.getByText("✅")).toHaveCount(1);
+    expect(await stageState(authedPage, problems[0].order)).toBe("cleared");
 
     // 次のステージも閉じない
     const res = await authedPage.goto(`/problems/${problems[1].id}`);

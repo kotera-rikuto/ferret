@@ -81,3 +81,8 @@ next-env.d.ts
 # 価格表（Pro / Pro Plus / 駆け込みパックの金額）を含むため公開しない。
 # 採点上限（1日3問・月200問）はコードに出ている実装事実なので tasks/D1 は公開する
 /tasks/D2-Stripe決済.md
+
+# Playwright が失敗時に残す証拠（スクリーンショット・trace）。
+# 実行するたびに作られる生成物なので追跡しない
+/test-results/
+/playwright-report/

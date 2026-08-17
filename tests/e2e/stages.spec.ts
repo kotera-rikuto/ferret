@@ -1,24 +1,35 @@
 /**
  * ステージ選択と問題画面。
  * ケース定義は tests/e2e/テストケース.md の §2・§3。
+ *
+ * §2 はデザイン移植（`943345a`）で前提が変わっている。
+ *   - 絵文字（✅🐾🔒）→ SVG アイコン。**読み上げ用の名前が無いので文字では引けない**
+ *   - 中央モーダル → ノードに付くポップオーバー。「キャンセル」ボタンは無くなり外側を押して閉じる
+ * ノードの状態は support/fixtures.ts の `stageState`（押せるか・スタートの吹き出し）で読む。
+ *
+ * **ノードの個数は数えない。** シード問題を開くために手前の実問題を全部クリア済みに
+ * するので、マップにはクリア済みのノードが実コンテンツの数だけ並ぶ（今後100問まで増える）。
  */
 
-import { test, expect, markCleared } from "./support/fixtures";
+import { test, expect, markCleared, stageNode, stageState } from "./support/fixtures";
 
 test.describe("§2 ステージ選択", () => {
-  test("E-200/201 回答が無ければ先頭だけが開いていて、鍵つきは押せない", async ({
+  test("E-200/201 手前まで進んだ状態では次の1つだけが開いていて、鍵つきは押せない", async ({
     authedPage,
     problems,
   }) => {
     const page = authedPage;
     await page.goto("/stages");
 
-    await expect(page.getByText("🐾")).toHaveCount(1);
-    await expect(page.getByText("🔒")).toHaveCount(problems.length - 1);
+    expect(await stageState(page, problems[0].order)).toBe("current");
+    expect(await stageState(page, problems[1].order)).toBe("locked");
 
-    // 鍵つきのノードを押してもモーダルが開かない
-    await page.getByText("🔒").first().click({ force: true });
-    await expect(page.getByText("このステージに挑みますか？")).toHaveCount(0);
+    // 鍵つきのノードを押してもポップオーバーが開かない
+    await stageNode(page, problems[1].order)
+      .locator("button")
+      .first()
+      .click({ force: true });
+    await expect(page.getByRole("button", { name: "挑む" })).toHaveCount(0);
   });
 
   test("E-202 クリアすると次のステージが開く", async ({
@@ -29,8 +40,10 @@ test.describe("§2 ステージ選択", () => {
     await markCleared(userId, problems[0].id, 100);
     await authedPage.goto("/stages");
 
-    await expect(authedPage.getByText("✅")).toHaveCount(1);
-    await expect(authedPage.getByText("🐾")).toHaveCount(1);
+    // 「1問目がクリア扱いになった」ことは、**2問目が現在地に移ったこと**で確かめる。
+    // クリア済みの見た目そのものは消去法で求めているので、単体では弱い
+    expect(await stageState(authedPage, problems[0].order)).toBe("cleared");
+    expect(await stageState(authedPage, problems[1].order)).toBe("current");
   });
 
   test("E-203 54点ではクリアにならない（境界）", async ({
@@ -41,8 +54,8 @@ test.describe("§2 ステージ選択", () => {
     await markCleared(userId, problems[0].id, 54);
     await authedPage.goto("/stages");
 
-    await expect(authedPage.getByText("✅")).toHaveCount(0);
-    await expect(authedPage.getByText("🐾")).toHaveCount(1);
+    expect(await stageState(authedPage, problems[0].order)).toBe("current");
+    expect(await stageState(authedPage, problems[1].order)).toBe("locked");
   });
 
   test("E-203b 55点ちょうどでクリアになる（境界）", async ({
@@ -52,7 +65,9 @@ test.describe("§2 ステージ選択", () => {
   }) => {
     await markCleared(userId, problems[0].id, 55);
     await authedPage.goto("/stages");
-    await expect(authedPage.getByText("✅")).toHaveCount(1);
+
+    expect(await stageState(authedPage, problems[0].order)).toBe("cleared");
+    expect(await stageState(authedPage, problems[1].order)).toBe("current");
   });
 
   test("E-205/207 現在地を押すと確認が出て、問題画面へ進める", async ({
@@ -62,14 +77,18 @@ test.describe("§2 ステージ選択", () => {
     const page = authedPage;
     await page.goto("/stages");
 
-    await page.getByText("🐾").click();
-    await expect(page.getByText("このステージに挑みますか？")).toBeVisible();
+    const node = stageNode(page, problems[0].order);
+    await node.locator("button").first().click();
+
+    // ポップオーバー。中央モーダルの「このステージに挑みますか？」は無くなり、
+    // ノードに付く吹き出しにタイトルと主ボタンが出る形になった
+    await expect(node.getByRole("heading", { name: problems[0].title })).toBeVisible();
 
     await page.getByRole("button", { name: "挑む" }).click();
     await expect(page).toHaveURL(new RegExp(`/problems/${problems[0].id}`));
   });
 
-  test("E-206 クリア済みは「復習」の文言になる", async ({
+  test("E-206 クリア済みは「もう一度読む」の文言になる", async ({
     authedPage,
     problems,
     userId,
@@ -77,19 +96,23 @@ test.describe("§2 ステージ選択", () => {
     await markCleared(userId, problems[0].id, 100);
     await authedPage.goto("/stages");
 
-    await authedPage.getByText("✅").click();
-    await expect(authedPage.getByText("このステージを復習しますか？")).toBeVisible();
-    await expect(authedPage.getByRole("button", { name: "復習する" })).toBeVisible();
+    await stageNode(authedPage, problems[0].order).locator("button").first().click();
+    // クリア済みは主ボタンの色も文言も変わる（「挑む」は出ない）
+    await expect(authedPage.getByRole("button", { name: "もう一度読む" })).toBeVisible();
+    await expect(authedPage.getByRole("button", { name: "挑む" })).toHaveCount(0);
   });
 
-  test("E-208 キャンセルすると閉じる", async ({ authedPage, problems }) => {
-    void problems;
+  test("E-208 外側を押すと閉じる", async ({ authedPage, problems }) => {
     const page = authedPage;
     await page.goto("/stages");
 
-    await page.getByText("🐾").click();
-    await page.getByRole("button", { name: "キャンセル" }).click();
-    await expect(page.getByText("このステージに挑みますか？")).toHaveCount(0);
+    await stageNode(page, problems[0].order).locator("button").first().click();
+    await expect(page.getByRole("button", { name: "挑む" })).toBeVisible();
+
+    // 「キャンセル」ボタンは無くなった。ポップオーバーの外側を押すと閉じる作りなので、
+    // 画面の隅を押す（外側判定は画面全体を覆う透明な層が受ける）
+    await page.mouse.click(8, 200);
+    await expect(page.getByRole("button", { name: "挑む" })).toHaveCount(0);
     await expect(page).toHaveURL(/\/stages/);
   });
 
@@ -98,8 +121,10 @@ test.describe("§2 ステージ選択", () => {
     problems,
   }) => {
     await authedPage.goto("/stages");
-    await expect(authedPage.getByText(`Stage ${problems[0].order}`)).toBeVisible();
-    await expect(authedPage.getByText(problems[0].title)).toBeVisible();
+    const node = stageNode(authedPage, problems[0].order);
+    // ラベルは「Stage 1」ではなく「STAGE 1」（デザイン移植で大文字になった）
+    await expect(node.getByText(`STAGE ${problems[0].order}`)).toBeVisible();
+    await expect(node.getByText(problems[0].title)).toBeVisible();
   });
 });
 
@@ -111,7 +136,8 @@ test.describe("§3 問題画面", () => {
     const page = authedPage;
     await page.goto(`/problems/${problems[0].id}`);
 
-    await expect(page.getByRole("heading", { name: problems[0].title })).toBeVisible();
+    // 問題画面のタイトルは見出し（h1〜h6）ではなく上部バーの文字
+    await expect(page.getByText(problems[0].title)).toBeVisible();
     await expect(page.locator("pre code")).toContainText("const rate = 0.9");
     await expect(page.getByText("このコードを実行すると何が起きますか。")).toBeVisible();
 
@@ -187,9 +213,7 @@ test.describe("§3 問題画面", () => {
     await markCleared(userId, problems[0].id, 100);
     const res = await authedPage.goto(`/problems/${problems[1].id}`);
     expect(res?.status()).toBe(200);
-    await expect(
-      authedPage.getByRole("heading", { name: problems[1].title }),
-    ).toBeVisible();
+    await expect(authedPage.getByText(problems[1].title)).toBeVisible();
   });
 
   test("E-273 振り返り画面はまだ無い", async ({ authedPage, problems }) => {

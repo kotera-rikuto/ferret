@@ -7,7 +7,14 @@
  * ここでは「ブラウザから見て本当にそうなっているか」だけを確かめる。
  */
 
-import { test, expect, stub, deepOutput, ANSWER } from "./support/fixtures";
+import {
+  test,
+  expect,
+  stub,
+  deepOutput,
+  submitLoginForm,
+  ANSWER,
+} from "./support/fixtures";
 
 test.describe("§5 レスポンスヘッダ", () => {
   test("E-400〜404 主要なヘッダが付いている", async ({ page }) => {
@@ -58,35 +65,31 @@ test.describe("§5 レスポンスヘッダ", () => {
 test.describe("§5 遷移先の乗っ取り", () => {
   test("E-413 next にプロトコル相対URLを入れても外部へ飛ばない", async ({
     page,
+    baseURL,
     userId,
   }) => {
     void userId;
     await page.goto("/login?next=//example.com");
-    await page.getByPlaceholder("メールアドレス").fill(
-      process.env.E2E_USER_EMAIL ?? "e2e@ferret.test",
-    );
-    await page.getByPlaceholder("パスワード").fill(
-      process.env.E2E_USER_PASSWORD ?? "FerretE2E2026!",
-    );
-    await page.getByRole("button", { name: "ログイン", exact: true }).click();
+    await submitLoginForm(page);
 
     await page.waitForURL(/\/stages/);
-    expect(new URL(page.url()).host).toBe(new URL(page.url()).host);
+    // 自分のホストに留まっていること。
+    // 元は `page.url()` を自分自身と比べていて、**何も検査していなかった**
+    expect(new URL(page.url()).host).toBe(new URL(baseURL!).host);
     expect(page.url()).not.toContain("example.com");
   });
 
-  test("E-414 next に絶対URLを入れても外部へ飛ばない", async ({ page, userId }) => {
+  test("E-414 next に絶対URLを入れても外部へ飛ばない", async ({
+    page,
+    baseURL,
+    userId,
+  }) => {
     void userId;
     await page.goto("/login?next=https://example.com");
-    await page.getByPlaceholder("メールアドレス").fill(
-      process.env.E2E_USER_EMAIL ?? "e2e@ferret.test",
-    );
-    await page.getByPlaceholder("パスワード").fill(
-      process.env.E2E_USER_PASSWORD ?? "FerretE2E2026!",
-    );
-    await page.getByRole("button", { name: "ログイン", exact: true }).click();
+    await submitLoginForm(page);
 
     await page.waitForURL(/\/stages/);
+    expect(new URL(page.url()).host).toBe(new URL(baseURL!).host);
     expect(page.url()).not.toContain("example.com");
   });
 
@@ -125,8 +128,10 @@ test.describe("§5 入力の扱い", () => {
     await page.getByRole("button", { name: "回答する" }).click();
 
     await page.waitForURL(/\/result\//);
-    await expect(page.getByText("もう一度挑戦しよう")).toBeVisible();
-    await expect(page.getByText("クリア！")).toHaveCount(0);
+    // 合否は見出しで引く。文字として引くと Next.js の読み上げ用の領域
+    // （遷移のたびに見出しの文字を複製する）にも当たって2件になる
+    await expect(page.getByRole("heading", { name: "もう一度挑戦しよう" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "クリア！" })).toHaveCount(0);
   });
 
   test("E-411 区切り記号を含む回答でも通常どおり採点される", async ({

@@ -258,24 +258,36 @@ export async function clearAttempts(userId: string) {
   if (error) throw new Error(`回答履歴の削除に失敗: ${error.message}`);
 }
 
+/** 採点を通さずに入れるクリア済みの回答行。`grader_version` で下ごしらえだと分かるようにしてある */
+function clearedRow(
+  userId: string,
+  problemId: number,
+  score: number,
+  createdAt?: string,
+) {
+  return {
+    // 既定（now()）に任せず明示できるようにしてある。理由は PREPARED_AT のコメント
+    ...(createdAt ? { created_at: createdAt } : {}),
+    user_id: userId,
+    problem_id: problemId,
+    answer: "E2E の下ごしらえ用に投入した回答です",
+    keyword_score: 20,
+    deep_score: score - 20,
+    total_score: score,
+    ai_feedback: "下ごしらえ用のフィードバックです。",
+    scoring_method: "ai",
+    grader_version: "e2e-seed",
+    answer_hash: `e2e-seed-${problemId}-${score}`,
+    is_provisional: false,
+    contradiction: false,
+  };
+}
+
 /** 特定の問題をクリア済みにする。解放状態を作り込むために使う */
 export async function markCleared(userId: string, problemId: number, score = 100) {
   const { error } = await admin()
     .from("user_attempts")
-    .insert({
-      user_id: userId,
-      problem_id: problemId,
-      answer: "E2E の下ごしらえ用に投入した回答です",
-      keyword_score: 20,
-      deep_score: score - 20,
-      total_score: score,
-      ai_feedback: "下ごしらえ用のフィードバックです。",
-      scoring_method: "ai",
-      grader_version: "e2e-seed",
-      answer_hash: `e2e-seed-${problemId}-${score}`,
-      is_provisional: false,
-      contradiction: false,
-    });
+    .insert(clearedRow(userId, problemId, score));
   if (error) throw new Error(`クリア状態の作成に失敗: ${error.message}`);
 }
 
@@ -291,7 +303,27 @@ export async function clearPrecedingStages(userId: string) {
   const db = admin();
   const { data, error } = await db.from("problems").select("id").lt(ORDER_COL, 9000);
   if (error) throw new Error(`先行ステージの取得に失敗: ${error.message}`);
-  for (const p of data ?? []) await markCleared(userId, p.id, 100);
+
+  /**
+   * 下ごしらえの行は**24時間より前**に置く。
+   *
+   * `/api/score` の使いすぎ防止（1分10件 / 1時間60件 / 24時間300件）は
+   * `user_attempts` の行数をそのまま数えるので、直前に実問題ぶんの行を入れると
+   * **テスト本体の採点が 429 で弾かれる**（実測。問題が増えるほど確実に当たる）。
+   *
+   * 「手前のステージは以前クリアしてある」という状態のほうが実際の使われ方にも近い。
+   * 解放判定（`loadProgress`）は最高点だけを見るので、日付をずらしても結果は変わらない。
+   */
+  const preparedAt = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const rows = (data ?? []).map((p) => clearedRow(userId, p.id, 100, preparedAt));
+  if (rows.length === 0) return;
+
+  // 1件ずつ insert すると、問題が増えるほどテスト1本あたりの待ち時間が伸びる
+  // （100問まで増える予定なので、往復回数を問題数に比例させない）
+  const { error: insertError } = await db.from("user_attempts").insert(rows);
+  if (insertError) {
+    throw new Error(`先行ステージのクリアに失敗: ${insertError.message}`);
+  }
 }
 
 export async function latestAttempt(userId: string, problemId: number) {
@@ -319,15 +351,75 @@ export async function countAttempts(userId: string, problemId: number) {
 // ログイン
 // ---------------------------------------------------------------------------
 
+/**
+ * すでに開いているログイン画面のフォームを埋めて送る。
+ *
+ * `login()` と分けてあるのは、`/login?next=...` へ**弾かれて来た**状態から
+ * そのまま送信するテスト（E-103・E-104・E-413・E-414）があるため。
+ * ここで `goto` すると `next` が消えて、確かめたい復帰そのものが消える。
+ *
+ * 入力欄は placeholder ではなく見出し（label）で引く。
+ * デザイン移植で placeholder が「メールアドレス」→「you@example.com」に変わり、
+ * ここが追従できずに**ログイン自体が通らなくなっていた**（E2E 全体が落ちる原因）。
+ * 見出しの文言のほうが変わりにくいので、そちらに寄せる。
+ */
+export async function submitLoginForm(
+  page: Page,
+  { email = TEST_USER.email, password = TEST_USER.password } = {},
+) {
+  await page.getByLabel("メールアドレス").fill(email);
+  await page.getByLabel("パスワード").fill(password);
+  await page.getByRole("button", { name: "ログイン", exact: true }).click();
+}
+
 export async function login(page: Page, next?: string) {
   await page.goto(next ? `/login?next=${encodeURIComponent(next)}` : "/login");
-  // 入力欄は placeholder ではなく見出し（label）で引く。
-  // デザイン移植で placeholder が「メールアドレス」→「you@example.com」に変わり、
-  // ここが追従できずに**ログイン自体が通らなくなっていた**（E2E 全体が落ちる原因）。
-  // 見出しの文言のほうが変わりにくいので、そちらに寄せる
-  await page.getByLabel("メールアドレス").fill(TEST_USER.email);
-  await page.getByLabel("パスワード").fill(TEST_USER.password);
-  await page.getByRole("button", { name: "ログイン", exact: true }).click();
+  await submitLoginForm(page);
+}
+
+// ---------------------------------------------------------------------------
+// 画面から状態を読む
+// ---------------------------------------------------------------------------
+
+/**
+ * ステージ選択マップのノード1つ。「STAGE {order}」のラベルを持つ枠で引く。
+ *
+ * 完全一致の正規表現にしているのは、`STAGE 1` が `STAGE 15` にも当たってしまうため。
+ */
+export function stageNode(page: Page, order: number) {
+  return page.locator("main section > div", {
+    has: page.getByText(new RegExp(`^STAGE ${order}$`)),
+  });
+}
+
+export type StageState = "cleared" | "current" | "locked";
+
+/**
+ * ノードの状態を画面から読む。
+ *
+ * 絵文字（✅🐾🔒）だった頃は文字として数えられたが、デザイン移植で SVG アイコンに
+ * 変わり、**アイコンには読み上げ用の名前が付いていない**ので文字では引けない。
+ * 代わりに、状態によって変わる**振る舞い**で判定する。
+ *   - locked  … ボタンが押せない（`disabled`）
+ *   - current … 「スタート」の吹き出しが出ている
+ *   - cleared … 押せるが現在地ではない
+ *
+ * `cleared` は残りとして求めているので、単体では弱い。「1つ前がクリア扱いになったか」を
+ * 見たいときは、**次のノードが current になること**と対で確かめること（そちらは強い）。
+ */
+export async function stageState(page: Page, order: number): Promise<StageState> {
+  const node = stageNode(page, order);
+  await expect(node).toHaveCount(1);
+  if (await node.locator("button").first().isDisabled()) return "locked";
+  return (await node.getByText("スタート").count()) > 0 ? "current" : "cleared";
+}
+
+/**
+ * リザルトの統計チップ（スコア / キーワード / AI 採点）を見出しから枠ごと引く。
+ * 見出しの span の親が枠なので、そこまで1つ上がる。
+ */
+export function statChip(page: Page, label: string) {
+  return page.getByText(label, { exact: true }).locator("xpath=..");
 }
 
 // ---------------------------------------------------------------------------
@@ -351,8 +443,16 @@ export const test = base.extend<Fixtures>({
     await clearAttempts(id);
   },
 
-  problems: async ({}, use) => {
+  problems: async ({ userId }, use) => {
     const seeded = await seedProblems();
+    // シードは実コンテンツの後ろ（order 9000番台）に並ぶので、手前のステージを
+    // クリア済みにしないと解放判定が届かず、1問目からして 404 になる。
+    // 問題が0件だった時期はシードが先頭に来ていたので要らなかった下ごしらえで、
+    // コンテンツが増えたことで必要になった（E4 の申し送り）。
+    //
+    // **マップの見え方が変わる。** 実問題は全部クリア済みとして描かれるので、
+    // ノードの個数を数えるテストは書けない。個々のノードを見ること（stageState）
+    await clearPrecedingStages(userId);
     await use(seeded);
     await removeProblems();
   },

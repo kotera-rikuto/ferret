@@ -12,7 +12,7 @@ import {
   stub,
   deepOutput,
   markCleared,
-  clearPrecedingStages,
+  statChip,
   ANSWER,
 } from "./support/fixtures";
 
@@ -32,8 +32,8 @@ const NG_WORDS = [
 test.describe("§6 表示", () => {
   test("E-450 ブラウザのタブに出るタイトル", async ({ page }) => {
     await page.goto("/");
-    // 🟡 create-next-app の既定値のまま。プロダクト名に変えたら期待値を直す
-    await expect(page).toHaveTitle("Create Next App");
+    // create-next-app の既定値（Create Next App）は解消済み（app/layout.tsx の metadata）
+    await expect(page).toHaveTitle("Ferret");
   });
 
   test("E-451 コードはダークテーマで表示される", async ({ authedPage, problems }) => {
@@ -58,9 +58,8 @@ test.describe("§6 表示", () => {
     problems,
     userId,
   }) => {
-    // シードは実コンテンツの後ろ（order 9001 以降）に並ぶので、
-    // 先行するステージをクリアしないと解放されない
-    await clearPrecedingStages(userId);
+    // 先行ステージのクリア（シードを解放するための下ごしらえ）は
+    // problems フィクスチャがまとめて行うようになった
 
     // 1問目: どちらも空。コードの枠だけで、増えた要素は出ない
     await authedPage.goto(`/problems/${problems[0].id}`);
@@ -171,10 +170,13 @@ test.describe("§6 表示", () => {
     await authedPage.getByRole("button", { name: "回答する" }).click();
     await authedPage.waitForURL(/\/result\//);
 
-    // 🟡 残課題 §5。巨大な数字で 0 を出す現状を固定しておく。
-    // レイアウトを変えたらこの期待値を直す
-    const score = authedPage.locator("span.text-9xl");
-    await expect(score).toBeVisible();
-    await expect(score).toHaveText("0");
+    // 🟡 残課題 §5 / タスク E6。**巨大な数字1つはデザイン移植でやめてある**
+    // （統計チップ3枚に分割。0点が罰に見える問題への対処として意図的にそうした）。
+    // 見せ方をこれ以上変えるかは E6 の判断なので、いまの出方を固定しておく
+    await expect(statChip(authedPage, "スコア")).toContainText("0 / 100");
+    await expect(statChip(authedPage, "キーワード")).toContainText("0 / 20");
+    await expect(statChip(authedPage, "AI 採点")).toContainText("0 / 80");
+    // 数字だけで終わらせず、次に見る場所が文章で添えられていること
+    await expect(authedPage.getByText("フェレットのメモ")).toBeVisible();
   });
 });
