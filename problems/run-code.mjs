@@ -30,6 +30,16 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 for (const p of problems) {
   console.log(`\n=== order=${p.order}「${p.title}」 ===`);
+
+  // 実行できない読み物（モジュール構文・package.json・テストファイルなど）は
+  // データ側で `runnable: false` と宣言しておく。
+  // **黙って SyntaxError を出すと「壊れている問題」と見分けが付かない**ので、
+  // 対象外であることを明示する。第10章で初めて必要になった。
+  if (p.runnable === false) {
+    console.log(`  （実行対象外: ${p.notRunnableReason ?? "そのままでは動かせる形ではない"}）`);
+    continue;
+  }
+
   const out = [];
   const say = (...args) =>
     out.push(args.map((a) => (typeof a === "string" ? a : inspect(a))).join(" "));
