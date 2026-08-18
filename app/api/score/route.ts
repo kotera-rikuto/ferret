@@ -364,7 +364,12 @@ async function handleScoring(
   // 点数が変わりうる。過去の結果をそのまま返すことでそれを防ぐ。API も呼ばないので原価ゼロ。
   const { data: prev } = await admin
     .from("user_attempts")
-    .select("total_score, keyword_score, deep_score, ai_feedback, axes, contradiction")
+    .select(
+      // ai_praise / ai_next_focus も複製する。これが無いと、同じ回答を再送した回で
+      // 2枠が空になり「再送したら文章が1枠に戻る」という食い違いが出る（tasks/E2）。
+      // 元の行がこの欄を持たない頃のものなら NULL がそのまま入り、画面は1枠で出す
+      "total_score, keyword_score, deep_score, ai_feedback, ai_praise, ai_next_focus, axes, contradiction",
+    )
     .eq("user_id", userId)
     .eq("problem_id", problem.id)
     .eq("answer_hash", hash)
@@ -384,6 +389,8 @@ async function handleScoring(
       deep_score: prev.deep_score,
       total_score: prev.total_score,
       ai_feedback: prev.ai_feedback,
+      ai_praise: prev.ai_praise,
+      ai_next_focus: prev.ai_next_focus,
       scoring_method: "ai",
       axes: prev.axes,
       grader_version: GRADER_VERSION,
@@ -397,6 +404,8 @@ async function handleScoring(
       keyword_score: prev.keyword_score,
       deep_score: prev.deep_score,
       feedback: prev.ai_feedback,
+      praise: prev.ai_praise,
+      next_focus: prev.ai_next_focus,
       axes: prev.axes,
       cleared: (prev.total_score ?? 0) >= CLEAR_THRESHOLD,
       perfect: (prev.total_score ?? 0) >= PERFECT_THRESHOLD,
@@ -435,6 +444,10 @@ async function handleScoring(
       deep_score: result.deepScore,
       total_score: result.total,
       ai_feedback: result.ai_feedback,
+      // 空文字ではなく NULL で入れる。「文章が無い」を1つの表し方に寄せておかないと、
+      // 画面と集計の両方で空文字と NULL の2通りを気にすることになる
+      ai_praise: result.ai_praise || null,
+      ai_next_focus: result.ai_next_focus || null,
       scoring_method: result.scoring_method,
       axes: {
         axes: result.axes,
@@ -461,6 +474,8 @@ async function handleScoring(
       keyword_score: result.keywordScore,
       deep_score: result.deepScore,
       feedback: result.ai_feedback,
+      praise: result.ai_praise || null,
+      next_focus: result.ai_next_focus || null,
       axes: result.axes,
       cleared: result.cleared,
       perfect: result.perfect,

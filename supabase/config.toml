@@ -160,10 +160,13 @@ max_indexes = 5
 # そのまま上書きされる**。`supabase db push`（マイグレーション）とは別物で、
 # db push では push されない。
 #
-# 2026-08-16 時点で、本番と食い違っている項目:
-#   - site_url / additional_redirect_urls が localhost のまま。
-#     push すると本番の確認メールのリンクが localhost を指すようになる。
-#     独自ドメインが決まったら、ここを本番URLに直してから push すること。
+# 本番と食い違っている項目: **いまは無い。**
+# 2026-08-18・C6 で site_url / additional_redirect_urls を本番URLに直した
+# （それまでは localhost のままで、push すると本番のリンクが localhost を指した）。
+#
+# **push できるのは、独自ドメインの取得と Resend の認証が終わってから。**
+# site_url は `https://ferretcode.com` を指しているので、ドメインが実在しないうちに
+# push すると本番の確認メールが「開けないリンク」を持つ。順序は tasks/C6 の作業記録。
 #
 # 逆に、以下は本番に合わせて修正済みなので push しても安全:
 #   - enable_confirmations = true（本番はメール確認が必須。以前ここは false で、
@@ -180,11 +183,13 @@ max_indexes = 5
 enabled = true
 # The base URL of your website. Used as an allow-list for redirects and for constructing URLs used
 # in emails.
-site_url = "http://127.0.0.1:3000"
+site_url = "https://ferretcode.com"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-additional_redirect_urls = ["https://127.0.0.1:3000"]
+# 開発用を残す。site_url が本番を指すようになったため、ここが残っていないと
+# ローカルの OAuth・確認リンクの戻り先が全部弾かれる（tasks/C6）。
+additional_redirect_urls = ["http://localhost:3000", "http://127.0.0.1:3000"]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
