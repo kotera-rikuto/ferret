@@ -254,7 +254,8 @@ describe("§10-3 /result/[id]", () => {
     expect(spy.sessionTables).toEqual(["user_attempts", "user_attempts"]);
     // id は異議申し立て（/api/feedback）で attempt_id として使う
     expect(spy.sessionSelects[0]).toBe(
-      "id, total_score, keyword_score, deep_score, ai_feedback",
+      // contradiction は読み違いのときの見せ方の分岐に使う（E6）
+      "id, total_score, keyword_score, deep_score, ai_feedback, contradiction",
     );
   });
 

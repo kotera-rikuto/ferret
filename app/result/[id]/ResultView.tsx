@@ -22,6 +22,8 @@ type Props = {
   feedback: string | null;
   cleared: boolean;
   perfect: boolean;
+  /** 結論が反転していると判定された回（`user_attempts.contradiction`） */
+  contradiction: boolean;
   xp: XpView;
 };
 
@@ -57,6 +59,10 @@ const CONFETTI_COLORS = ["#f59e0b", "#fbbf24", "#c47000"];
  * 巨大なスコア1つではなく統計チップに分けているのは、0点のときに
  * 巨大な「0」が罰のように見える問題（TASKS.md）への対処。
  * チップならキーワード分など「拾えた数字」が横に並ぶ。
+ *
+ * さらに読み違い（結論の反転）を検出した回だけ、チップと文章の**順番と大きさを入れ替える**。
+ * この場面は3枠すべてが 0 で並ぶうえ、本人は真面目に読んで結論だけが逆になっている。
+ * 点数は消さず1行に畳み、「次に見る場所」を主役にする（残課題 §5 / タスク E6）。
  */
 export function ResultView({
   problemId,
@@ -67,8 +73,18 @@ export function ResultView({
   feedback,
   cleared,
   perfect,
+  contradiction,
   xp,
 }: Props) {
+  /**
+   * 見せ方を控えめにする回。
+   *
+   * 読み違いに絞っているのは、点数で線を引くと「あと一歩」の回まで巻き込むため。
+   * `cleared` を条件に入れているのは、矛盾が申告のみで裏が取れない場合の上限が
+   * 40点で、将来クリア閾値を下げたときに「クリアなのに控えめ」が生まれないようにするため。
+   * 文章が無いときに畳むと画面が空になるので、そのときは通常の並びに戻す。
+   */
+  const softened = contradiction && !cleared && Boolean(feedback);
   // 異議申し立て・誤り報告。2種で状態を分けるのは、片方を送った後も
   // もう片方を送れるようにするため
   const [reports, setReports] = useState<Record<FeedbackKind, ReportState>>({
@@ -120,18 +136,92 @@ export function ResultView({
   }
 
   // スコアのカウントアップ。演出であって真値は totalScore（サーバー由来）
-  const [shownScore, setShownScore] = useState(0);
+  const [countUp, setCountUp] = useState(0);
   useEffect(() => {
+    // 控えめにする回では数えない。数字が動くと視線がそこに集まり、
+    // 主役を入れ替えた意味が消える
+    if (softened) return;
     const start = performance.now();
     let raf = 0;
     function tick(now: number) {
       const t = Math.min((now - start) / 900, 1);
-      setShownScore(Math.round(totalScore * (1 - Math.pow(1 - t, 3))));
+      setCountUp(Math.round(totalScore * (1 - Math.pow(1 - t, 3))));
       if (t < 1) raf = requestAnimationFrame(tick);
     }
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [totalScore]);
+  }, [totalScore, softened]);
+
+  // 演出を止めた回は真値をそのまま出す（0 のまま止まって見えないように）
+  const shownScore = softened ? totalScore : countUp;
+
+  /**
+   * スコアの3項目。チップと1行の2通りで**同じ数字**を出すために配列にしてある。
+   *
+   * `accent` を文字列そのままで持っているのは Tailwind の都合。
+   * `bg-${...}` のように組み立てるとクラスが生成されず色が消えるので、
+   * 完全なクラス名のままここに書いておく必要がある。
+   */
+  const stats = [
+    { label: "スコア", value: shownScore, max: 100, accent: "bg-brand" },
+    { label: "キーワード", value: keywordScore, max: 20, accent: "bg-brand-soft" },
+    { label: "AI 採点", value: deepScore, max: 80, accent: "bg-brand-soft" },
+  ];
+
+  const scoreChips = (
+    <div className="flex w-full gap-3.5">
+      {stats.map((s) => (
+        <div
+          key={s.label}
+          className="flex-1 overflow-hidden rounded-2xl border-2 border-b-5 border-line bg-panel text-center"
+        >
+          <span
+            className={`block ${s.accent} py-1.5 text-[11px] font-extrabold tracking-widest text-white`}
+          >
+            {s.label}
+          </span>
+          <span className="block px-1 py-3.5 text-[28px] font-extrabold">
+            {s.value}
+            <span className="text-[13px] font-bold text-muted"> / {s.max}</span>
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+
+  // 控えめにする回の点数。**隠さない。** 見えないと「ごまかされた」と受け取られる。
+  // 大きさと配置だけを変え、探せば分かる場所に残す
+  const scoreLine = (
+    <div className="flex w-full flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
+      {stats.map((s) => (
+        <span key={s.label} className="text-xs font-bold">
+          <span className="text-muted">{s.label}</span>{" "}
+          <span className="text-ink">{s.value}</span>
+          <span className="text-locked-ink"> / {s.max}</span>
+        </span>
+      ))}
+    </div>
+  );
+
+  const feedbackPanel = feedback ? (
+    <div
+      className={`flex w-full flex-col gap-3 rounded-2xl border-2 border-line bg-panel ${
+        softened ? "border-b-5 p-7" : "p-6"
+      }`}
+    >
+      <h2
+        className={`flex items-center gap-2 font-extrabold ${
+          softened ? "text-[15px]" : "text-sm"
+        }`}
+      >
+        <Mascot className={softened ? "w-7.5 h-7.5" : "w-6.5 h-6.5"} />
+        フェレットのメモ
+      </h2>
+      <p className={`leading-loose ${softened ? "text-[15px]" : "text-sm"}`}>
+        {feedback}
+      </p>
+    </div>
+  ) : null;
 
   // XP バーは「この回答を出す前の位置」から動かす。
   // 0 から動かすと、増えていない回でも増えたように見えてしまう。
@@ -170,6 +260,36 @@ export function ResultView({
     return () => timers.forEach(clearTimeout);
   }, [leveledUp, xp.now.percent]);
 
+  /* XP バー。最高点を伸ばしたぶんだけ増える（lib/progress/level.ts）。
+     増えなかった回でもバーは出す ── 一度貯まったものは減らない、という
+     見せ方に揃えるため、「+0 XP」ではなくバッジを出さないだけにしてある。
+
+     読み違いのときは点数と一緒に文章の下へ回す（数字の並びを1か所にまとめる） */
+  const xpBar = (
+    <div className="flex w-full flex-col gap-2.5 rounded-2xl border-2 border-line bg-panel px-5 py-4">
+      <div className="flex items-center gap-3.5">
+        <IconPaw size={26} className="shrink-0 text-brand" />
+        <div className="h-4 flex-1 overflow-hidden rounded-full bg-brand-tint">
+          <div
+            className={`h-full rounded-full bg-gradient-to-r from-brand to-brand-soft ${
+              xpSnap ? "" : "transition-[width] duration-700 ease-out"
+            }`}
+            style={{ width: `${xpFill}%` }}
+          />
+        </div>
+        {xp.gain > 0 && (
+          <span className="shrink-0 text-sm font-extrabold text-brand-deep">
+            +{xp.gain} XP
+          </span>
+        )}
+      </div>
+      <div className="flex items-baseline justify-between text-xs font-bold text-muted">
+        <span className="font-extrabold text-ink">レベル {xp.now.level}</span>
+        <span>つぎのレベルまで あと {xp.now.xpToNext} XP</span>
+      </div>
+    </div>
+  );
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       {/* 紙吹雪はクリア時だけ。位置と遅れは添字から決める（乱数だと SSR とズレる） */}
@@ -201,73 +321,21 @@ export function ResultView({
           {perfect ? "パーフェクト！" : cleared ? "クリア！" : "もう一度挑戦しよう"}
         </h1>
 
-        {/* 統計チップ */}
-        <div className="flex w-full gap-3.5">
-          <div className="flex-1 overflow-hidden rounded-2xl border-2 border-b-5 border-line bg-panel text-center">
-            <span className="block bg-brand py-1.5 text-[11px] font-extrabold tracking-widest text-white">
-              スコア
-            </span>
-            <span className="block px-1 py-3.5 text-[28px] font-extrabold">
-              {shownScore}
-              <span className="text-[13px] font-bold text-muted"> / 100</span>
-            </span>
-          </div>
-          <div className="flex-1 overflow-hidden rounded-2xl border-2 border-b-5 border-line bg-panel text-center">
-            <span className="block bg-brand-soft py-1.5 text-[11px] font-extrabold tracking-widest text-white">
-              キーワード
-            </span>
-            <span className="block px-1 py-3.5 text-[28px] font-extrabold">
-              {keywordScore}
-              <span className="text-[13px] font-bold text-muted"> / 20</span>
-            </span>
-          </div>
-          <div className="flex-1 overflow-hidden rounded-2xl border-2 border-b-5 border-line bg-panel text-center">
-            <span className="block bg-brand-soft py-1.5 text-[11px] font-extrabold tracking-widest text-white">
-              AI 採点
-            </span>
-            <span className="block px-1 py-3.5 text-[28px] font-extrabold">
-              {deepScore}
-              <span className="text-[13px] font-bold text-muted"> / 80</span>
-            </span>
-          </div>
-        </div>
-
-        {/* XP バー。最高点を伸ばしたぶんだけ増える（lib/progress/level.ts）。
-            増えなかった回でもバーは出す ── 一度貯まったものは減らない、という
-            見せ方に揃えるため、「+0 XP」ではなくバッジを出さないだけにしてある */}
-        <div className="flex w-full flex-col gap-2.5 rounded-2xl border-2 border-line bg-panel px-5 py-4">
-          <div className="flex items-center gap-3.5">
-            <IconPaw size={26} className="shrink-0 text-brand" />
-            <div className="h-4 flex-1 overflow-hidden rounded-full bg-brand-tint">
-              <div
-                className={`h-full rounded-full bg-gradient-to-r from-brand to-brand-soft ${
-                  xpSnap ? "" : "transition-[width] duration-700 ease-out"
-                }`}
-                style={{ width: `${xpFill}%` }}
-              />
-            </div>
-            {xp.gain > 0 && (
-              <span className="shrink-0 text-sm font-extrabold text-brand-deep">
-                +{xp.gain} XP
-              </span>
-            )}
-          </div>
-          <div className="flex items-baseline justify-between text-xs font-bold text-muted">
-            <span className="font-extrabold text-ink">レベル {xp.now.level}</span>
-            <span>つぎのレベルまで あと {xp.now.xpToNext} XP</span>
-          </div>
-        </div>
-
-        {/* AIフィードバック。praise / next_focus の2枠表示は保存形式の変更待ち
-            （design/移植残タスク.md）。当面は結合済みの ai_feedback を1枠で出す */}
-        {feedback && (
-          <div className="flex w-full flex-col gap-3 rounded-2xl border-2 border-line bg-panel p-6">
-            <h2 className="flex items-center gap-2 text-sm font-extrabold">
-              <Mascot className="w-6.5 h-6.5" />
-              フェレットのメモ
-            </h2>
-            <p className="text-sm leading-loose">{feedback}</p>
-          </div>
+        {/* 点数・XP・文章。読み違いのときだけ順番を入れ替え、文章を主役にする。
+            文章そのものは praise / next_focus を結合済みの ai_feedback（1枠）。
+            2枠に分けるのは保存形式の変更待ち（design/移植残タスク.md・E2） */}
+        {softened ? (
+          <>
+            {feedbackPanel}
+            {scoreLine}
+            {xpBar}
+          </>
+        ) : (
+          <>
+            {scoreChips}
+            {xpBar}
+            {feedbackPanel}
+          </>
         )}
 
         {/* 主ボタンは1本。もう一方はテキストリンクに格下げして迷いを減らす */}

@@ -31,7 +31,8 @@ export default async function ResultPage({
   // session クライアント経由なので RLS で自分の行だけに絞られる
   const { data: attempt } = await supabase
     .from("user_attempts")
-    .select("id, total_score, keyword_score, deep_score, ai_feedback")
+    // contradiction は見せ方の分岐に使う（読み違いのときは点数を主役から降ろす・E6）
+    .select("id, total_score, keyword_score, deep_score, ai_feedback, contradiction")
     .eq("problem_id", problemId)
     // 判定保留（レート上限時に層1のみで採点した回）は合否を出さない
     .eq("is_provisional", false)
@@ -79,6 +80,7 @@ export default async function ResultPage({
       feedback={attempt.ai_feedback}
       cleared={attempt.total_score >= CLEAR_THRESHOLD}
       perfect={attempt.total_score >= PERFECT_THRESHOLD}
+      contradiction={attempt.contradiction === true}
       xp={xpView(
         totalXp(bestByProblem.values()),
         xpGain(previousBest, attempt.total_score),

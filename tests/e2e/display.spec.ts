@@ -154,7 +154,7 @@ test.describe("§6 表示", () => {
     await expect(page).toHaveURL(/\/result\//);
   });
 
-  test("E-272 0点でも罰のように見える表示になっていないか（現状の記録）", async ({
+  test("E-272 読み違いのときは、点数より先に「次に見る場所」が出る", async ({
     authedPage,
     problems,
   }) => {
@@ -171,14 +171,27 @@ test.describe("§6 表示", () => {
     await authedPage.getByRole("button", { name: "回答する" }).click();
     await authedPage.waitForURL(/\/result\//);
 
-    // 🟡 残課題 §5 / タスク E6。**巨大な数字1つはデザイン移植でやめてある**
-    // （統計チップ3枚に分割。0点が罰に見える問題への対処として意図的にそうした）。
-    // 見せ方をこれ以上変えるかは E6 の判断なので、いまの出方を固定しておく
+    // 残課題 §5 / タスク E6。読み違いを検出した回は、3枠すべてが 0 で並ぶ。
+    // 点数は**隠さない**（見えないと「ごまかされた」と受け取られる）が、
+    // 主役は「次に見る場所」に移す。ここで固定するのは順番と、点数が残っていること
+    const memo = authedPage.getByText("フェレットのメモ");
+    await expect(memo).toBeVisible();
+
     await expect(statChip(authedPage, "スコア")).toContainText("0 / 100");
     await expect(statChip(authedPage, "キーワード")).toContainText("0 / 20");
     await expect(statChip(authedPage, "AI 採点")).toContainText("0 / 80");
-    // 数字だけで終わらせず、次に見る場所が文章で添えられていること
-    await expect(authedPage.getByText("フェレットのメモ")).toBeVisible();
+
+    // 文章が点数より上にあること。スマホ幅（mobile プロジェクト）でも同じ順番になる
+    const memoBox = (await memo.boundingBox())!;
+    const scoreBox = (await statChip(authedPage, "スコア").boundingBox())!;
+    expect(memoBox.y).toBeLessThan(scoreBox.y);
+
+    // 点数の文字が文章より大きくないこと（大きさで主役が逆転しないように）
+    const fontSize = (locator: ReturnType<typeof statChip>) =>
+      locator.evaluate((el) => parseFloat(getComputedStyle(el).fontSize));
+    expect(await fontSize(statChip(authedPage, "スコア"))).toBeLessThanOrEqual(
+      await fontSize(memo),
+    );
   });
 });
 
