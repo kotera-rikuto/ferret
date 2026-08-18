@@ -115,6 +115,13 @@ describe("§10-1 /stages", () => {
     expect(spy.sessionFilters).toContainEqual(["user_id", USER_ID]);
   });
 
+  it("I-386 レベルは解放判定で読んだ最高点から出す（問い合わせを増やさない）", async () => {
+    await StagesPage();
+    // XP のために user_attempts を3回目に読んだり、users を読んだりしない
+    expect(spy.sessionTables).toEqual(["user_attempts", "user_attempts"]);
+    expect(spy.selects.map(([t]) => t)).not.toContain("users");
+  });
+
   it("I-371 一覧に model_answer / rubric_items を含めない", async () => {
     await StagesPage();
     const columns = spy.selects.filter(([t]) => t === "problems").map(([, c]) => c);
@@ -243,7 +250,8 @@ describe("§10-3 /result/[id]", () => {
   it("I-379 回答履歴は session クライアントで読む（RLS が効く側）", async () => {
     setup({ resultAttempt: ATTEMPT });
     await ResultPage(params(String(UNLOCKED_ID)));
-    expect(spy.sessionTables).toEqual(["user_attempts"]);
+    // 表示する回答と XP の集計で user_attempts を2回読む。どちらも session 側
+    expect(spy.sessionTables).toEqual(["user_attempts", "user_attempts"]);
     // id は異議申し立て（/api/feedback）で attempt_id として使う
     expect(spy.sessionSelects[0]).toBe(
       "id, total_score, keyword_score, deep_score, ai_feedback",
@@ -278,6 +286,35 @@ describe("§10-3 /result/[id]", () => {
     expect(spy.orders).toContainEqual(["created_at", { ascending: false }]);
     expect(spy.orders).not.toContainEqual(["total_score", { ascending: false }]);
     expect(select).not.toContain("max(");
+  });
+
+  /**
+   * XP は users.xp に貯めず、回答ログから毎回導出する（lib/progress/level.ts）。
+   * カウンタを持つと「採点結果は保存できたのに加算だけ失敗した」というズレが生まれ、
+   * 画面は普通に描画される（数字が少し小さいだけ）ので気づけない。
+   * ストリークと同じ方針なので、書き込みが1つも走らないことまで見る。
+   */
+  it("I-384 XP は回答ログから導出する（users.xp に触らない）", async () => {
+    setup({ resultAttempt: ATTEMPT });
+    await ResultPage(params(String(UNLOCKED_ID)));
+
+    expect(spy.sessionSelects[1]).toBe("id, problem_id, total_score");
+    expect(spy.sessionFilters).toContainEqual(["user_id", USER_ID]);
+    // 判定保留（層1のみで採点した回）は XP にも数えない
+    expect(spy.sessionFilters).toContainEqual(["is_provisional", false]);
+
+    expect(spy.sessionTables).not.toContain("users");
+    expect(spy.selects.map(([t]) => t)).not.toContain("users");
+    expect(spy.inserted).toHaveLength(0);
+    expect(spy.upserted).toHaveLength(0);
+  });
+
+  it("I-385 XP の集計を service_role で行わない", async () => {
+    setup({ resultAttempt: ATTEMPT });
+    await ResultPage(params(String(UNLOCKED_ID)));
+    // admin で数えると、RLS が壊れたときに他人の行まで数えて
+    // XP が増える方向に転ぶ。session なら「少なく出る」側に倒れる
+    expect(spy.selects).toHaveLength(0);
   });
 
   it("I-379b 解放状態を見ずに描画する（クリア済みの復習を妨げない）", async () => {
