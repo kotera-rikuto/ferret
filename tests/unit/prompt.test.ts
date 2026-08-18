@@ -95,6 +95,23 @@ describe("§4 STATIC_PROMPT", () => {
     expect(STATIC_PROMPT).toContain("行番号");
     expect(STATIC_PROMPT).toContain("場所を特定しない案内は書きません");
   });
+
+  /**
+   * B3（残課題 §8「直す候補」1）。「エラーが出ると思います」だけの回答に
+   * core=full が付き、60点でクリアしていた。**core は1段24点なので、
+   * 1段の揺れがそのまま合否を変える。**
+   *
+   * 対になる full の例（短くても原因に触れていれば full）を必ず一緒に置くこと。
+   * partial 側だけを足すと「短い回答は下げる」と読まれ、
+   * 設計の根幹（短くても正しければ通す）が崩れる。
+   */
+  it("U-162 結果だけで原因に触れていない回答を full にしない判断例がある", () => {
+    expect(STATIC_PROMPT).toContain(
+      "結果だけを述べて原因に触れていない回答は full にしません",
+    );
+    // 短くても原因に触れていれば full、という対の例
+    expect(STATIC_PROMPT).toContain("core は full。短くても、");
+  });
 });
 
 describe("§4 problemBlock", () => {
