@@ -274,9 +274,16 @@ double_confirm_changes = true
 # 実態に合わせて true にしてある。
 enable_confirmations = true
 # If enabled, users will need to reauthenticate or have logged in recently to change their password.
-# パスワード変更画面を作るときに true にする。
-# 放置した端末からパスワードだけ書き換えてアカウントを乗っ取られるのを防ぐため
-secure_password_change = false
+# 放置した端末からパスワードだけ書き換えてアカウントを乗っ取られるのを防ぐため。
+#
+# 2026-08-19（C3）にパスワード変更画面を作ったので true にした。ただし注意が2点ある。
+#   1. **反映には `supabase config push` が要る。** それは独自ドメインの取得と Resend の
+#      認証が済むまで実行できない（このファイル冒頭の警告参照）。つまり本番ではまだ効いていない。
+#   2. いま実際に守っているのは**アプリ側**（app/settings/PasswordForm.tsx）。
+#      変更の直前にいまのパスワードでログインし直させている。
+#      この設定が求める「直前にログインしていること」も同時に満たすので、
+#      push しても画面の作りを変える必要はない。
+secure_password_change = true
 # Controls the minimum amount of time that must pass before sending another signup confirmation or password reset email.
 max_frequency = "1s"
 # Number of characters used in the email OTP.

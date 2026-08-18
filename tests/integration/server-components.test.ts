@@ -55,6 +55,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 const StagesPage = (await import("@/app/stages/page")).default;
 const ProblemPage = (await import("@/app/problems/[id]/page")).default;
 const ResultPage = (await import("@/app/result/[id]/page")).default;
+const SettingsPage = (await import("@/app/settings/page")).default;
 
 // ---------------------------------------------------------------------------
 // セットアップ
@@ -325,5 +326,23 @@ describe("§10-3 /result/[id]", () => {
     // リザルトは「自分の回答があるか」だけで判断する。
     // 回答がある＝そのステージは開いていたということなので、二重に判定しない
     expect(spy.selects.filter(([t]) => t === "problems")).toHaveLength(0);
+  });
+});
+
+describe("§10-4 せってい画面", () => {
+  it("I-383 未ログインならログイン画面へ送る", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    expect(await outcome(() => SettingsPage())).toBe("REDIRECT:/login");
+  });
+
+  /**
+   * せってい画面は問題に紐づかないので、DB を一切読まない。
+   * 読み始めたら `loadProgress` を通す必要が出てくる（`ideas/セキュリティ_残課題.md` §4）。
+   * ここで「読んでいない」を固定して、足したときに気づけるようにしておく。
+   */
+  it("I-384 ログイン確認だけで描画し、DB を読まない", async () => {
+    expect(await outcome(() => SettingsPage())).toBe("RENDERED");
+    expect(spy.selects).toHaveLength(0);
+    expect(spy.sessionTables).toHaveLength(0);
   });
 });

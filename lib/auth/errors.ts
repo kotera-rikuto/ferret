@@ -1,4 +1,17 @@
 /**
+ * パスワードの最低文字数。
+ *
+ * **Supabase 側の設定（`supabase/config.toml` の `minimum_password_length`）と
+ * 必ず同じ値にすること。** 片方だけ変えると、案内どおりに入力しても弾かれる、
+ * あるいは案内より短いものが通る状態になる（実際に 2026-08-18 の C4 まで
+ * 本番は 6 で案内は 8 だった）。
+ *
+ * 定数にしているのは、案内の文面（下の `weak_password`）と
+ * 入力欄（`app/settings/PasswordForm.tsx`）の2か所から参照するため。
+ */
+export const PASSWORD_MIN_LENGTH = 8;
+
+/**
  * Supabase Auth のエラーを日本語にする。
  *
  * 「登録に失敗しました」だけだと、パスワードが短いのか・既に登録済みなのか・
@@ -26,7 +39,12 @@ export function authErrorMessage(
   // 文字数は Supabase 側の設定（supabase/config.toml の minimum_password_length）と
   // 揃えること。片方だけ変えると、案内どおりに入力しても弾かれる状態になる
   if (code === "weak_password" || msg.includes("password should be at least")) {
-    return "パスワードをもう少し長くしてください（8文字以上）。";
+    return `パスワードをもう少し長くしてください（${PASSWORD_MIN_LENGTH}文字以上）。`;
+  }
+  // パスワード変更でいまと同じものを入れたとき（app/settings/PasswordForm.tsx）。
+  // 変更したつもりで変わっていない状態を、はっきり伝える
+  if (code === "same_password" || msg.includes("should be different from the old")) {
+    return "いま使っているパスワードと同じです。別のものをご用意ください。";
   }
   // 流出済みパスワードの拒否（password_hibp_enabled）を有効にすると返ってくる。
   // 「あなたのパスワードが漏れている」ではなく「このパスワードは他所で流出済み」なので、

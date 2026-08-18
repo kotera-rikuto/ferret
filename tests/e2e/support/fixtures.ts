@@ -252,6 +252,55 @@ export async function ensureUser(): Promise<string> {
   return found.id;
 }
 
+/**
+ * 使い捨てアカウント。**退会とパスワード変更の通しで使う。**
+ *
+ * 共有のテストユーザー（TEST_USER）でこれをやると、
+ * 退会でユーザーが消え、パスワード変更で他のテストがログインできなくなる。
+ * だから1テストにつき1つ作って、その中で使い切る。
+ *
+ * 管理APIで作るので**確認メールは飛ばない**（E-111 を止めている理由がここには無い）。
+ */
+export type DisposableUser = { id: string; email: string; password: string };
+
+export async function createDisposableUser(label: string): Promise<DisposableUser> {
+  const email = `e2e-${label}-${Date.now()}@ferret.test`;
+  const password = "FerretDisposable2026!";
+
+  const { data, error } = await admin().auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+  });
+  if (error || !data.user) {
+    throw new Error(`使い捨てアカウントの作成に失敗: ${error?.message}`);
+  }
+  return { id: data.user.id, email, password };
+}
+
+/** 使い捨てアカウントの後片付け。退会が通っていれば既に居ないので、その場合は何もしない */
+export async function removeUser(userId: string) {
+  const db = admin();
+  const { data } = await db.auth.admin.getUserById(userId);
+  if (!data.user) return;
+  const { error } = await db.auth.admin.deleteUser(userId);
+  if (error) {
+    throw new Error(`使い捨てアカウントの削除に失敗（残ります）: ${error.message}`);
+  }
+}
+
+/** ログイン情報がまだ存在するか。退会できたことの確認に使う */
+export async function authUserExists(userId: string): Promise<boolean> {
+  const { data } = await admin().auth.admin.getUserById(userId);
+  return Boolean(data.user);
+}
+
+/** public.users の行がまだ存在するか（退会で消えるはずのもの） */
+export async function profileRowExists(userId: string): Promise<boolean> {
+  const { data } = await admin().from("users").select("id").eq("id", userId).maybeSingle();
+  return Boolean(data);
+}
+
 /** 回答履歴を消す。ステージの解放状態を初期化するために毎回呼ぶ */
 export async function clearAttempts(userId: string) {
   const { error } = await admin().from("user_attempts").delete().eq("user_id", userId);
@@ -336,6 +385,35 @@ export async function latestAttempt(userId: string, problemId: number) {
     .limit(1)
     .maybeSingle();
   return data;
+}
+
+/**
+ * 実コンテンツの問題を1つ選ぶ（`order` が最小のもの）。
+ *
+ * 退会で回答が消えることを確かめるには、そのユーザーの回答行が1件要る。
+ * シード問題（`order` 9000番台）を使うと**投入と削除が他のテストと衝突する**ので、
+ * すでに入っている問題に相乗りする。読むだけなので後片付けも要らない。
+ */
+export async function firstProblemId(): Promise<number> {
+  const { data, error } = await admin()
+    .from("problems")
+    .select("id")
+    .lt(ORDER_COL, 9000)
+    .order("order")
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error(`問題の取得に失敗: ${error.message}`);
+  if (!data) throw new Error("問題が1件も登録されていません");
+  return data.id;
+}
+
+/** そのユーザーの回答行の総数。退会で消えたことの確認に使う */
+export async function countAllAttempts(userId: string) {
+  const { count } = await admin()
+    .from("user_attempts")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId);
+  return count ?? 0;
 }
 
 export async function countAttempts(userId: string, problemId: number) {
