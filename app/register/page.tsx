@@ -138,6 +138,22 @@ export default function RegisterPage() {
           >
             {loading ? "送信中..." : "登録する"}
           </button>
+          {/*
+           * 同意の一文はボタンの直下に置く。
+           * **押す前に読める位置に、押す操作の意味を書く**必要があるため、
+           * フッターの共通リンク（LegalFooter）ではこの役を兼ねられない。
+           */}
+          <p className="text-[11px] font-bold leading-relaxed text-muted text-center">
+            登録すると
+            <Link href="/terms" className="text-brand-deep underline mx-0.5">
+              利用規約
+            </Link>
+            と
+            <Link href="/privacy" className="text-brand-deep underline mx-0.5">
+              プライバシーポリシー
+            </Link>
+            に同意したものとみなします。
+          </p>
         </form>
 
         <p className="text-muted text-sm font-bold text-center">

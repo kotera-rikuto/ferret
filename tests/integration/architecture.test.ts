@@ -148,6 +148,28 @@ describe("§11 静的検査", () => {
   });
 
   /**
+   * 法務文書への導線が、ログインの前に置かれた画面から消えていない。
+   *
+   * 規約に同意して登録する人が同意の前に読める場所は、
+   * ログインを要求しない画面（タイトル・ログイン・新規登録）だけ。
+   * デザインを直すときに**フッターは真っ先に消される部品**なので、
+   * 消えても画面は正常に見えてしまう。ここで固定する。
+   */
+  it("I-399 ログイン前の画面から法務文書へ辿れる", () => {
+    const entrances = ["app/page.tsx", "app/login/page.tsx", "app/register/page.tsx"];
+
+    for (const path of entrances) {
+      const f = SOURCES.find((s) => s.path === path);
+      expect(f, `${path} が見つからない`).toBeDefined();
+      // タイトル・ログインは LegalFooter、新規登録は同意の一文が導線
+      const reachable =
+        f!.code.includes("LegalFooter") ||
+        (f!.code.includes("/terms") && f!.code.includes("/privacy"));
+      expect(reachable, `${path} から法務文書へ辿れない`).toBe(true);
+    }
+  });
+
+  /**
    * PostgREST の予約語と同名のカラムを、引用符なしで絞り込みに使わない。
    *
    * `order` はクエリ文字列の予約語（並び替え指定）なので、

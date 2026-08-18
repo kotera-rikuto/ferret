@@ -15,6 +15,7 @@ import {
   statChip,
   ANSWER,
 } from "./support/fixtures";
+import { OPERATOR_NAME } from "../../lib/legal";
 
 /** lib/ai/scorer.ts の NG_WORDS のうち、画面に出てはいけないもの */
 const NG_WORDS = [
@@ -178,5 +179,70 @@ test.describe("§6 表示", () => {
     await expect(statChip(authedPage, "AI 採点")).toContainText("0 / 80");
     // 数字だけで終わらせず、次に見る場所が文章で添えられていること
     await expect(authedPage.getByText("フェレットのメモ")).toBeVisible();
+  });
+});
+
+/**
+ * 法務文書（C2）。
+ *
+ * 見るべきは体裁ではなく**読める場所に置かれているか**。
+ * ログインを要求してしまう・導線が消えるという壊れ方は、
+ * 画面そのものは正常に見えるので目視では気づけない。
+ */
+test.describe("§6 法務文書", () => {
+  const documents = [
+    ["/terms", "利用規約"],
+    ["/privacy", "プライバシーポリシー"],
+  ] as const;
+
+  for (const [path, heading] of documents) {
+    test(`E-457 未ログインで ${path} が読める`, async ({ page }) => {
+      await page.goto(path);
+      // ログイン画面へ飛ばされていないこと（proxy の matcher に入れると起きる）
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+      // 運営者の表記は、文書として成立するための必須項目（lib/legal.ts）
+      await expect(page.getByText(OPERATOR_NAME).first()).toBeVisible();
+    });
+  }
+
+  test("E-458 タイトル画面とログイン画面から辿れる", async ({ page }) => {
+    for (const from of ["/", "/login"]) {
+      await page.goto(from);
+      await page.getByRole("link", { name: "利用規約" }).click();
+      await expect(page.getByRole("heading", { name: "利用規約" })).toBeVisible();
+
+      await page.goto(from);
+      await page.getByRole("link", { name: "プライバシーポリシー" }).click();
+      await expect(
+        page.getByRole("heading", { name: "プライバシーポリシー" }),
+      ).toBeVisible();
+    }
+  });
+
+  test("E-459 新規登録画面に同意の一文がある", async ({ page }) => {
+    await page.goto("/register");
+    await expect(page.getByText("同意したものとみなします")).toBeVisible();
+  });
+
+  /**
+   * 「回答は OpenAI に送信されます」の注記から、その根拠の文書へ辿れること。
+   * 注記だけが浮いている状態（C2 の起点）に戻っていないかを見る。
+   */
+  test("E-460 問題画面の注記からプライバシーポリシーへ辿れる", async ({
+    authedPage,
+    problems,
+  }) => {
+    await authedPage.goto(`/problems/${problems[0].id}`);
+    await expect(authedPage.getByText("OpenAI に送信されます")).toBeVisible();
+
+    // 別タブで開く。書きかけの回答を差し替えないため（ProblemForm のコメント）
+    const [opened] = await Promise.all([
+      authedPage.waitForEvent("popup"),
+      authedPage.getByRole("link", { name: "くわしく" }).click(),
+    ]);
+    await expect(
+      opened.getByRole("heading", { name: "プライバシーポリシー" }),
+    ).toBeVisible();
   });
 });

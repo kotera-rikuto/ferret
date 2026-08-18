@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ANSWER_MIN_CHARS, ANSWER_MAX_CHARS } from "@/lib/ai/compose";
 import { IconInfo } from "@/components/ui/icons";
@@ -112,10 +113,26 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
       {/* 送信は下部固定フッター。スクロール位置に関係なく常に押せる場所に置く */}
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-panel">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-6 px-6 py-4">
-          {/* OpenAI 送信の注記は常時表示（仕様書 §9.5 の法務要件） */}
+          {/*
+           * OpenAI 送信の注記は常時表示（仕様書 §9.5 の法務要件）。
+           *
+           * 送信の根拠と範囲はプライバシーポリシー第3条に書いてある。
+           * 別タブで開くのは、回答を書いている途中に画面を差し替えないため
+           * （下書きは localStorage に残るが、書きかけの人を動かさないほうがよい）。
+           */}
           <p className="flex items-center gap-2 text-[11px] font-bold leading-relaxed text-muted">
             <IconInfo size={15} className="shrink-0" />
-            回答は採点のため OpenAI に送信されます。個人情報やひみつのコードは書かないでください。
+            <span>
+              回答は採点のため OpenAI に送信されます。個人情報やひみつのコードは書かないでください。
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-deep underline ml-1 whitespace-nowrap"
+              >
+                くわしく
+              </Link>
+            </span>
           </p>
           <button
             onClick={handleSubmit}

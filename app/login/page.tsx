@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
+import { LegalFooter } from "@/components/legal/LegalFooter";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { authErrorMessage, OAUTH_ENABLED } from "@/lib/auth/errors";
@@ -85,7 +86,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6 py-10">
+    // 縦2段（カード + 法務フッター）。1段目が余りを取る grid にしてあるので、
+    // フッターを足してもカードは画面の中央に置かれたまま。
+    // 「← もどる」は fixed なので段を占めない
+    <div className="min-h-screen grid grid-rows-[1fr_auto] justify-items-center px-6 py-10">
       <Link
         href="/"
         className="fixed top-6 left-7 text-sm font-extrabold text-muted hover:text-ink"
@@ -93,7 +97,7 @@ export default function LoginPage() {
         ← もどる
       </Link>
 
-      <div className="w-full max-w-sm bg-panel border-2 border-line rounded-3xl p-8 flex flex-col gap-5">
+      <div className="self-center w-full max-w-sm bg-panel border-2 border-line rounded-3xl p-8 flex flex-col gap-5">
         <div className="flex items-center justify-center gap-2.5 text-xl font-extrabold">
           <Mascot className="w-8 h-8" />
           Ferret
@@ -169,6 +173,7 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+      <LegalFooter />
     </div>
   );
 }
