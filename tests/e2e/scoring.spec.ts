@@ -269,6 +269,45 @@ test.describe("§4 エラー時の挙動", () => {
   });
 });
 
+test.describe("§4 XP", () => {
+  /**
+   * XP は `users.xp` に貯めず、回答ログから毎回導出する（lib/progress/level.ts）。
+   * 計算そのものは単体テスト（§13）で固めてあるので、ここで見たいのは**配線**。
+   *
+   * 送り直し（同一回答のリプレイ）でも `user_attempts` には行が積まれる。
+   * 1回ごとに加算する作りへ変わると、**送信ボタンを押すだけで増える**経路になるので、
+   * 行が増えても XP が動かないことを画面側から押さえる。
+   *
+   * 数字（クリア10 / パーフェクト15）は lib/progress/level.ts の XP_CLEAR / XP_PERFECT。
+   * E2E からアプリのコードは読み込まない方針なのでここに書き写している
+   * （display.spec.ts が NG語の一覧を持っているのと同じ扱い）。
+   */
+  test("E-274 クリアで XP が増え、同じ回答を送り直しても増えない", async ({
+    authedPage,
+    problems,
+    userId,
+  }) => {
+    await stub.setOutput(deepOutput(["full", "full", "full", "full"]));
+    await answer(authedPage, problems[0].id);
+
+    await expect(verdict(authedPage, "パーフェクト！")).toBeVisible();
+    // 100点はパーフェクト帯なので XP_PERFECT
+    await expect(authedPage.getByText("+15 XP")).toBeVisible();
+    await expect(
+      authedPage.getByText(/つぎのレベルまで あと \d+ XP/),
+    ).toBeVisible();
+
+    // まったく同じ回答をもう一度送る（リプレイ）
+    await answer(authedPage, problems[0].id);
+    await expect(verdict(authedPage, "パーフェクト！")).toBeVisible();
+
+    // 行は2件になっている（送り直し自体は成立している）
+    expect(await countAttempts(userId, problems[0].id)).toBe(2);
+    // それでも XP は動かないので、増えたぶんの表示は出ない
+    await expect(authedPage.getByText(/\+\d+ XP/)).toHaveCount(0);
+  });
+});
+
 test.describe("§4 クリア判定の非対称性", () => {
   /**
    * 🟡 クリア判定は最高点、リザルト画面は最新の回答を読む。

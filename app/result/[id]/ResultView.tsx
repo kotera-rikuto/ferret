@@ -3,11 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
+import { IconPaw } from "@/components/ui/icons";
 import {
   COMMENT_MAX_CHARS,
   COMMENT_MIN_CHARS,
   type FeedbackKind,
 } from "@/lib/feedback";
+// 型だけを読み込む。計算は page.tsx（サーバー）側で済ませてあるので、
+// しきい値や配点をブラウザへ送らずに済む
+import type { XpView } from "@/lib/progress/level";
 
 type Props = {
   problemId: number;
@@ -18,6 +22,7 @@ type Props = {
   feedback: string | null;
   cleared: boolean;
   perfect: boolean;
+  xp: XpView;
 };
 
 type ReportState = "idle" | "sending" | "sent";
@@ -62,6 +67,7 @@ export function ResultView({
   feedback,
   cleared,
   perfect,
+  xp,
 }: Props) {
   // 異議申し立て・誤り報告。2種で状態を分けるのは、片方を送った後も
   // もう片方を送れるようにするため
@@ -127,6 +133,43 @@ export function ResultView({
     return () => cancelAnimationFrame(raf);
   }, [totalScore]);
 
+  // XP バーは「この回答を出す前の位置」から動かす。
+  // 0 から動かすと、増えていない回でも増えたように見えてしまう。
+  //
+  // レベルをまたいだ回は、右端まで満たす → 一瞬で空にする → 新しいレベルのぶんを満たす。
+  // 前の位置から新しい位置へ直接動かすと（90% → 0%）バーが**縮んで**見え、
+  // 増えたのに減ったように映る。
+  //
+  // なお「レベル◯になった」という文は出さない。XP は回答ログから毎回導出しているので、
+  // ここでの「前の状態」は**この問題ぶんを引いた値**であって、
+  // その回答をした時点の値ではない。後から別の問題をクリアしたあとにこの画面を開くと、
+  // レベルが上がった回として複数の画面が名乗り出てしまう。
+  // 動きは演出（クリア時の紙吹雪と同じ扱い）だが、文にすると事実の主張になる
+  const leveledUp = xp.now.level > xp.before.level;
+  const [xpFill, setXpFill] = useState(xp.before.percent);
+  // 空に戻す一瞬だけトランジションを切る（切らないと右端から左端へ滑って戻る）
+  const [xpSnap, setXpSnap] = useState(false);
+
+  useEffect(() => {
+    // スコアのカウントアップ（900ms）が終わってから動かす。同時に動くと視線が散る
+    const timers = [
+      setTimeout(() => setXpFill(leveledUp ? 100 : xp.now.percent), 900),
+    ];
+    if (leveledUp) {
+      timers.push(
+        setTimeout(() => {
+          setXpSnap(true);
+          setXpFill(0);
+        }, 1700),
+        setTimeout(() => {
+          setXpSnap(false);
+          setXpFill(xp.now.percent);
+        }, 1760),
+      );
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [leveledUp, xp.now.percent]);
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       {/* 紙吹雪はクリア時だけ。位置と遅れは添字から決める（乱数だと SSR とズレる） */}
@@ -186,6 +229,32 @@ export function ResultView({
               {deepScore}
               <span className="text-[13px] font-bold text-muted"> / 80</span>
             </span>
+          </div>
+        </div>
+
+        {/* XP バー。最高点を伸ばしたぶんだけ増える（lib/progress/level.ts）。
+            増えなかった回でもバーは出す ── 一度貯まったものは減らない、という
+            見せ方に揃えるため、「+0 XP」ではなくバッジを出さないだけにしてある */}
+        <div className="flex w-full flex-col gap-2.5 rounded-2xl border-2 border-line bg-panel px-5 py-4">
+          <div className="flex items-center gap-3.5">
+            <IconPaw size={26} className="shrink-0 text-brand" />
+            <div className="h-4 flex-1 overflow-hidden rounded-full bg-brand-tint">
+              <div
+                className={`h-full rounded-full bg-gradient-to-r from-brand to-brand-soft ${
+                  xpSnap ? "" : "transition-[width] duration-700 ease-out"
+                }`}
+                style={{ width: `${xpFill}%` }}
+              />
+            </div>
+            {xp.gain > 0 && (
+              <span className="shrink-0 text-sm font-extrabold text-brand-deep">
+                +{xp.gain} XP
+              </span>
+            )}
+          </div>
+          <div className="flex items-baseline justify-between text-xs font-bold text-muted">
+            <span className="font-extrabold text-ink">レベル {xp.now.level}</span>
+            <span>つぎのレベルまで あと {xp.now.xpToNext} XP</span>
           </div>
         </div>
 
