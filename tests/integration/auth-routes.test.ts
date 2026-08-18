@@ -121,6 +121,7 @@ describe("§7 proxy", () => {
     ["/problems/5", "/problems/5"],
     ["/result/5", "/result/5"],
     ["/review/5", "/review/5"],
+    ["/settings", "/settings"],
   ])("I-300〜302 未ログインで %s はログイン画面へ送る", async (path, expected) => {
     getUserMock.mockResolvedValue(LOGGED_OUT);
     const res = await proxy(get(`http://localhost:3000${path}`));
@@ -144,6 +145,9 @@ describe("§7 proxy", () => {
       "/problems/:path*",
       "/result/:path*",
       "/review/:path*",
+      // せってい（2026-08-19・C3）。退会とパスワード変更を置いた画面なので、
+      // ログインしていない人を DB へのクエリが走る前に弾く
+      "/settings/:path*",
     ]);
   });
 

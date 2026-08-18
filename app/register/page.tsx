@@ -54,6 +54,20 @@ export default function RegisterPage() {
           <p className="text-muted text-sm font-bold leading-relaxed">
             {email} に確認メールを送りました。メール内のリンクをクリックするとログインできます。
           </p>
+          {/*
+           * C7（2026-08-19）。**登録済みのアドレスでもこの画面が出る。**
+           *
+           * Supabase はアカウントの有無を外から調べられないようにするため、
+           * 登録済みのアドレスでも signUp を成功したように返し、メールは送らない。
+           * こちら側では変えられない挙動なので、案内でしか埋められない。
+           *
+           * この一文が無いと、前に登録したことを忘れた人が**届かないメールを
+           * 待ち続ける。** 全員に同じ文面を出すので、「登録済みかどうかを教えない」
+           * という認証基盤の性質は崩れない（教えるのは次の一手だけ）。
+           */}
+          <p className="text-muted text-xs font-bold leading-relaxed">
+            すでにご登録のあるメールアドレスの場合、メールは届きません。そのままログイン画面へお進みください。
+          </p>
           <Link href="/login" className="text-brand-deep text-sm font-extrabold">
             ログイン画面へ
           </Link>
