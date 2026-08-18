@@ -24,6 +24,9 @@ for (const p of problems) {
     for (const line of out) console.log(`  ${line}`);
     if (out.length === 0) console.log("  （出力なし）");
   } catch (e) {
+    // **例外の手前までの出力も出す。** 途中で止まる問題（TDZ など）は
+    // 「どこまで出てから止まったか」が答えそのものなので、捨てると確認にならない
+    for (const line of out) console.log(`  ${line}`);
     console.log(`  実行時エラー: ${e.constructor.name}: ${e.message}`);
   }
 }

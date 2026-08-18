@@ -47,11 +47,19 @@ const problems = await (
   await fetch(`${url}/rest/v1/problems?select=id,order,title&order=${col}.asc`, { headers: h })
 ).json();
 
+// **日時を1週間前にずらす。** 使いすぎの安全網（app/api/score/route.ts の RATE_LIMITS）は
+// user_attempts.created_at の直近24時間を数えるので、印つきの行を「今」で入れると
+// **1分10件の枠をそのまま食い潰し、本命の採点が 429 で弾かれる。**
+// 実際に第3章の確認で踏んだ（14件入れた直後の1回目が 429）。
+// 進行判定は最高点しか見ないので（lib/progress/unlock.ts）、日時をずらしても解放には影響しない。
+const backdated = new Date(Date.now() - 7 * 24 * 60 * 60_000).toISOString();
+
 const rows = problems
   .filter((p) => orders.includes(p.order))
   .map((p) => ({
     user_id: dev.id,
     problem_id: p.id,
+    created_at: backdated,
     answer: `【${MARKER}】ブラウザ確認のために置いた行。実際の回答ではない。`,
     keyword_score: 20,
     deep_score: CLEAR_THRESHOLD - 20 + 5,
