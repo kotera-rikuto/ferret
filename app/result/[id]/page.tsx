@@ -31,8 +31,12 @@ export default async function ResultPage({
   // session クライアント経由なので RLS で自分の行だけに絞られる
   const { data: attempt } = await supabase
     .from("user_attempts")
-    // contradiction は見せ方の分岐に使う（読み違いのときは点数を主役から降ろす・E6）
-    .select("id, total_score, keyword_score, deep_score, ai_feedback, contradiction")
+    // contradiction は見せ方の分岐に使う（読み違いのときは点数を主役から降ろす・E6）。
+    // ai_praise / ai_next_focus は2枠表示に使う。この欄が無かった頃の行は
+    // どちらも NULL なので、つなげた ai_feedback を1枠で出す（E2）
+    .select(
+      "id, total_score, keyword_score, deep_score, ai_feedback, ai_praise, ai_next_focus, contradiction",
+    )
     .eq("problem_id", problemId)
     // 判定保留（レート上限時に層1のみで採点した回）は合否を出さない
     .eq("is_provisional", false)
@@ -78,6 +82,8 @@ export default async function ResultPage({
       keywordScore={attempt.keyword_score}
       deepScore={attempt.deep_score}
       feedback={attempt.ai_feedback}
+      praise={attempt.ai_praise}
+      nextFocus={attempt.ai_next_focus}
       cleared={attempt.total_score >= CLEAR_THRESHOLD}
       perfect={attempt.total_score >= PERFECT_THRESHOLD}
       contradiction={attempt.contradiction === true}

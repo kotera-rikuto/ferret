@@ -19,7 +19,15 @@ type Props = {
   totalScore: number;
   keywordScore: number;
   deepScore: number;
+  /** praise と next_focus をつなげた文章。この欄しか無い行のために残してある */
   feedback: string | null;
+  /**
+   * 「よかったところ」。2欄を持たない頃に採点した行では null になる。
+   * そのときは feedback を1枠で表示する（tasks/E2）
+   */
+  praise: string | null;
+  /** 「つぎの一歩」。null の扱いは praise と同じ */
+  nextFocus: string | null;
   cleared: boolean;
   perfect: boolean;
   /** 結論が反転していると判定された回（`user_attempts.contradiction`） */
@@ -71,6 +79,8 @@ export function ResultView({
   keywordScore,
   deepScore,
   feedback,
+  praise,
+  nextFocus,
   cleared,
   perfect,
   contradiction,
@@ -84,7 +94,8 @@ export function ResultView({
    * 40点で、将来クリア閾値を下げたときに「クリアなのに控えめ」が生まれないようにするため。
    * 文章が無いときに畳むと画面が空になるので、そのときは通常の並びに戻す。
    */
-  const softened = contradiction && !cleared && Boolean(feedback);
+  const softened =
+    contradiction && !cleared && Boolean(feedback || praise || nextFocus);
   // 異議申し立て・誤り報告。2種で状態を分けるのは、片方を送った後も
   // もう片方を送れるようにするため
   const [reports, setReports] = useState<Record<FeedbackKind, ReportState>>({
@@ -203,25 +214,47 @@ export function ResultView({
     </div>
   );
 
-  const feedbackPanel = feedback ? (
-    <div
-      className={`flex w-full flex-col gap-3 rounded-2xl border-2 border-line bg-panel ${
-        softened ? "border-b-5 p-7" : "p-6"
-      }`}
-    >
-      <h2
-        className={`flex items-center gap-2 font-extrabold ${
-          softened ? "text-[15px]" : "text-sm"
+  // 見出し付きの2枠。**片方が空のことがある**（禁止語で差し替えた結果、
+  // その帯域のテンプレートが空の場合）。空の枠は出さない ──
+  // 見出しだけが残ると、書き忘れか不備のように見える
+  const memoBlocks = [
+    { tag: "よかったところ", text: praise },
+    { tag: "つぎの一歩", text: nextFocus },
+  ].filter((b): b is { tag: string; text: string } => Boolean(b.text));
+
+  const bodyClass = `leading-loose ${softened ? "text-[15px]" : "text-sm"}`;
+
+  const feedbackPanel =
+    memoBlocks.length > 0 || feedback ? (
+      <div
+        className={`flex w-full flex-col gap-4 rounded-2xl border-2 border-line bg-panel ${
+          softened ? "border-b-5 p-7" : "p-6"
         }`}
       >
-        <Mascot className={softened ? "w-7.5 h-7.5" : "w-6.5 h-6.5"} />
-        フェレットのメモ
-      </h2>
-      <p className={`leading-loose ${softened ? "text-[15px]" : "text-sm"}`}>
-        {feedback}
-      </p>
-    </div>
-  ) : null;
+        <h2
+          className={`flex items-center gap-2 font-extrabold ${
+            softened ? "text-[15px]" : "text-sm"
+          }`}
+        >
+          <Mascot className={softened ? "w-7.5 h-7.5" : "w-6.5 h-6.5"} />
+          フェレットのメモ
+        </h2>
+        {memoBlocks.length > 0 ? (
+          memoBlocks.map((b) => (
+            <div key={b.tag} className="flex flex-col gap-1.5">
+              <span className="self-start rounded-full bg-brand-tint px-2.5 py-[3px] text-[11px] font-extrabold text-brand-deep">
+                {b.tag}
+              </span>
+              <p className={bodyClass}>{b.text}</p>
+            </div>
+          ))
+        ) : (
+          // 2欄を持たない頃に採点した行。つなげた文章しか残っておらず
+          // 分け直せないので、今までどおり1枠で出す（tasks/E2）
+          <p className={bodyClass}>{feedback}</p>
+        )}
+      </div>
+    ) : null;
 
   // XP バーは「この回答を出す前の位置」から動かす。
   // 0 から動かすと、増えていない回でも増えたように見えてしまう。
@@ -322,8 +355,8 @@ export function ResultView({
         </h1>
 
         {/* 点数・XP・文章。読み違いのときだけ順番を入れ替え、文章を主役にする。
-            文章そのものは praise / next_focus を結合済みの ai_feedback（1枠）。
-            2枠に分けるのは保存形式の変更待ち（design/移植残タスク.md・E2） */}
+            文章は「よかったところ」「つぎの一歩」の2枠（E2）。
+            2欄を持たない頃の行だけ、つなげた ai_feedback を1枠で出す */}
         {softened ? (
           <>
             {feedbackPanel}
