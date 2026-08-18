@@ -29,10 +29,18 @@
   --color-path-done: #f2c14e;
   --color-path-todo: #ddd1b4;
 
-  /* コードパネル専用（常にダーク） */
-  --color-code-bg: #211b12;
+  /*
+   * コードパネル専用（常にダーク）。
+   *
+   * bg と ink は Shiki のテーマ gruvbox-dark-hard の背景・地の文をそのまま写している
+   * （lib/code/highlight.ts）。色付きの <pre> は自分の背景色を持って出てくるので、
+   * ここがズレると枠の見出し部分と本文で色が変わって段差に見える。
+   * **写し忘れを検知するテストがある**（tests/unit/highlight.test.ts の U-604）。
+   * edge（下端の縁）と muted（見出しの文字）はパネルの装飾側なので、モックの暖色のまま。
+   */
+  --color-code-bg: #1d2021;
   --color-code-edge: #120e08;
-  --color-code-ink: #ece2cd;
+  --color-code-ink: #ebdbb2;
   --color-code-muted: #7d715a;
 
   --font-sans: var(--font-mplus-rounded), "Hiragino Maru Gothic ProN", sans-serif;

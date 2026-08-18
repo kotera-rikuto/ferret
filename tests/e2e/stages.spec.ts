@@ -147,6 +147,39 @@ test.describe("§3 問題画面", () => {
     ).toBeVisible();
   });
 
+  /**
+   * コードの色分け（E5・Shiki）。
+   *
+   * 見るのは「色が2色以上あること」ではなく **キーワードと文字列が
+   * 別々の色で出ていること**。前者だと、文法の読み込みに失敗して
+   * 全部が地の文の色になった状態でも、コメント1行で通ってしまう。
+   *
+   * 色は増やす前に**サーバーで付け終わっている**必要があるので、
+   * JavaScript を切った状態でも色が出ることまで見る。
+   */
+  test("E-241 コードに色が付く（サーバー側で色付け済み）", async ({
+    authedPage,
+    problems,
+  }) => {
+    const page = authedPage;
+    await page.goto(`/problems/${problems[0].id}`);
+
+    const colorOf = (word: string) =>
+      page
+        .locator("pre code span", { hasText: new RegExp(`^\\s*${word}\\s*$`) })
+        .first()
+        .evaluate((el) => getComputedStyle(el).color);
+
+    // キーワード（const）と識別子（rate）が別の色になっている
+    expect(await colorOf("const")).not.toBe(await colorOf("rate"));
+
+    // 色付きのまま HTML が届いている（ブラウザ側で後から塗っていない）
+    const html = await page.content();
+    expect(html).toContain("shiki");
+    // 行頭のインデントは色付きの span の中に入るので \s* で受ける
+    expect(html).toMatch(/<span style="color:#[0-9a-fA-F]{6}">\s*const<\/span>/);
+  });
+
   test("E-233〜236 文字数の下限・上限がボタンの活性に反映される", async ({
     authedPage,
     problems,
