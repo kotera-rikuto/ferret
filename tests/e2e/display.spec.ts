@@ -39,10 +39,12 @@ test.describe("§6 表示", () => {
 
   test("E-451 コードはダークテーマで表示される", async ({ authedPage, problems }) => {
     await authedPage.goto(`/problems/${problems[0].id}`);
-    const block = authedPage.locator("pre").first();
-    const bg = await block.evaluate((el) =>
-      getComputedStyle(el.parentElement!).backgroundColor,
-    );
+    // 背景を持っているのはパネルの枠。
+    // Shiki 化で <pre> の親が入れ物の div に変わったので、
+    // 親をたどらず枠そのものを掴む（入れ物は背景を持たないため、
+    // 親をたどる書き方だと「透明＝暗い」で素通りしてしまう）
+    const block = authedPage.locator("[data-code-panel]").first();
+    const bg = await block.evaluate((el) => getComputedStyle(el).backgroundColor);
     // zinc-900 相当。明るい背景になっていないことを見る
     const [r, g, b] = bg.match(/\d+/g)!.map(Number);
     expect(r + g + b).toBeLessThan(200);

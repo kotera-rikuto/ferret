@@ -3,35 +3,50 @@ import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
+import { highlightCode, PRE_CLASS } from "@/lib/code/highlight";
 import { IconBook, IconChevronDown, IconClose } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
 import { ProblemForm } from "./ProblemForm";
 
 /**
  * ダークなコードパネル。画面が明色でもコードは常にダーク（UXルール）。
- * Shiki によるハイライトは未導入で、当面は素のテキスト（design/移植残タスク.md）。
  *
  * コードと実行結果で2回使うので、枠の見た目はここに1つだけ置く。
  * 別々に書くと片方だけに手が入って、並べたときに揃わなくなる。
+ *
+ * `html` が渡ってきたときは Shiki が色を付けた `<pre>` をそのまま置く。
+ * **実行結果のパネルには渡さない。** エラー文やログはコードではないので、
+ * 文法として色分けすると（キーワードに見える単語だけが光って）かえって読みにくい。
  */
 function CodePanel({
   label,
   hint,
   body,
+  html,
 }: {
   label: string;
   hint: string;
   body: string;
+  html?: string | null;
 }) {
   return (
-    <div className="overflow-hidden rounded-2xl border-b-5 border-code-edge bg-code-bg">
+    <div
+      data-code-panel
+      className="overflow-hidden rounded-2xl border-b-5 border-code-edge bg-code-bg"
+    >
       <div className="flex items-center justify-between border-b border-white/10 px-4.5 py-2.5 text-[11px] font-bold tracking-wider text-code-muted">
         <span>{label}</span>
         <span>{hint}</span>
       </div>
-      <pre className="overflow-x-auto p-5 font-mono text-sm leading-loose text-code-ink">
-        <code>{body}</code>
-      </pre>
+      {html ? (
+        // 入れ物は display:contents なので、レイアウト上は
+        // Shiki の <pre> がこのパネルの直下にいるのと同じ扱いになる
+        <div className="contents" dangerouslySetInnerHTML={{ __html: html }} />
+      ) : (
+        <pre className={`${PRE_CLASS} text-code-ink`}>
+          <code>{body}</code>
+        </pre>
+      )}
     </div>
   );
 }
@@ -74,6 +89,10 @@ export default async function ProblemPage({
 
   if (!problem) notFound();
 
+  // 色付けはここ（サーバー）で終わらせる。ブラウザには色の付いた HTML だけが届く。
+  // 対応していない言語や、万一の失敗のときは null が返り、素のテキストで出る
+  const codeHtml = await highlightCode(problem.code, problem.language);
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* 上部バー: × は「中断してマップへ」。クイズ系の定石に合わせて戻る矢印ではなく × */}
@@ -104,6 +123,7 @@ export default async function ProblemPage({
           label={(problem.language ?? "js").toUpperCase()}
           hint="読んでみよう"
           body={problem.code}
+          html={codeHtml}
         />
 
         {/* 実行結果。影響型（エラーの出力から原因の場所を特定する読み方）で使う。
