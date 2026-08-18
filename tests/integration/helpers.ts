@@ -39,6 +39,14 @@ export type DbState = {
   insertError: { message: string } | null;
   /** upsert が返すエラー。null なら成功 */
   upsertError: { message: string } | null;
+  /**
+   * delete が返すエラーを**テーブル単位**で置く（退会の削除で使う）。
+   * 途中の1テーブルだけ失敗させて「その先へ進まないこと」を見るため、
+   * 単一のフラグにはしていない。
+   */
+  deleteErrors: Record<string, { message: string }>;
+  /** auth.admin.deleteUser が返すエラー。null なら成功 */
+  authDeleteError: { message: string } | null;
 };
 
 export type DbSpy = {
@@ -60,6 +68,12 @@ export type DbSpy = {
   orders: Array<[string, unknown]>;
   /** limit() に渡された件数 */
   limits: number[];
+  /** delete された [テーブル, 列名, 値]。**呼ばれた順に入る**（退会の削除順を見る） */
+  deleted: Array<[string, string, unknown]>;
+  /** auth.admin.deleteUser に渡された user_id */
+  authDeleted: string[];
+  /** session 側の signOut に渡されたオプション */
+  signOuts: unknown[];
 };
 
 export function emptySpy(): DbSpy {
@@ -73,6 +87,9 @@ export function emptySpy(): DbSpy {
     sessionSelects: [],
     orders: [],
     limits: [],
+    deleted: [],
+    authDeleted: [],
+    signOuts: [],
   };
 }
 
@@ -149,7 +166,28 @@ function makeAdmin(state: DbState, spy: DbSpy) {
           spy.upserted.push([row, options]);
           return Promise.resolve({ error: state.upsertError });
         },
+        /**
+         * 退会の削除。`.delete().eq(列, 値)` の形しか使わないので鎖は最小限。
+         * **どのテーブルを何番目に消したか**を spy.deleted の並びで見る
+         */
+        delete() {
+          return {
+            eq(column: string, value: unknown) {
+              spy.deleted.push([table, column, value]);
+              return Promise.resolve({ error: state.deleteErrors[table] ?? null });
+            },
+          };
+        },
       };
+    },
+    // 退会でアカウント本体を消す口。service_role でしか呼べない
+    auth: {
+      admin: {
+        deleteUser(userId: string) {
+          spy.authDeleted.push(userId);
+          return Promise.resolve({ data: null, error: state.authDeleteError });
+        },
+      },
     },
   };
 }
@@ -161,7 +199,15 @@ function makeSession(
   getUser: () => Promise<{ data: { user: { id: string } | null } }>,
 ) {
   return {
-    auth: { getUser },
+    auth: {
+      getUser,
+      // 退会の最後に Cookie を落とすために呼ばれる。
+      // scope が渡っているか（通信せず手元だけ消しているか）を spy で見る
+      signOut(options?: unknown) {
+        spy.signOuts.push(options);
+        return Promise.resolve({ error: null });
+      },
+    },
     from(table: string) {
       spy.sessionTables.push(table);
       return {
@@ -244,6 +290,8 @@ export function defaultState(patch: Partial<DbState> = {}): DbState {
     replay: null,
     insertError: null,
     upsertError: null,
+    deleteErrors: {},
+    authDeleteError: null,
     ...patch,
   };
 }

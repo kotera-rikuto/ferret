@@ -84,5 +84,11 @@ export const config = {
   // 各ページにも自前のガード（redirect("/login")）があるが、
   // ここで止めれば DB へのクエリが走る前に弾ける。
   // 追加でページを作ったらここにも足すこと
-  matcher: ["/stages/:path*", "/problems/:path*", "/result/:path*", "/review/:path*"],
+  matcher: [
+    "/stages/:path*",
+    "/problems/:path*",
+    "/result/:path*",
+    "/review/:path*",
+    "/settings/:path*",
+  ],
 };
