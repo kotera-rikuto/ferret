@@ -186,7 +186,9 @@ Supabase では SQL エディターから一度実行するだけで使えるよ
 | `keyword_score` | INTEGER | 層1（正規表現）スコア 0〜20 |
 | `deep_score` | INTEGER | 層2（AI採点）スコア 0〜80 |
 | `total_score` | INTEGER | 合計スコア 0〜100 |
-| `ai_feedback` | TEXT | AI が生成したフィードバック文（リザルト画面に表示）。**必ず保存すること** |
+| `ai_feedback` | TEXT | AI が生成したフィードバック文（下の2欄をつなげたもの）。**必ず保存すること。** この欄しか無い過去の行があるので消せない |
+| `ai_praise` | TEXT | **【E2 で追加】** 「よかったところ」。NGワード検査後の本文。**NULL 可** — この欄が無かった頃の行、または検査で空になった回。空の枠は画面に出さない |
+| `ai_next_focus` | TEXT | **【E2 で追加】** 「つぎの一歩」。NULL の扱いは `ai_praise` と同じ |
 | `scoring_method` | TEXT | `ai`（通常）/ `keyword_only`（レート制限超過時に層1のみで判定）。v3 で CHECK 制約を追加 |
 | `axes` | JSONB | **【v3 で追加】** 4観点の判定内訳 `{ core: { verdict, evidence, demoted }, ... }`。**「なぜこの点数か」を振り返り画面に出す唯一の材料。** `keyword_only` 時は NULL |
 | `grader_version` | TEXT | **【v3 で追加】** 例 `gpt-4o-mini-2024-07-18/p3`。モデル差し替え時に旧採点と新採点が混ざるのを防ぐ |

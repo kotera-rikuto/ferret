@@ -567,6 +567,37 @@ describe("§3 採点の成功", () => {
   });
 
   /**
+   * 2枠表示（tasks/E2）の材料。つなげた文章だけを保存していた頃は
+   * 「よかったところ」「つぎの一歩」に分け直せなかった。
+   * つなげた文章も残すのは、この欄を持たない過去の行と同じ経路で表示するため。
+   */
+  it("I-159b よかったところ・つぎの一歩を分けて保存する", async () => {
+    await post(VALID);
+    const row = spy.inserted[0];
+    expect(row.ai_praise).toBeTruthy();
+    expect(row.ai_next_focus).toBeTruthy();
+    expect(row.ai_feedback).toBe(`${row.ai_praise} ${row.ai_next_focus}`);
+  });
+
+  /**
+   * 空文字ではなく NULL で入れる。「文章が無い」の表し方が2通りあると、
+   * 画面と集計の両方でその両方を気にすることになる。
+   * core=none の低得点帯は「よかったところ」のテンプレートが空になる帯域。
+   */
+  it("I-159c 空になった枠は NULL で保存する", async () => {
+    createMock.mockResolvedValue(
+      openAiOk(
+        deepOutput(["none", "none", "none", "none"], { praise: "弱点があります。" }),
+      ),
+    );
+    await post(VALID);
+    const row = spy.inserted[0];
+    expect(row.ai_praise).toBeNull();
+    expect(row.ai_next_focus).toBeTruthy();
+    expect(row.ai_feedback).toBe(row.ai_next_focus);
+  });
+
+  /**
    * どの誤読に当たったか（残課題 §3）。2026-08-17 に追加。
    * 保存していないと「この問題は回答者の3割が同じ読み違いをしている」が集計できず、
    * 問題文を直す判断材料が一次データとして残らない。
@@ -654,6 +685,33 @@ describe("§4 同一回答リプレイ", () => {
     await post(VALID);
     const axes = spy.inserted[0].axes as Record<string, unknown>;
     expect(axes.matched_reject).toBe("2");
+  });
+
+  /**
+   * リプレイは行を複製して返す経路なので、2枠の欄も一緒に運ぶ必要がある（tasks/E2）。
+   * ここが欠けると「同じ回答を送り直したら文章が1枠に戻る」という食い違いが出る。
+   */
+  it("I-176 リプレイでも2枠の文章を引き継ぐ", async () => {
+    setup({
+      replay: {
+        ...PREV,
+        ai_praise: "中核まで読み取れています。",
+        ai_next_focus: "次は根拠の行を書き添えてみてください。",
+      },
+    });
+    const { json } = await post(VALID);
+    expect(spy.inserted[0].ai_praise).toBe("中核まで読み取れています。");
+    expect(spy.inserted[0].ai_next_focus).toBe("次は根拠の行を書き添えてみてください。");
+    expect(json.praise).toBe("中核まで読み取れています。");
+  });
+
+  /** この欄を持たない頃の行を再送した場合。空のまま複製し、画面は1枠で出す */
+  it("I-176b 2枠を持たない行のリプレイでは、つなげた文章だけが残る", async () => {
+    setup({ replay: PREV });
+    await post(VALID);
+    expect(spy.inserted[0].ai_feedback).toBe(PREV.ai_feedback);
+    expect(spy.inserted[0].ai_praise ?? null).toBeNull();
+    expect(spy.inserted[0].ai_next_focus ?? null).toBeNull();
   });
 
   it("I-175 リプレイ検索は user_id・problem_id・answer_hash・判定保留で絞る", async () => {

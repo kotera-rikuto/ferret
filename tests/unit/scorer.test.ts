@@ -673,4 +673,78 @@ describe("§5-3 フィードバックの整形", () => {
       }
     }
   });
+
+  // -------------------------------------------------------------------------
+  // 2つに分けたまま返す（tasks/E2）
+  // -------------------------------------------------------------------------
+
+  /**
+   * つなげた文章しか返していなかった頃は、画面で2枠に分けられず、
+   * 禁止語でどちらが差し替えられたのかも追えなかった。
+   *
+   * ここで固定するのは「分けたまま返る」ことと、**つなげた文章が2つから導ける**こと。
+   * 後者が無いと、片方だけを直して両者が食い違う作りに戻せてしまう。
+   */
+  it("U-263 2つを分けたまま返し、つなげた文章と一致する", async () => {
+    const r = await feedbackOf(deepOutput());
+    expect(r.ai_praise).toBe(CLEAN_PRAISE);
+    expect(r.ai_next_focus).toBe(CLEAN_NEXT);
+    expect(r.ai_feedback).toBe(`${r.ai_praise} ${r.ai_next_focus}`);
+  });
+
+  /**
+   * 差し替え先のテンプレートが空の帯域（core=none の低得点帯に「よかったところ」は無い）。
+   * 空文字のまま返し、枠を出さない判断は画面に任せる。
+   * ここで無理に文章を作ると、読めていない回答を褒めることになる。
+   */
+  it("U-264 差し替え先が空の帯域では、その枠だけ空になる", async () => {
+    const r = await feedbackOf(
+      deepOutput(["none", "none", "none", "none"], { praise: "弱点です" }),
+    );
+    expect(r.ai_praise).toBe("");
+    expect(r.ai_next_focus).toBe(CLEAN_NEXT);
+    expect(r.ai_feedback).toBe(CLEAN_NEXT);
+  });
+
+  it("U-265 捏造を検出したら2つともテンプレートに置き換わる", async () => {
+    const r = await feedbackOf(
+      deepOutput(["full", "full", "full", "none"], {
+        evidence: EVIDENCE_FAKE,
+        praise: "完璧に正しく理解しています。",
+        next_focus: "そのままの読み方で問題ありません。",
+      }),
+    );
+    expect(r.fabricationSuspected).toBe(true);
+    expect(r.ai_praise).not.toContain("完璧に");
+    expect(r.ai_next_focus).not.toContain("そのままの読み方");
+    expect(r.ai_praise.length).toBeGreaterThan(0);
+    expect(r.ai_next_focus.length).toBeGreaterThan(0);
+  });
+
+  /** 帯域と差し替えの組み合わせを回して、2枠と1枠の本文が食い違わないことを見る */
+  it("U-266 どの帯域でも、つなげた文章は2つの枠から導ける", async () => {
+    const scenarios: Verdicts[] = [
+      ["full", "full", "full", "full"],
+      ["full", "none", "none", "full"],
+      ["partial", "none", "none", "none"],
+      ["none", "none", "none", "none"],
+    ];
+    const substitutions = [
+      {},
+      { praise: "弱点です" },
+      { next_focus: "失敗です" },
+      { praise: "弱点です", next_focus: "失敗です" },
+    ];
+    for (const verdicts of scenarios) {
+      for (const opts of substitutions) {
+        const r = await feedbackOf(deepOutput(verdicts, opts));
+        const label = `verdicts=${verdicts.join("/")} opts=${JSON.stringify(opts)}`;
+        expect(
+          [r.ai_praise, r.ai_next_focus].filter(Boolean).join(" "),
+          `${label} で2枠とつなげた文章が食い違った`,
+        ).toBe(r.ai_feedback);
+        expect(r.ai_feedback.trim().length, `${label} で空になった`).toBeGreaterThan(0);
+      }
+    }
+  });
 });
