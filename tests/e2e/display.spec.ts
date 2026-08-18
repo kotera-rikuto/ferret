@@ -261,3 +261,68 @@ test.describe("§6 法務文書", () => {
     ).toBeVisible();
   });
 });
+
+/**
+ * メモ欄（G2）。
+ *
+ * 確かめるのは3つだけで、**どれも壊れても画面は正常に見える。**
+ *   - 残ること（端末に保存されている）
+ *   - 回答の下書きと混ざらないこと（保存する名前が別）
+ *   - **採点に送られないこと**（メモには考えの途中経過が入るので、送ると点が変わる）
+ */
+test.describe("§6 メモ欄", () => {
+  /**
+   * 確かめる内容は describe の上に書いてある。
+   *   - 残ること（端末に保存されている）
+   *   - 回答の下書きと混ざらないこと（保存する名前が別）
+   *   - **採点に送られないこと**（メモには考えの途中経過が入るので、送ると点が変わる）
+   *
+   * 目印になる文字列を使うのは、問題のコードや設問にたまたま含まれる語だと
+   * 「送られていない」を確かめたつもりで素通りするため。
+   */
+  const MEMO_LABEL = "メモ（採点には送りません）";
+  const MEMO_TEXT = "目印QX7 ─ ここで total の値を追う";
+
+  test("E-461 メモは開き直しても残り、回答の下書きと混ざらない", async ({
+    authedPage,
+    problems,
+  }) => {
+    const page = authedPage;
+    await page.goto(`/problems/${problems[0].id}`);
+
+    await page.getByLabel(MEMO_LABEL).fill(MEMO_TEXT);
+    await page.getByPlaceholder("回答を入力してください...").fill(ANSWER);
+
+    await page.reload();
+
+    // 保存する名前が同じだと、どちらかがもう一方を上書きしてここで入れ替わる
+    await expect(page.getByLabel(MEMO_LABEL)).toHaveValue(MEMO_TEXT);
+    await expect(page.getByPlaceholder("回答を入力してください...")).toHaveValue(
+      ANSWER,
+    );
+  });
+
+  test("E-462 メモは採点に送られず、採点した後も残る", async ({
+    authedPage,
+    problems,
+  }) => {
+    await stub.setOutput(deepOutput());
+    const page = authedPage;
+    await page.goto(`/problems/${problems[0].id}`);
+
+    await page.getByLabel(MEMO_LABEL).fill(MEMO_TEXT);
+    await page.getByPlaceholder("回答を入力してください...").fill(ANSWER);
+    await page.getByRole("button", { name: "回答する" }).click();
+    await page.waitForURL(/\/result\//);
+
+    // 採点器へ渡った本文にメモが1文字も入っていないこと
+    const { requests } = await stub.inspect();
+    expect(JSON.stringify(requests)).not.toContain(MEMO_TEXT);
+
+    // 採点後もメモは残る（オーナー判断 2026-08-19）。
+    // 回答の下書きは役目を終えて消えるので、そこで対になっている
+    await page.goto(`/problems/${problems[0].id}`);
+    await expect(page.getByLabel(MEMO_LABEL)).toHaveValue(MEMO_TEXT);
+    await expect(page.getByPlaceholder("回答を入力してください...")).toHaveValue("");
+  });
+});
