@@ -79,18 +79,19 @@ C2・C3・E1 との衝突はこれで消えたので、順番の制約はもう�
 
 | ファイル | 触るタスク |
 |---|---|
-| `app/result/[id]/ResultView.tsx` | E1 E2 E3 E6 E8 |
+| `app/result/[id]/ResultView.tsx` | E2 E3 E6 E8（E1 は**済**） |
+| `app/review/[id]/page.tsx` / `app/review/page.tsx` | E8（E1 で新設） |
 | `app/api/score/route.ts` | B2 D1 E2 E3 G3 |
 | `app/problems/[id]/page.tsx` | E4 E5 E8（G2 は**済**） |
 | `app/stages/page.tsx` | D1 D2 E3 E7 E8 |
 | `lib/ai/prompt.ts` | B2 B3 G3 |
 | `lib/ai/compose.ts` | B3 D1 E7 |
 | `components/stage/StageMap.tsx` | E7 E8 |
-| `components/layout/AppSidebar.tsx` | C3 E1 E8 |
+| `components/layout/AppSidebar.tsx` | C3 E8（E1 は**済**） |
 | `app/settings/page.tsx` | C3 D2 E9 |
 | `app/globals.css` | E5 E9 E10 |
 | `supabase/config.toml` | C1 C3 C4 C5 |
-| `proxy.ts` | C3 E1（C2 は**触らなかった**。法務文書はログイン不要なので `matcher` に足さないのが正解） |
+| `proxy.ts` | C3（C2 も E1 も**触らなかった**。法務文書はログイン不要なので `matcher` に足さないのが正解で、`/review` は**先に入れてあった**） |
 
 ### データベースの変更について
 
@@ -207,8 +208,8 @@ Supabase の管理画面 → **SQL Editor** で直接見られる。
   D1 採点の上限 ──→ D2 Stripe決済     ※ C（公開）の後
 
 【いつでも】
-  B3（残る候補2）/ E1 E8 E9
-  ※ B2・E2・E3・E5・E6・E7・F3・G2・Z1 は完了（E3・E6 の票は tasked/ へ移動中）
+  B3（残る候補2）/ E8 E9
+  ※ B2・E1・E2・E3・E5・E6・E7・F3・G2・Z1 は完了（E3・E6 の票は tasked/ へ移動中）
   ※ E10（マスコットの動き）は素材が用意できてから
 ```
 
@@ -254,7 +255,7 @@ Supabase の管理画面 → **SQL Editor** で直接見られる。
 
 | | タスク | 規模 | 前提 |
 |---|---|---|---|
-| [E1](E1-振り返り画面.md) | 採点の内訳を見せる画面 | 中 | なし（材料は揃っている） |
+| ~~[E1](E1-振り返り画面.md)~~ | ~~採点の内訳を見せる画面~~ | 中 | **✅ 2026-08-19 完了。** `/review/[id]`（内訳）と `/review`（といた問題の一覧）。サイドバーの「準備中」も外した。**採点の計算には触っていない** |
 | ~~[E2](E2-フィードバックの2枠表示.md)~~ | ~~「よかったところ」「つぎの一歩」を分ける~~ | 中 | **✅ 2026-08-18 完了**（`ai_praise` / `ai_next_focus`。過去の行も再採点せず分け直した）。**E2E だけ未実行 → `残タスク.md` §C-4 の公開ゲート** |
 | [E3](E3-XPとレベル.md) | 経験値の加算と表示 | 中 | **判断あり** |
 | [E4](E4-問題データに欄を足す.md) | 実行結果と前提知識の欄を足す（旧 E4 + 旧 G4） | 小〜中 | **判断あり・A1 と A2 をブロック** |
