@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { M_PLUS_Rounded_1c, JetBrains_Mono } from "next/font/google";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "@/lib/theme";
+import { InlineScript } from "@/components/theme/InlineScript";
 import { ThemeSync } from "@/components/theme/ThemeSync";
 import "./globals.css";
 
@@ -42,7 +43,9 @@ export default function RootLayout({
       className={`${mplusRounded.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <head>
-        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+        {/* 素の <script> ではなく InlineScript を通す。
+            理由（React の script 警告と type の出し分け）はその部品の冒頭に書いてある */}
+        <InlineScript html={THEME_INIT_SCRIPT} />
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeSync />

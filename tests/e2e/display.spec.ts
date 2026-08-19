@@ -87,6 +87,41 @@ test.describe("§6 表示", () => {
     await expect(body).toBeVisible();
   });
 
+  /**
+   * ハイドレーションのずれ（サーバーが返した HTML と、ブラウザが組んだ結果の食い違い）。
+   *
+   * **起きても画面は正常に見える。** React が黙ってブラウザ側で組み立て直すので、
+   * 見た目は合ったまま、実際には二重に描き直されている。
+   * ずれると `<head>` のテーマ初期化スクリプトも作り直され、
+   * **暗い配色の人に一瞬明るい画面が出る**（`components/theme/InlineScript.tsx`）。
+   *
+   * 2026-08-20 に開発中の画面で両方が出た。そのときは
+   * **古いサーバーHTML × 新しいコード**という開発時だけの食い違いだったが、
+   * 本物のずれと見分けが付かないので、ここで網を張る。
+   */
+  test("E-463 主要な画面でハイドレーションのずれが出ない", async ({
+    authedPage,
+    problems,
+  }) => {
+    const errors: string[] = [];
+    const watch = (text: string) => {
+      if (/Hydration failed|Encountered a script tag|didn't match/i.test(text)) {
+        errors.push(text.slice(0, 200));
+      }
+    };
+    authedPage.on("console", (msg) => {
+      if (msg.type() === "error") watch(msg.text());
+    });
+    authedPage.on("pageerror", (err) => watch(String(err)));
+
+    for (const path of ["/", "/login", "/register", "/stages", `/problems/${problems[0].id}`]) {
+      await authedPage.goto(path);
+      await authedPage.waitForLoadState("networkidle");
+    }
+
+    expect(errors, errors.join("\n")).toEqual([]);
+  });
+
   test("E-452 主要な画面に NG語が出ない", async ({ authedPage, problems }) => {
     const pages = ["/", "/login", "/register", "/stages", `/problems/${problems[0].id}`];
     for (const path of pages) {
