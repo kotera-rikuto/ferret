@@ -6,6 +6,7 @@ import { loadProgress } from "@/lib/progress/unlock";
 import { highlightCode, PRE_CLASS } from "@/lib/code/highlight";
 import { IconBook, IconChevronDown, IconClose } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
+import { MemoPad } from "./MemoPad";
 import { ProblemForm } from "./ProblemForm";
 
 /**
@@ -164,6 +165,13 @@ export default async function ProblemPage({
             </p>
           </details>
         )}
+
+        {/* メモ欄。回答欄のすぐ上に置く（オーナー判断 2026-08-19）。
+            コードを読みながら値を追う作業と、回答をまとめる作業が続いているので、
+            その間に挟むのが動線として素直。
+            **問題データは渡していない。** メモは端末の中だけで完結し、
+            採点にも保存にも一切関わらない（MemoPad.tsx の冒頭コメント） */}
+        <MemoPad problemId={problem.id} />
 
         {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
         <ProblemForm

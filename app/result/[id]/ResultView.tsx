@@ -385,12 +385,9 @@ export function ResultView({
                 <Link href={`/problems/${problemId}`} className="text-muted hover:text-ink">
                   もう一度挑む
                 </Link>
-                <span className="text-muted">
+                <Link href={`/review/${problemId}`} className="text-muted hover:text-ink">
                   ふりかえる
-                  <span className="ml-1 rounded-full bg-locked px-1.5 py-0.5 text-[10px] text-locked-ink">
-                    準備中
-                  </span>
-                </span>
+                </Link>
               </div>
             </>
           ) : (
@@ -401,7 +398,13 @@ export function ResultView({
               >
                 もう一度挑む
               </Link>
+              {/* 届かなかった回にも「ふりかえる」を置く。
+                  どこまで読めていたかを確かめたいのはむしろこちらの回で、
+                  クリアしたときにだけ内訳が見られるのは順序が逆になる */}
               <div className="flex items-center justify-center gap-7 text-[13px] font-extrabold">
+                <Link href={`/review/${problemId}`} className="text-muted hover:text-ink">
+                  ふりかえる
+                </Link>
                 <Link href="/stages" className="text-muted hover:text-ink">
                   ステージにもどる
                 </Link>

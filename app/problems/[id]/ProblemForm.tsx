@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ANSWER_MIN_CHARS, ANSWER_MAX_CHARS } from "@/lib/ai/compose";
@@ -23,6 +23,8 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // 注記を回答欄の説明として結び付けるための id（下の noticeId の用途は E-455 の注参照）
+  const noticeId = useId();
 
   // 書きかけの回答は端末に残す。×やリロードの一発で長文が消えるのは
   // 解約級の体験なので、確認ダイアログではなく「消えない」ほうで守る。
@@ -90,6 +92,11 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
         onChange={(e) => handleChange(e.target.value)}
         placeholder="回答を入力してください..."
         rows={7}
+        // OpenAI 送信の注記を、この欄の説明として結び付ける。
+        // 注記は DOM 上では送信ボタンの後ろにある（E-455 の対処。下のフッター参照）ので、
+        // 読み上げで順に辿ると「書いた後」に流れてしまう。ここで結び付けておけば
+        // 回答欄に入った時点で読まれ、書き始める前に届く
+        aria-describedby={noticeId}
         className="resize-y rounded-2xl border-2 border-line bg-panel px-4.5 py-4 text-[15px] leading-loose outline-none focus:border-brand placeholder:text-locked-ink"
       />
 
@@ -112,7 +119,25 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
 
       {/* 送信は下部固定フッター。スクロール位置に関係なく常に押せる場所に置く */}
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-panel">
+        {/*
+         * **並び順に意味がある（E-455）。**
+         *
+         * DOM 上は 送信ボタン → 注記 の順で、見た目だけ flex の order で入れ替えている。
+         * 素直に「注記 → ボタン」と書くと、回答欄から Tab を1回押したときに当たるのが
+         * 注記の中の「くわしく」リンクになり、**キーボードだけで「入力 → Tab → Enter」と
+         * 送信できる導線が1手増える**（C2 でリンクを足したときに起きた）。
+         * 見た目の左右は order で保つので、目で見える並びは変わらない。
+         *
+         * 読み上げの順が変わる点は、回答欄の aria-describedby で補っている（上の textarea）。
+         */}
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-6 px-6 py-4">
+          <button
+            onClick={handleSubmit}
+            disabled={tooShort || tooLong || loading}
+            className="order-2 whitespace-nowrap rounded-2xl border-b-5 border-brand-deep bg-brand px-12 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2 disabled:cursor-not-allowed disabled:border-locked-edge disabled:bg-locked disabled:text-locked-ink disabled:active:translate-y-0 disabled:active:border-b-5"
+          >
+            回答する
+          </button>
           {/*
            * OpenAI 送信の注記は常時表示（仕様書 §9.5 の法務要件）。
            *
@@ -120,7 +145,10 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
            * 別タブで開くのは、回答を書いている途中に画面を差し替えないため
            * （下書きは localStorage に残るが、書きかけの人を動かさないほうがよい）。
            */}
-          <p className="flex items-center gap-2 text-[11px] font-bold leading-relaxed text-muted">
+          <p
+            id={noticeId}
+            className="order-1 flex items-center gap-2 text-[11px] font-bold leading-relaxed text-muted"
+          >
             <IconInfo size={15} className="shrink-0" />
             <span>
               回答は採点のため OpenAI に送信されます。個人情報やひみつのコードは書かないでください。
@@ -134,13 +162,6 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
               </Link>
             </span>
           </p>
-          <button
-            onClick={handleSubmit}
-            disabled={tooShort || tooLong || loading}
-            className="whitespace-nowrap rounded-2xl border-b-5 border-brand-deep bg-brand px-12 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2 disabled:cursor-not-allowed disabled:border-locked-edge disabled:bg-locked disabled:text-locked-ink disabled:active:translate-y-0 disabled:active:border-b-5"
-          >
-            回答する
-          </button>
         </div>
       </footer>
 
