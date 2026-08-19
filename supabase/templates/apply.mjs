@@ -9,9 +9,13 @@
  *
  * このスクリプトを通せば、**リポジトリのファイルが唯一の正**になる。
  *
- * 使い方（トークンを履歴やファイルに残さないため、環境変数で渡す）:
+ * 使い方（トークンを履歴やファイルに残さないため、環境変数で渡す）。
+ * **bash と zsh の両方で動く形にしてある。** 以前は `read -rs -p "PAT: " VAR` と
+ * 書いていたが、zsh の `read -p` は「コプロセスから読む」という別の意味なので
+ * `read: -p: no coprocess` で失敗する（2026-08-19 に実際に踏んだ）。
+ * macOS の既定シェルは zsh なので、bash 専用の書き方をここに置かないこと:
  *
- *   read -rs -p "PAT: " SUPABASE_ACCESS_TOKEN; export SUPABASE_ACCESS_TOKEN; echo
+ *   printf 'PAT: '; read -rs SUPABASE_ACCESS_TOKEN; echo; export SUPABASE_ACCESS_TOKEN
  *   node supabase/templates/apply.mjs
  *   unset SUPABASE_ACCESS_TOKEN
  *
@@ -74,7 +78,7 @@ async function main() {
       [
         "SUPABASE_ACCESS_TOKEN が設定されていません。次のように渡してください:",
         "",
-        '  read -rs -p "PAT: " SUPABASE_ACCESS_TOKEN; export SUPABASE_ACCESS_TOKEN; echo',
+        `  printf 'PAT: '; read -rs SUPABASE_ACCESS_TOKEN; echo; export SUPABASE_ACCESS_TOKEN`,
         "  node supabase/templates/apply.mjs",
         "  unset SUPABASE_ACCESS_TOKEN",
         "",
