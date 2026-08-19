@@ -18,6 +18,7 @@
 import { pathToFileURL } from "node:url";
 import { createContext, runInNewContext } from "node:vm";
 import { inspect } from "node:util";
+import { stripTypeScriptTypes } from "node:module";
 
 /** 非同期の出力を待つ時間。問題側の最長は 30ms（ステージ71）なので十分な余裕を取る */
 const SETTLE_MS = 400;
@@ -61,7 +62,12 @@ for (const p of problems) {
   });
 
   try {
-    runInNewContext(p.code, context);
+    // TS は vm がそのままでは読めないので、型注釈だけを落としてから実行する。
+    // **落とすのは型情報だけで、実行時の挙動は1つも変わらない**（消した部分は空白になる）。
+    // これで TS 編でも「模範解答に書いた出力が本当にそうなるか」を確かめられる。
+    // enum や namespace は落とせないので、使う問題は runnable: false にすること。
+    const source = p.language === "ts" ? stripTypeScriptTypes(p.code) : p.code;
+    runInNewContext(source, context);
     // 予約された処理が走り終わるのを待つ。出力が増えなくなったら早めに切り上げる
     let quiet = 0;
     for (let waited = 0; waited < SETTLE_MS && quiet < 3; waited += STEP_MS) {
