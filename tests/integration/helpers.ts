@@ -18,7 +18,15 @@ import { NextRequest } from "next/server";
 // ---------------------------------------------------------------------------
 
 export type ProblemListRow = { id: number; order: number; title: string };
-export type AttemptRow = { problem_id: number; total_score: number };
+/**
+ * `created_at` は解放判定（loadProgress）では使わないので任意。
+ * といた問題の一覧（/review）だけが「最新の回」を選ぶために読む
+ */
+export type AttemptRow = {
+  problem_id: number;
+  total_score: number;
+  created_at?: string;
+};
 
 export type DbState = {
   /** レート制限のカウントが返す行（created_at の ISO 文字列） */

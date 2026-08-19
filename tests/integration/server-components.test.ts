@@ -13,9 +13,12 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   makeClients,
   defaultState,
+  ANSWER,
+  EVIDENCE_REAL,
   UNLOCKED_ID,
   LOCKED_ID,
   USER_ID,
+  type AttemptRow,
   type DbState,
   type DbSpy,
 } from "./helpers";
@@ -56,6 +59,8 @@ const StagesPage = (await import("@/app/stages/page")).default;
 const ProblemPage = (await import("@/app/problems/[id]/page")).default;
 const ResultPage = (await import("@/app/result/[id]/page")).default;
 const SettingsPage = (await import("@/app/settings/page")).default;
+const ReviewPage = (await import("@/app/review/[id]/page")).default;
+const ReviewIndexPage = (await import("@/app/review/page")).default;
 
 // ---------------------------------------------------------------------------
 // セットアップ
@@ -344,5 +349,187 @@ describe("§10-4 せってい画面", () => {
     expect(await outcome(() => SettingsPage())).toBe("RENDERED");
     expect(spy.selects).toHaveLength(0);
     expect(spy.sessionTables).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §10-5 ふりかえり画面
+// ---------------------------------------------------------------------------
+
+/** 内訳つきの回答。引用は ANSWER の中に実在する文字列にしてある */
+const REVIEW_ATTEMPT = {
+  id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+  answer: ANSWER,
+  total_score: 73,
+  keyword_score: 15,
+  deep_score: 58,
+  contradiction: false,
+  created_at: "2026-08-18T02:00:00.000Z",
+  axes: {
+    axes: [
+      { axis: "core", verdict: "full", raw: "full", demoted: false, evidence: EVIDENCE_REAL, points: 48 },
+      { axis: "ground", verdict: "partial", raw: "partial", demoted: false, evidence: "", points: 8 },
+      { axis: "depth", verdict: "none", raw: "none", demoted: false, evidence: "", points: 0 },
+      { axis: "articulation", verdict: "full", raw: "full", demoted: false, evidence: EVIDENCE_REAL, points: 4 },
+    ],
+    keyword_hits: [true, true, true, false],
+    evidence_capped: false,
+    fabrication_suspected: false,
+    matched_reject: "none",
+  },
+};
+
+describe("§10-5 /review/[id]", () => {
+  it("I-870 未ログインならログイン画面へ送る", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    expect(await outcome(() => ReviewPage(params(String(UNLOCKED_ID))))).toBe(
+      "REDIRECT:/login",
+    );
+  });
+
+  it.each(["abc", "0", "-1"])("I-871 URL の id が整数でない（%s）なら 404", async (id) => {
+    expect(await outcome(() => ReviewPage(params(id)))).toBe("NOT_FOUND");
+  });
+
+  /**
+   * **この画面で模範解答を守っているのはこの1行。**
+   * 解放判定ではなく「自分の回答が残っているか」を関門にしている
+   * （回答がある＝そのステージは開いていた。リザルトと同じ考え方＝I-379b）。
+   * ここが緩むと、解いていない問題の答えを URL を打つだけで読めてしまう
+   */
+  it("I-872 回答が無ければ問題画面へ返し、問題を引きにいかない", async () => {
+    setup({ resultAttempt: null });
+    expect(await outcome(() => ReviewPage(params(String(UNLOCKED_ID))))).toBe(
+      `REDIRECT:/problems/${UNLOCKED_ID}`,
+    );
+    // 模範解答を含むクエリがそもそも走らない
+    expect(spy.selects).toHaveLength(0);
+  });
+
+  it("I-873 回答は session クライアントで読む（RLS が効く側）", async () => {
+    setup({ resultAttempt: REVIEW_ATTEMPT });
+    await ReviewPage(params(String(UNLOCKED_ID)));
+
+    expect(spy.sessionTables).toEqual(["user_attempts"]);
+    expect(spy.sessionSelects[0]).toBe(
+      "id, answer, total_score, keyword_score, deep_score, axes, contradiction, created_at",
+    );
+    expect(spy.sessionFilters).toContainEqual(["user_id", USER_ID]);
+    expect(spy.sessionFilters).toContainEqual(["problem_id", UNLOCKED_ID]);
+  });
+
+  it("I-874 判定保留を除き、作成日時の降順で1件だけ取る", async () => {
+    setup({ resultAttempt: REVIEW_ATTEMPT });
+    await ReviewPage(params(String(UNLOCKED_ID)));
+
+    expect(spy.sessionFilters).toContainEqual(["is_provisional", false]);
+    expect(spy.orders).toContainEqual(["created_at", { ascending: false }]);
+    expect(spy.limits).toContain(1);
+  });
+
+  /**
+   * 模範解答は出すが、**採点基準は出さない**（オーナー判断 2026-08-19）。
+   * `rubric_items` が見えると、並べるべき語がそのまま分かってしまい
+   * キーワードだけで点が取れる。漏れても画面は正常に見えるので、ここで固定する
+   */
+  it("I-875 問題は admin で読み、採点基準を select しない", async () => {
+    setup({ resultAttempt: REVIEW_ATTEMPT });
+    await ReviewPage(params(String(UNLOCKED_ID)));
+
+    const problemSelects = spy.selects.filter(([table]) => table === "problems");
+    expect(problemSelects).toHaveLength(1);
+
+    const columns = problemSelects[0][1];
+    expect(columns).toContain("model_answer");
+    for (const secret of ["rubric_items", "keywords", "core_reject"]) {
+      expect(columns, `${secret} を読んでいる`).not.toContain(secret);
+    }
+  });
+
+  /**
+   * リザルトと同じく解放状態を見ない（I-379b）。
+   * loadProgress を通すと problems の一覧クエリが増えるので、その形で確かめる
+   */
+  it("I-876 解放状態を見ずに描画する（クリア済みの復習を妨げない）", async () => {
+    setup({ resultAttempt: REVIEW_ATTEMPT });
+    expect(await outcome(() => ReviewPage(params(String(LOCKED_ID))))).toBe(
+      "RENDERED",
+    );
+    expect(spy.selects.map(([, columns]) => columns)).not.toContain(
+      "id, order, title",
+    );
+  });
+
+  it("I-877 問題の詳細が取れなければ 404", async () => {
+    setup({ resultAttempt: REVIEW_ATTEMPT, problemDetail: null });
+    expect(await outcome(() => ReviewPage(params(String(UNLOCKED_ID))))).toBe(
+      "NOT_FOUND",
+    );
+  });
+
+  /**
+   * 採点の仕組みを変える前の回答には内訳が無い。
+   * **落ちずに描画できること**が条件（tasks/E1 の注意）
+   */
+  it.each([
+    ["内訳が無い", null],
+    ["内訳の形が違う", { core: { verdict: "full" } }],
+  ])("I-878 %s 古い回答でも落ちない", async (_label, axes) => {
+    setup({ resultAttempt: { ...REVIEW_ATTEMPT, axes } });
+    expect(await outcome(() => ReviewPage(params(String(UNLOCKED_ID))))).toBe(
+      "RENDERED",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §10-6 といた問題の一覧
+// ---------------------------------------------------------------------------
+
+const SOLVED: AttemptRow[] = [
+  { problem_id: UNLOCKED_ID, total_score: 40, created_at: "2026-08-17T01:00:00.000Z" },
+  { problem_id: UNLOCKED_ID, total_score: 73, created_at: "2026-08-18T01:00:00.000Z" },
+  { problem_id: LOCKED_ID, total_score: 88, created_at: "2026-08-16T01:00:00.000Z" },
+];
+
+describe("§10-6 /review", () => {
+  it("I-879 未ログインならログイン画面へ送る", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    expect(await outcome(() => ReviewIndexPage())).toBe("REDIRECT:/login");
+  });
+
+  it("I-880 回答は session、問題は admin で読む", async () => {
+    setup({ attempts: SOLVED });
+    expect(await outcome(() => ReviewIndexPage())).toBe("RENDERED");
+
+    expect(spy.sessionTables).toEqual(["user_attempts"]);
+    expect(spy.sessionSelects[0]).toBe("problem_id, total_score, created_at");
+    expect(spy.sessionFilters).toContainEqual(["user_id", USER_ID]);
+    // 判定保留（層1のみで採点した回）には内訳が無いので出さない
+    expect(spy.sessionFilters).toContainEqual(["is_provisional", false]);
+  });
+
+  /**
+   * 一覧に模範解答を持ち込まない。
+   * 表示に要るのは番号・題名だけで、ここで読むと画面へ渡る経路ができる
+   */
+  it("I-881 一覧に model_answer / rubric_items を含めない", async () => {
+    setup({ attempts: SOLVED });
+    await ReviewIndexPage();
+
+    const problemSelects = spy.selects.filter(([table]) => table === "problems");
+    expect(problemSelects).toHaveLength(1);
+    for (const secret of ["model_answer", "rubric_items", "keywords"]) {
+      expect(problemSelects[0][1]).not.toContain(secret);
+    }
+  });
+
+  it.each([
+    ["回答が0件", { attempts: [] }],
+    ["回答の取得が null", { attempts: null }],
+    ["問題の取得が null", { attempts: SOLVED, problemList: null }],
+  ])("I-882 %s でも落ちない", async (_label, patch) => {
+    setup(patch);
+    expect(await outcome(() => ReviewIndexPage())).toBe("RENDERED");
   });
 });

@@ -249,8 +249,19 @@ test.describe("§3 問題画面", () => {
     await expect(authedPage.getByText(problems[1].title)).toBeVisible();
   });
 
-  test("E-273 振り返り画面はまだ無い", async ({ authedPage, problems }) => {
+  /**
+   * 振り返り画面は 2026-08-19（E1）に入った。**404 ではなくなっている。**
+   *
+   * 代わりに固定するのは「まだ解いていない問題では開かない」こと。
+   * あの画面は模範解答を出すので、ここが緩むと URL を打つだけで答えが読める。
+   * 画面の中身そのものは tests/e2e/review.spec.ts（§17）が見る
+   */
+  test("E-273 解いていない問題の振り返りは開かず、問題画面へ返す", async ({
+    authedPage,
+    problems,
+  }) => {
     const res = await authedPage.goto(`/review/${problems[0].id}`);
-    expect(res?.status()).toBe(404);
+    expect(res?.status()).toBe(200);
+    await expect(authedPage).toHaveURL(new RegExp(`/problems/${problems[0].id}`));
   });
 });

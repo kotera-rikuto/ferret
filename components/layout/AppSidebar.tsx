@@ -4,8 +4,9 @@ import { IconBook, IconGear, IconMap } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
 
 // ログイン後画面の左ナビ。lg 未満では表示しない（呼び出し側が簡易ヘッダーを出す）。
-// 「ふりかえり」は画面が未実装なので押せないボタン + 準備中チップにしてある（E1 で解禁）。
-// リンクにして 404 を踏ませるより、押せないことが見えているほうが親切
+// 「ふりかえり」は 2026-08-19（E1）に解禁した。行き先は `/review`（といた問題の一覧）で、
+// そこから回ごとのふりかえり（`/review/[id]`）へ入る。
+// 一覧を挟むのは、ふりかえり本体が回答1件ごとの画面だから
 //
 // `current` は「いまどの画面にいるか」。強調を1か所だけにするために持たせている。
 // 全部を同じ見た目にすると、どこにいるのか画面から分からなくなる
@@ -14,7 +15,7 @@ export function AppSidebar({
   current = "stages",
 }: {
   email: string | null;
-  current?: "stages" | "settings";
+  current?: "stages" | "review" | "settings";
 }) {
   // 強調とそれ以外。文字色まで変えるので、クラスをまとめて切り替える
   const active =
@@ -33,16 +34,10 @@ export function AppSidebar({
         <IconMap size={20} />
         ステージ
       </Link>
-      <button
-        disabled
-        className="flex items-center gap-3 rounded-xl border-2 border-transparent px-3.5 py-3 text-[15px] font-extrabold tracking-wide text-muted"
-      >
+      <Link href="/review" className={current === "review" ? active : idle}>
         <IconBook size={20} />
         ふりかえり
-        <span className="ml-auto rounded-full bg-locked px-2 py-0.5 text-[10px] font-extrabold text-locked-ink">
-          準備中
-        </span>
-      </button>
+      </Link>
       <Link href="/settings" className={current === "settings" ? active : idle}>
         <IconGear size={20} />
         せってい
