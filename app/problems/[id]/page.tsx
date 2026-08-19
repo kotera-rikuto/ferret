@@ -105,13 +105,23 @@ export default async function ProblemPage({
         >
           <IconClose size={22} />
         </Link>
-        <div className="flex items-center justify-center gap-2.5 text-sm font-extrabold">
-          <span className="text-xs font-extrabold tracking-widest text-muted">
+        {/* 狭い画面ではタイトルを1行に切る（E8）。
+            折り返させると、この帯だけで画面の高さの 1/7 を使ってしまい、
+            さらに読解型のバッジが縦書きに潰れる（実測 375px で3行・97px）。
+            タイトルは直前のマップで見えているので、ここで全文が読めなくても迷わない。
+            `min-w-0` はこの列を縮められるようにするためで、
+            付けないと truncate が効かない（flex の初期値が min-width:auto のため） */}
+        <div className="flex min-w-0 items-center justify-center gap-2.5 text-sm font-extrabold">
+          <span className="shrink-0 text-xs font-extrabold tracking-widest text-muted">
             STAGE {problem.order}
           </span>
-          {problem.title ?? `Stage ${problem.order}`}
+          {/* lg 以上は truncate を丸ごと戻す。3つのプロパティの合成なので、
+              whitespace だけ戻すと省略記号の指定が残る */}
+          <span className="truncate lg:overflow-visible lg:text-clip lg:whitespace-normal">
+            {problem.title ?? `Stage ${problem.order}`}
+          </span>
           {problem.reading_type && (
-            <span className="rounded-full bg-brand-tint px-2.5 py-0.5 text-[11px] font-extrabold text-brand-deep">
+            <span className="shrink-0 rounded-full bg-brand-tint px-2.5 py-0.5 text-[11px] font-extrabold whitespace-nowrap text-brand-deep">
               {problem.reading_type}
             </span>
           )}
@@ -123,8 +133,12 @@ export default async function ProblemPage({
           1088px = 余白24 + 読む列720 + すき間32 + メモ288 + 余白24 で、
           **1088 以上あれば読む列は今までと同じ 720**（コードの折り返しが変わらない）。
           1024〜1088 の間は読む列がそのぶん縮む。
-          しきい値は MemoPad.tsx の SIDE_BY_SIDE と対（片方だけ動かさないこと） */}
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 pt-9 pb-44 lg:max-w-[1088px] lg:flex-row lg:items-start lg:gap-8">
+          しきい値は MemoPad.tsx の SIDE_BY_SIDE と対（片方だけ動かさないこと）
+
+          下の余白（`pb-44`）は固定フッターに隠れる分の逃げ（`ProblemForm` の footer）。
+          **狭い画面ではフッターを固定していないので、逃がす必要がない**（E8）──
+          そのまま残すと回答ボタンの下に 176px の空白が続く */}
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 pt-9 pb-10 lg:max-w-[1088px] lg:flex-row lg:items-start lg:gap-8 lg:pb-44">
         <div className="flex min-w-0 flex-1 flex-col gap-6">
           <CodePanel
             label={(problem.language ?? "js").toUpperCase()}
