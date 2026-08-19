@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ANSWER_MIN_CHARS, ANSWER_MAX_CHARS } from "@/lib/ai/compose";
 import { IconInfo } from "@/components/ui/icons";
-import { Mascot } from "@/components/ui/Mascot";
+import { MascotMotion } from "@/components/ui/MascotMotion";
 
 // model_answer / rubric_items は意図的に含めない。
 // クライアントに渡すと模範回答が見えてしまう
@@ -178,10 +178,14 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
         </div>
       </footer>
 
-      {/* 採点待ち。実測 1.2〜4.3 秒かかるので、マスコットの演出で待ち時間を埋める */}
+      {/*
+       * 採点待ち。実測 1.2〜4.3 秒かかるので、マスコットの演出で待ち時間を埋める。
+       * **動きの1周は 1.3 秒**にしてある（globals.css）。待ち時間より長いと、
+       * 1周する前に画面が切り替わって尻切れになる。
+       */}
       {loading && (
         <div className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-5 bg-bg/95">
-          <Mascot mood="thinking" className="w-36 animate-sniff" />
+          <MascotMotion motion="thinking" className="w-36" />
           <p className="text-base font-extrabold">フェレットがコードを読んでいます</p>
           <div className="flex gap-2">
             <span className="size-2.5 animate-blink rounded-full bg-brand" />

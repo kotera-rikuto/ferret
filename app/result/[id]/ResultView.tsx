@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
+import { MascotMotion } from "@/components/ui/MascotMotion";
 import { IconPaw } from "@/components/ui/icons";
 import {
   COMMENT_MAX_CHARS,
@@ -345,11 +346,22 @@ export function ResultView({
       )}
 
       <main className="mx-auto flex min-h-screen w-full max-w-xl flex-col items-center gap-5 px-6 py-12">
-        {/* 不合格の画面で喜ばせない。届かなかったときは考えている顔にする */}
-        <Mascot
-          mood={cleared ? "happy" : "thinking"}
-          className="w-32 animate-pop drop-shadow-[0_8px_18px_rgba(74,59,40,0.18)]"
-        />
+        {/*
+         * 不合格の画面で喜ばせない。届かなかったときは考えている顔にする。
+         * **動くのはクリアしたときだけ**（E10）。届かなかった回は静止画のままで、
+         * そこに動きを足すと「惜しい」を演出することになる。
+         */}
+        {cleared ? (
+          <MascotMotion
+            motion="cheer"
+            className="w-32 drop-shadow-[0_8px_18px_rgba(74,59,40,0.18)]"
+          />
+        ) : (
+          <Mascot
+            mood="thinking"
+            className="w-32 animate-pop drop-shadow-[0_8px_18px_rgba(74,59,40,0.18)]"
+          />
+        )}
         <h1 className="text-4xl font-extrabold tracking-wide text-brand-deep">
           {perfect ? "パーフェクト！" : cleared ? "クリア！" : "もう一度挑戦しよう"}
         </h1>

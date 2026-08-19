@@ -65,10 +65,24 @@
   --animate-float: float 3s ease-in-out infinite;
   --animate-halo: halo 1.8s ease-out infinite;
   --animate-bob: bob 1.2s ease-in-out infinite;
-  --animate-sniff: sniff 1s ease-in-out infinite;
   --animate-pop: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-blink: blink 1.2s ease-in-out infinite;
   --animate-fall: fall 2.6s ease-in 0.15s forwards;
+
+  /*
+   * マスコットの部品ごとの動き（E10・components/ui/MascotMotion.tsx）。
+   *
+   * 1枚の絵を揺らす `sniff` を置き換えたもの。絵をしっぽと本体に切り分けて
+   * 別々に動かしている（切り方は design/mascot/cut-parts.py）。
+   *
+   * **採点待ちの1周は 1.3 秒。** 実測の待ち時間が 1.2〜4.3 秒なので、
+   * これより長いと1周する前に画面が切り替わって尻切れになる。
+   */
+  --animate-mascot-breathe: mascot-breathe 2.6s ease-in-out infinite;
+  --animate-mascot-tail: mascot-tail 1.3s ease-in-out infinite;
+  --animate-mascot-glint: mascot-glint 2.6s ease-in-out infinite;
+  --animate-mascot-cheer: mascot-cheer 0.95s cubic-bezier(0.33, 1, 0.68, 1) both;
+  --animate-mascot-tail-flick: mascot-tail-flick 0.95s ease-out both;
 
   /* タイトル画面のマスコット浮遊 */
   @keyframes float {
@@ -104,14 +118,102 @@
     }
   }
 
-  /* 採点待ちでフェレットが匂いを嗅ぐように揺れる */
-  @keyframes sniff {
+  /*
+   * 採点待ち：息をしているように上下する。
+   * 縮むときに横へ広がる（体積が変わらないように見せる）。
+   * 軸は足元（`origin-bottom`）に置いてあるので、立ち位置は動かない。
+   */
+  @keyframes mascot-breathe {
     0%,
     100% {
-      transform: rotate(-3deg) translateY(0);
+      transform: translateY(0) scale(1, 1);
+    }
+    45% {
+      transform: translateY(-2.2%) scale(0.985, 1.022);
+    }
+    72% {
+      transform: translateY(0.5%) scale(1.012, 0.986);
+    }
+  }
+
+  /* 採点待ち：しっぽを振る。軸はしっぽの付け根（腕の裏） */
+  @keyframes mascot-tail {
+    0%,
+    100% {
+      transform: rotate(-5.5deg);
     }
     50% {
-      transform: rotate(3deg) translateY(-8px);
+      transform: rotate(5.5deg);
+    }
+  }
+
+  /*
+   * 採点待ち：虫眼鏡のレンズを光が横切る。
+   *
+   * **虫眼鏡そのものは動かせない。** レンズが顔に重なっていて、
+   * ずらすと顔の輪郭が描かれていない部分が出る（cut-parts.py の注）。
+   * 動くのはレンズの内側を通る光だけなので、絵を切らずに済む。
+   */
+  @keyframes mascot-glint {
+    0%,
+    58% {
+      opacity: 0;
+      transform: translateX(-230%) rotate(20deg);
+    }
+    70% {
+      opacity: 0.55;
+    }
+    84%,
+    100% {
+      opacity: 0;
+      transform: translateX(230%) rotate(20deg);
+    }
+  }
+
+  /*
+   * リザルト：クリアしたときの登場。ためて跳んで着地する。
+   * 跳ぶときに縦へ伸び、着地でつぶれる。`pop`（拡大するだけ）の置き換え。
+   * **繰り返さない。** 不合格の画面では使わない（静止画のまま）。
+   */
+  @keyframes mascot-cheer {
+    0% {
+      opacity: 0;
+      transform: translateY(6%) scale(0.86, 0.9);
+    }
+    18% {
+      opacity: 1;
+      transform: translateY(4%) scale(1.06, 0.88);
+    }
+    44% {
+      transform: translateY(-14%) scale(0.94, 1.12);
+    }
+    66% {
+      transform: translateY(0) scale(1.08, 0.9);
+    }
+    84% {
+      transform: translateY(-3%) scale(0.98, 1.03);
+    }
+    100% {
+      transform: translateY(0) scale(1, 1);
+    }
+  }
+
+  /* リザルト：しっぽを1回強く振って収まる */
+  @keyframes mascot-tail-flick {
+    0% {
+      transform: rotate(10deg);
+    }
+    30% {
+      transform: rotate(-9deg);
+    }
+    55% {
+      transform: rotate(7deg);
+    }
+    75% {
+      transform: rotate(-4deg);
+    }
+    100% {
+      transform: rotate(0deg);
     }
   }
 
@@ -228,4 +330,42 @@ body {
   background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+
+/*
+ * OS の「動きを減らす」設定（2026-08-19・E10）。
+ *
+ * **それまで一切対応していなかった**（このファイルに一度も書かれていなかった）。
+ * E10 で繰り返す動きが増えるので、元からあった動きも含めてここで止める。
+ *
+ * **どのレイヤーにも入れないこと。** Tailwind の `animate-*` は `@layer utilities`
+ * から出てくるので、どのレイヤーにも属さないこの規則が必ず勝つ（暗い配色と同じ理屈）。
+ *
+ * `animation: none` で足りる理由: どの @keyframes も「素の見た目」を起点に動かしてあるので、
+ * 止めれば素の見た目に戻る。登場の動き（pop / mascot-cheer）も、止めれば
+ * 最初から出ている状態になる（`both` の塗り分けが無くなるだけ）。
+ *
+ * **例外は紙吹雪だけ。** 止めると画面の上端に貼り付いたまま残るので、出さない。
+ *
+ * ⚠️ ステージ選択の「現在地へ戻る」は JS の `scrollTo({ behavior: "smooth" })` で
+ * 動いており、CSS では止められない（components/stage/StageMap.tsx）。
+ * E10 の担当範囲外なので触っていない → 残タスクへ申し送り。
+ */
+@media (prefers-reduced-motion: reduce) {
+  .animate-float,
+  .animate-halo,
+  .animate-bob,
+  .animate-pop,
+  .animate-blink,
+  .animate-mascot-breathe,
+  .animate-mascot-tail,
+  .animate-mascot-glint,
+  .animate-mascot-cheer,
+  .animate-mascot-tail-flick {
+    animation: none !important;
+  }
+
+  .animate-fall {
+    display: none !important;
+  }
 }
