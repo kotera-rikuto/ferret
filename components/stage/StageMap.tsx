@@ -58,8 +58,14 @@ const ROW_H = 180;
  */
 const ROW_H_NARROW = 224;
 
-/** 上の `ROW_H_NARROW` の説明と対になる境目。Tailwind の `lg`（1024px）と同じ */
-const NARROW_QUERY = "(max-width: 1023px)";
+/**
+ * 上の `ROW_H_NARROW` の説明と対になる境目。**Tailwind の `lg` と同じ文字列を持ち、
+ * 「狭い」は否定で出す。**`(max-width: 1023px)` と書くと厳密な補集合にならず、
+ * 拡大表示などで幅が 1023.5px になったときに**どちらの条件も外れる**
+ * （`lg:` が当たらないのに行の高さはパソコン側、という食い違いが出る）。
+ * `MemoPad.tsx` の `SIDE_BY_SIDE` も同じ文字列（片方だけ動かさないこと）。
+ */
+const WIDE_QUERY = "(min-width: 64rem)";
 
 /** 節の上端から先頭ノードまで。現在地の「スタート」吹き出し（丸の 53px 上）を収める高さ */
 const PAD_TOP = 76;
@@ -97,15 +103,17 @@ const xOf = (order: number) => XS[(order - 1) % XS.length];
  * 起動時は `scrollToCurrent` が現在地まで飛ぶので、その動きに紛れる。
  */
 function useNarrow(): boolean {
-  return useSyncExternalStore(
+  const wide = useSyncExternalStore(
     (onChange) => {
-      const mql = window.matchMedia(NARROW_QUERY);
+      const mql = window.matchMedia(WIDE_QUERY);
       mql.addEventListener("change", onChange);
       return () => mql.removeEventListener("change", onChange);
     },
-    () => window.matchMedia(NARROW_QUERY).matches,
-    () => false,
+    () => window.matchMedia(WIDE_QUERY).matches,
+    // サーバー描画は「広い」に寄せる。パソコンでの出力を従来と一致させるため
+    () => true,
   );
+  return !wide;
 }
 
 type ChapterGroup = {

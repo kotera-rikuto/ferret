@@ -129,72 +129,83 @@ export default async function ProblemPage({
         <span />
       </header>
 
-      {/* 下の余白は固定フッターに隠れる分の逃げ（`ProblemForm` の footer）。
-          狭い画面ではフッターを固定していないので、逃がす必要がない ──
-          そのまま残すと回答ボタンの下に 176px の空白が続く（E8） */}
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 pt-9 pb-10 lg:pb-44">
-        <CodePanel
-          label={(problem.language ?? "js").toUpperCase()}
-          hint="読んでみよう"
-          body={problem.code}
-          html={codeHtml}
-        />
+      {/* lg 以上は「読む列 + メモ」の2列にする（オーナー判断 2026-08-19）。
+          1088px = 余白24 + 読む列720 + すき間32 + メモ288 + 余白24 で、
+          **1088 以上あれば読む列は今までと同じ 720**（コードの折り返しが変わらない）。
+          1024〜1088 の間は読む列がそのぶん縮む。
+          しきい値は MemoPad.tsx の SIDE_BY_SIDE と対（片方だけ動かさないこと）
 
-        {/* 実行結果。影響型（エラーの出力から原因の場所を特定する読み方）で使う。
-            コードと同じ枠に混ぜるとエラー文がコードの一部に見えてしまうので、
-            必ず別のパネルに出す。空の問題では枠ごと出さない */}
-        {problem.context && (
-          <CodePanel label="実行結果" hint="実行するとこう出た" body={problem.context} />
-        )}
+          下の余白（`pb-44`）は固定フッターに隠れる分の逃げ（`ProblemForm` の footer）。
+          **狭い画面ではフッターを固定していないので、逃がす必要がない**（E8）──
+          そのまま残すと回答ボタンの下に 176px の空白が続く */}
+      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 px-6 pt-9 pb-10 lg:max-w-[1088px] lg:flex-row lg:items-start lg:gap-8 lg:pb-44">
+        <div className="flex min-w-0 flex-1 flex-col gap-6">
+          <CodePanel
+            label={(problem.language ?? "js").toUpperCase()}
+            hint="読んでみよう"
+            body={problem.code}
+            html={codeHtml}
+          />
 
-        {/* 設問。フェレットが問いかけている形にして、余白の多い画面に手がかりを置く */}
-        <div className="flex items-start gap-4">
-          <Mascot mood="thinking" className="hidden w-20 shrink-0 sm:block" />
-          <div className="relative flex-1 rounded-2xl border-2 border-line bg-panel px-5 py-4 sm:before:absolute sm:before:top-6 sm:before:-left-2.5 sm:before:size-4 sm:before:rotate-45 sm:before:border-b-2 sm:before:border-l-2 sm:before:border-line sm:before:bg-panel">
-            <p className="text-base font-extrabold leading-relaxed whitespace-pre-line">
-              {problem.question}
-            </p>
+          {/* 実行結果。影響型（エラーの出力から原因の場所を特定する読み方）で使う。
+              コードと同じ枠に混ぜるとエラー文がコードの一部に見えてしまうので、
+              必ず別のパネルに出す。空の問題では枠ごと出さない */}
+          {problem.context && (
+            <CodePanel label="実行結果" hint="実行するとこう出た" body={problem.context} />
+          )}
+
+          {/* 設問。フェレットが問いかけている形にして、余白の多い画面に手がかりを置く */}
+          <div className="flex items-start gap-4">
+            <Mascot mood="thinking" className="hidden w-20 shrink-0 sm:block" />
+            <div className="relative flex-1 rounded-2xl border-2 border-line bg-panel px-5 py-4 sm:before:absolute sm:before:top-6 sm:before:-left-2.5 sm:before:size-4 sm:before:rotate-45 sm:before:border-b-2 sm:before:border-l-2 sm:before:border-line sm:before:bg-panel">
+              <p className="text-base font-extrabold leading-relaxed whitespace-pre-line">
+                {problem.question}
+              </p>
+            </div>
           </div>
+
+          {/* 前提知識。
+              既定は閉じておく。読まなくても解ける人の画面を煩雑にしないためで、
+              「不合格になってから開く」形にはしない（間違えないと助けが出ない形は
+              装備獲得型の方針と合わない）。
+              details なので JS なしで開閉でき、この画面はサーバーコンポーネントのまま。
+              ここに答えは書かない（tasks/E4-問題データに欄を足す.md の注意） */}
+          {problem.prerequisite && (
+            <details className="group rounded-2xl border-2 border-line bg-panel px-5 py-4">
+              <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-extrabold text-brand-deep [&::-webkit-details-marker]:hidden">
+                <IconBook size={17} />
+                ヒント
+                <IconChevronDown
+                  size={16}
+                  className="ml-auto transition-transform group-open:rotate-180"
+                />
+              </summary>
+              <p className="mt-3 border-t-2 border-line pt-3 text-sm leading-loose whitespace-pre-line">
+                {problem.prerequisite}
+              </p>
+            </details>
+          )}
+
+          {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
+          <ProblemForm
+            problem={{
+              id: problem.id,
+              title: problem.title ?? `Stage ${problem.order}`,
+              code: problem.code,
+              question: problem.question,
+            }}
+          />
         </div>
 
-        {/* 前提知識。
-            既定は閉じておく。読まなくても解ける人の画面を煩雑にしないためで、
-            「不合格になってから開く」形にはしない（間違えないと助けが出ない形は
-            装備獲得型の方針と合わない）。
-            details なので JS なしで開閉でき、この画面はサーバーコンポーネントのまま。
-            ここに答えは書かない（tasks/E4-問題データに欄を足す.md の注意） */}
-        {problem.prerequisite && (
-          <details className="group rounded-2xl border-2 border-line bg-panel px-5 py-4">
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-extrabold text-brand-deep [&::-webkit-details-marker]:hidden">
-              <IconBook size={17} />
-              わからない言葉があるとき
-              <IconChevronDown
-                size={16}
-                className="ml-auto transition-transform group-open:rotate-180"
-              />
-            </summary>
-            <p className="mt-3 border-t-2 border-line pt-3 text-sm leading-loose whitespace-pre-line">
-              {problem.prerequisite}
-            </p>
-          </details>
-        )}
-
-        {/* メモ欄。回答欄のすぐ上に置く（オーナー判断 2026-08-19）。
-            コードを読みながら値を追う作業と、回答をまとめる作業が続いているので、
-            その間に挟むのが動線として素直。
+        {/* メモ欄。**読む列の外**に置く（当初は回答欄の上・オーナー判断で 2026-08-19 に変更）。
+            回答欄の上に縦に挟むと、コードを読み終えてから回答を書き始めるまでの間に
+            メモの高さぶん画面が伸びて回答欄が下へ逃げる。横に置ける幅があるときは横へ、
+            足りないときは折りたたみ（MemoPad.tsx）。
+            **DOM 上は回答欄より後ろ。** ここを回答欄より前に戻すと、回答欄から Tab を
+            押したときに当たるのがメモになり、E-455 で直した送信までの導線がまた1手増える。
             **問題データは渡していない。** メモは端末の中だけで完結し、
             採点にも保存にも一切関わらない（MemoPad.tsx の冒頭コメント） */}
         <MemoPad problemId={problem.id} />
-
-        {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
-        <ProblemForm
-          problem={{
-            id: problem.id,
-            title: problem.title ?? `Stage ${problem.order}`,
-            code: problem.code,
-            question: problem.question,
-          }}
-        />
       </main>
     </div>
   );

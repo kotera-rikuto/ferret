@@ -142,6 +142,8 @@ test.describe("§1 ログインの失敗と案内", () => {
     await page.goto("/register");
     await page.getByLabel("メールアドレス").fill(fresh);
     await page.getByLabel("パスワード").fill("FerretE2E2026!");
+    // 2026-08-19 から、同意にチェックを入れるまで登録ボタンは押せない（E-459）
+    await page.getByLabel("利用規約とプライバシーポリシーに同意する").check();
     await page.getByRole("button", { name: "登録する" }).click();
 
     await expect(page.getByRole("heading", { name: "確認メールを送りました" })).toBeVisible();
@@ -171,6 +173,8 @@ test.describe("§1 ログインの失敗と案内", () => {
     await page.goto("/register");
     await page.getByLabel("メールアドレス").fill(TEST_USER.email);
     await page.getByLabel("パスワード").fill(TEST_USER.password);
+    // 2026-08-19 から、同意にチェックを入れるまで登録ボタンは押せない（E-459）
+    await page.getByLabel("利用規約とプライバシーポリシーに同意する").check();
     await page.getByRole("button", { name: "登録する" }).click();
 
     await expect(
@@ -187,6 +191,8 @@ test.describe("§1 ログインの失敗と案内", () => {
     // 弱いパスワードは Supabase に弾かれるので、アカウントは作られない
     await page.getByLabel("メールアドレス").fill(`e2e-weak-${Date.now()}@ferret.test`);
     await page.getByLabel("パスワード").fill("abc");
+    // 2026-08-19 から、同意にチェックを入れるまで登録ボタンは押せない（E-459）
+    await page.getByLabel("利用規約とプライバシーポリシーに同意する").check();
     await page.getByRole("button", { name: "登録する" }).click();
 
     await expect(page.getByText(/パスワードをもう少し長くしてください（\d+文字以上）。/)).toBeVisible();

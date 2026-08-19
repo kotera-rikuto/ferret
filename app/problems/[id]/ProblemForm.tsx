@@ -142,41 +142,54 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
          *
          * 読み上げの順が変わる点は、回答欄の aria-describedby で補っている（上の textarea）。
          *
-         * 狭い画面では横に並べる幅が無いので縦に積む。**積んでも順序は変えない** ──
+         * **幅は問題画面の `main` と同じ形にしてある**（`page.tsx` の 1088px の注）。
+         * **右端のあき（メモ欄と同じ幅の空き箱）はここの見た目のためにある** ──
+         * 入れないと、横並びのときに送信ボタンだけがメモ欄の下へ潜り込み、
+         * 回答欄の右端と揃わなくなる。
+         *
+         * 狭い画面では横に並べる幅が無いので縦に積む（E8）。**積んでも順序は変えない** ──
          * order は縦並びでも効くので、目に見える並びは「注記 → ボタン」のまま保たれる。
          */}
-        <div className="mx-auto flex max-w-3xl flex-col items-stretch gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:px-6 lg:py-4">
-          <button
-            onClick={handleSubmit}
-            disabled={tooShort || tooLong || loading}
-            className="order-2 w-full whitespace-nowrap rounded-2xl border-b-5 border-brand-deep bg-brand px-12 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2 disabled:cursor-not-allowed disabled:border-locked-edge disabled:bg-locked disabled:text-locked-ink disabled:active:translate-y-0 disabled:active:border-b-5 lg:w-auto"
-          >
-            回答する
-          </button>
-          {/*
-           * OpenAI 送信の注記は常時表示（仕様書 §9.5 の法務要件）。
-           *
-           * 送信の根拠と範囲はプライバシーポリシー第3条に書いてある。
-           * 別タブで開くのは、回答を書いている途中に画面を差し替えないため
-           * （下書きは localStorage に残るが、書きかけの人を動かさないほうがよい）。
-           */}
-          <p
-            id={noticeId}
-            className="order-1 flex items-center gap-2 text-[11px] font-bold leading-relaxed text-muted"
-          >
-            <IconInfo size={15} className="shrink-0" />
-            <span>
-              回答は採点のため OpenAI に送信されます。個人情報やひみつのコードは書かないでください。
-              <Link
-                href="/privacy"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-brand-deep underline ml-1 whitespace-nowrap"
-              >
-                くわしく
-              </Link>
-            </span>
-          </p>
+        <div className="mx-auto flex max-w-3xl items-center lg:max-w-[1088px] lg:gap-8 lg:px-6 lg:py-4">
+          <div className="flex min-w-0 flex-1 flex-col items-stretch gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+            <button
+              onClick={handleSubmit}
+              disabled={tooShort || tooLong || loading}
+              className="order-2 w-full whitespace-nowrap rounded-2xl border-b-5 border-brand-deep bg-brand px-12 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2 disabled:cursor-not-allowed disabled:border-locked-edge disabled:bg-locked disabled:text-locked-ink disabled:active:translate-y-0 disabled:active:border-b-5 lg:w-auto"
+            >
+              回答する
+            </button>
+            {/*
+             * OpenAI 送信の注記は常時表示（仕様書 §9.5 の法務要件）。
+             *
+             * 送信の根拠と範囲はプライバシーポリシー第3条に書いてある。
+             * 別タブで開くのは、回答を書いている途中に画面を差し替えないため
+             * （下書きは localStorage に残るが、書きかけの人を動かさないほうがよい）。
+             */}
+            <p
+              id={noticeId}
+              className="order-1 flex items-center gap-2 text-[11px] font-bold leading-relaxed text-muted"
+            >
+              <IconInfo size={15} className="shrink-0" />
+              <span>
+                回答は採点のため OpenAI に送信されます。個人情報やひみつのコードは書かないでください。
+                <Link
+                  href="/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-brand-deep underline ml-1 whitespace-nowrap"
+                >
+                  くわしく
+                </Link>
+              </span>
+            </p>
+          </div>
+
+          {/* メモ欄と同じ幅の空き。上の注のとおり、見た目を揃えるためだけの箱 */}
+          <div
+            aria-hidden="true"
+            className="hidden w-72 shrink-0 lg:block"
+          />
         </div>
       </footer>
 

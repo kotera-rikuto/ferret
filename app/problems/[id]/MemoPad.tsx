@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
-import { IconPencil } from "@/components/ui/icons";
+import { useId, useState, useSyncExternalStore } from "react";
+import { IconChevronDown, IconPencil } from "@/components/ui/icons";
 
 /**
  * 問題を読みながら書き留めるメモ欄。
@@ -33,6 +33,30 @@ export const MEMO_MAX_CHARS = 2000;
 /** 残り文字数を出し始める割合。常時出すと、採点される欄のように見えるため */
 const COUNTER_FROM = 0.8;
 
+/**
+ * 読む列の横にメモを並べる幅（オーナー判断 2026-08-19）。
+ *
+ * **横に並べたメモは画面に貼り付く**（`lg:sticky`）。狙いは
+ * 「コードを読みながら書ける」と「回答を書くときに参照できる」を同時に満たすこと ──
+ * 縦に積むとどちらか一方しか満たせず、もう一方はスクロールが要る。
+ *
+ * 境目は **`lg`（1024px）＝アプリ共通のデスクトップの線**。この画面だけ独自の値を
+ * 持たせない（他の画面も lg 未満で簡易ヘッダーに切り替わる）。**スマホは折りたたみ。**
+ * 1024〜1088px の間は読む列が 720 から少し縮むが、コードは枠の中で横スクロールする。
+ *
+ * ⚠️ **この文字列は Tailwind の `lg:` と同じ幅を指していないといけない。**
+ * `rem` で書いてあるのはそのため（Tailwind は `64rem` で出力する）。
+ * ずれると「横に並んでいるのに開閉ボタンも出る」状態になる。
+ * 対になっているのは `page.tsx` と `ProblemForm.tsx` の `lg:`。
+ */
+const SIDE_BY_SIDE = "(min-width: 64rem)";
+
+function subscribeSideBySide(onChange: () => void) {
+  const query = window.matchMedia(SIDE_BY_SIDE);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
 /** localStorage を初回描画で読むための購読なしストア。サーバー描画時は null */
 const subscribeNothing = () => () => {};
 
@@ -40,6 +64,7 @@ export function MemoPad({ problemId }: { problemId: number }) {
   // 回答の下書き（ferret:draft:{id}）とは別の名前にする。
   // 混ざると、メモを開いたら回答が出てくる（またはその逆）ことになる
   const memoKey = `ferret:memo:${problemId}`;
+  const bodyId = useId();
 
   // 復元のしかたは ProblemForm の下書きと同じ。
   // effect での setState は lint（react-hooks/set-state-in-effect）で禁止なので、
@@ -49,11 +74,26 @@ export function MemoPad({ problemId }: { problemId: number }) {
     () => localStorage.getItem(memoKey),
     () => null,
   );
+
+  // 横に並べられる幅か。**サーバー側では画面幅が分からない**ので、
+  // 狭いほう（折りたたみ）を既定にして、広い画面では描画後に開く
+  const sideBySide = useSyncExternalStore(
+    subscribeSideBySide,
+    () => window.matchMedia(SIDE_BY_SIDE).matches,
+    () => false,
+  );
+
   const [edited, setEdited] = useState<string | null>(null);
+  const [manuallyOpen, setManuallyOpen] = useState<boolean | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
 
   const memo = edited ?? storedMemo ?? "";
   const restored = edited === null && Boolean(storedMemo);
+
+  // 横に並んでいるときは畳む意味がないので常に開く。
+  // 縦のときは、**すでに書いたものがあれば開いた状態で出す** ──
+  // 閉じたままだと、前回のメモが画面のどこにも見えないまま問題を解くことになる
+  const open = sideBySide || (manuallyOpen ?? Boolean(storedMemo));
 
   function handleChange(value: string) {
     // 保存に失敗しても入力は画面に残す。先に state を更新しておくことで、
@@ -72,44 +112,70 @@ export function MemoPad({ problemId }: { problemId: number }) {
 
   const length = memo.length;
 
+  // 見出しの中身は開閉ボタンと固定見出しで共通。
+  // 別々に書くと、片方だけ文言が変わって「採点には送りません」が消える
+  const label = (
+    <>
+      <IconPencil size={17} className="text-brand-deep" />
+      メモ
+      {/* 採点されない欄であることを、書き始める前に見える場所に置く。
+          置かないと回答欄と取り違えて、書いたのに送られない事故になる */}
+      <span className="text-[11px] font-bold text-muted">
+        （採点には送りません）
+      </span>
+    </>
+  );
+
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border-2 border-line bg-panel px-5 py-4">
-      <div className="flex items-center gap-2 text-sm font-extrabold">
-        <IconPencil size={17} className="text-brand-deep" />
-        メモ
-        {/* 採点されない欄であることを、書き始める前に見える場所に置く。
-            置かないと回答欄と取り違えて、書いたのに送られない事故になる */}
-        <span className="text-[11px] font-bold text-muted">
-          （採点には送りません）
-        </span>
-      </div>
+    <div className="flex flex-col gap-2 rounded-2xl border-2 border-line bg-panel px-5 py-4 lg:sticky lg:top-24 lg:w-72 lg:shrink-0">
+      {sideBySide ? (
+        <p className="flex items-center gap-2 text-sm font-extrabold">{label}</p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setManuallyOpen(!open)}
+          aria-expanded={open}
+          aria-controls={bodyId}
+          className="flex items-center gap-2 text-sm font-extrabold"
+        >
+          {label}
+          <IconChevronDown
+            size={16}
+            className={`ml-auto transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+      )}
 
-      <textarea
-        value={memo}
-        onChange={(e) => handleChange(e.target.value)}
-        maxLength={MEMO_MAX_CHARS}
-        placeholder="変数の値を追う、気になった行を控える、回答の下書きにする..."
-        rows={4}
-        aria-label="メモ（採点には送りません）"
-        // 回答欄と見た目を変えてある。同じ白い枠を2つ並べると、
-        // どちらに書けば採点されるのかが見て分からない
-        className="resize-y rounded-xl bg-bg-deep px-4 py-3 text-sm leading-loose outline-none focus:ring-2 focus:ring-brand placeholder:text-locked-ink"
-      />
+      {/* 閉じているときも要素は残す（class で隠す）。
+          外してしまうと aria-controls の指す先が消え、書きかけの入力も失われる */}
+      <div id={bodyId} className={open ? "flex flex-col gap-2" : "hidden"}>
+        <textarea
+          value={memo}
+          onChange={(e) => handleChange(e.target.value)}
+          maxLength={MEMO_MAX_CHARS}
+          placeholder="変数の値を追う、気になった行を控える、回答の下書きにする..."
+          rows={4}
+          aria-label="メモ（採点には送りません）"
+          // 回答欄と見た目を変えてある。同じ白い枠を2つ並べると、
+          // どちらに書けば採点されるのかが見て分からない
+          className="resize-y rounded-xl bg-bg-deep px-4 py-3 text-sm leading-loose outline-none focus:ring-2 focus:ring-brand placeholder:text-locked-ink lg:h-64"
+        />
 
-      <div className="flex items-center justify-between text-xs font-bold text-muted">
-        <span>
-          {saveFailed
-            ? "この端末には保存できませんでした。書いた内容は画面を閉じるまで残ります。"
-            : restored
-              ? "前回のメモを表示しています"
-              : " "}
-        </span>
-        {/* 上限に近づいたときだけ出す */}
-        {length >= MEMO_MAX_CHARS * COUNTER_FROM && (
-          <span className="shrink-0">
-            {length} / {MEMO_MAX_CHARS}
+        <div className="flex items-center justify-between text-xs font-bold text-muted">
+          <span>
+            {saveFailed
+              ? "この端末には保存できませんでした。書いた内容は画面を閉じるまで残ります。"
+              : restored
+                ? "前回のメモを表示しています"
+                : " "}
           </span>
-        )}
+          {/* 上限に近づいたときだけ出す */}
+          {length >= MEMO_MAX_CHARS * COUNTER_FROM && (
+            <span className="shrink-0">
+              {length} / {MEMO_MAX_CHARS}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

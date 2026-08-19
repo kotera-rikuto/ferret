@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/legal/LegalPage";
-import { CONTACT_EMAIL, OPERATOR_NAME, PROCESSORS } from "@/lib/legal";
+import {
+  CONTACT_EMAIL,
+  OPERATOR_DISCLOSURE,
+  OPERATOR_NAME,
+  PROCESSORS,
+} from "@/lib/legal";
 
 /**
  * プライバシーポリシー。
@@ -27,7 +32,10 @@ export default function PrivacyPage() {
   return (
     <LegalPage
       title="プライバシーポリシー"
-      lead={`${OPERATOR_NAME}（以下「運営者」）は、コードリーディング訓練サービス「Ferret」（以下「本サービス」）において取得する情報を、次のとおり取り扱います。`}
+      // 運営者を屋号で書くと「Ferret は…サービス「Ferret」において」と同じ名前が
+      // 2回続くので、冒頭では名前を出さずに「本サービスの運営者」と定義している。
+      // 名前そのものは第12条と欄外（LegalPage のフッター）に出る
+      lead="コードリーディング訓練サービス「Ferret」（以下「本サービス」）の運営者（以下「運営者」）は、本サービスにおいて取得する情報を、次のとおり取り扱います。"
       other={{ href: "/terms", label: "利用規約を読む →" }}
     >
       <section>
@@ -224,6 +232,9 @@ export default function PrivacyPage() {
             </dd>
           </div>
         </dl>
+        {/* 屋号での表記と対になる一文（lib/legal.ts の注）。
+            消すと、氏名・住所を知り得る状態に置いていないことになる */}
+        <p>{OPERATOR_DISCLOSURE}</p>
       </section>
     </LegalPage>
   );

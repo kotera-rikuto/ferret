@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/legal/LegalPage";
-import { CONTACT_EMAIL, OPERATOR_NAME, PROCESSORS } from "@/lib/legal";
+import { CONTACT_EMAIL, OPERATOR_DISCLOSURE, PROCESSORS } from "@/lib/legal";
 
 /**
  * 利用規約。
@@ -26,7 +26,10 @@ export default function TermsPage() {
   return (
     <LegalPage
       title="利用規約"
-      lead={`この利用規約（以下「本規約」）は、${OPERATOR_NAME}（以下「運営者」）が提供するコードリーディング訓練サービス「Ferret」（以下「本サービス」）の利用条件を定めるものです。本サービスを利用する方（以下「利用者」）は、本規約に同意したうえでご利用ください。`}
+      // 運営者を屋号で書くと「Ferret が提供するサービス「Ferret」」と同じ名前が
+      // 2回続くので、冒頭では名前を出さずに「本サービスの運営者」と定義している。
+      // 名前そのものは欄外（LegalPage のフッター）に出る
+      lead="この利用規約（以下「本規約」）は、コードリーディング訓練サービス「Ferret」（以下「本サービス」）の運営者（以下「運営者」）が定める、本サービスの利用条件です。本サービスを利用する方（以下「利用者」）は、本規約に同意したうえでご利用ください。"
       other={{ href: "/privacy", label: "プライバシーポリシーを読む →" }}
     >
       <section>
@@ -246,6 +249,9 @@ export default function TermsPage() {
           <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>{" "}
           までご連絡ください。運営者から利用者への連絡は、登録されたメールアドレスへの送信または画面上の掲示によって行います。
         </p>
+        {/* 屋号での表記と対になる一文（lib/legal.ts の注）。
+            消すと、氏名・住所を知り得る状態に置いていないことになる */}
+        <p>{OPERATOR_DISCLOSURE}</p>
       </section>
 
       <section>
