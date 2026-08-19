@@ -25,7 +25,15 @@ export default function Home() {
           <p className="text-sm font-bold text-muted leading-loose">
             コードを読んで、日本語で説明する。
             <br />
-            AI がフィードバックを返す、コードリーディングの訓練所。
+            AI がフィードバックを返す、
+            <br />
+            {/* 折り返す位置を語の切れ目に固定する。
+                日本語はどこでも改行できるので、放っておくと画面幅しだいで
+                「学習サイト。」だけが次の行に落ちる。塊にしておけば、
+                狭い画面では「コードリーディング特化 / プログラミング学習サイト。」で折れる。
+                改行を跨いだ JSX の空白は消えるので、2つの間に隙間は出ない */}
+            <span className="inline-block">コードリーディング特化</span>
+            <span className="inline-block">プログラミング学習サイト。</span>
           </p>
           <div className="flex flex-col gap-3 mt-2 w-full max-w-xs">
             <Link

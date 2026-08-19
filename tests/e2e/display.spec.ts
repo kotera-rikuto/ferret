@@ -15,7 +15,8 @@ import {
   statChip,
   ANSWER,
 } from "./support/fixtures";
-import { OPERATOR_NAME } from "../../lib/legal";
+import type { Page } from "@playwright/test";
+import { OPERATOR_DISCLOSURE, OPERATOR_NAME } from "../../lib/legal";
 
 /** lib/ai/scorer.ts の NG_WORDS のうち、画面に出てはいけないもの */
 const NG_WORDS = [
@@ -68,7 +69,7 @@ test.describe("§6 表示", () => {
     await authedPage.goto(`/problems/${problems[0].id}`);
     await expect(authedPage.locator("pre")).toHaveCount(1);
     await expect(authedPage.getByText("実行結果")).toHaveCount(0);
-    await expect(authedPage.getByText("わからない言葉があるとき")).toHaveCount(0);
+    await expect(authedPage.getByText("ヒント")).toHaveCount(0);
 
     // 2問目: どちらも入っている。1問目をクリアして解放する
     await markCleared(userId, problems[0].id, 100);
@@ -82,7 +83,7 @@ test.describe("§6 表示", () => {
     // 前提知識は閉じた状態で置かれ、押すと開く（JS を使わない details）
     const body = authedPage.getByText("配列の末尾に要素を足すメソッド");
     await expect(body).toBeHidden();
-    await authedPage.getByText("わからない言葉があるとき").click();
+    await authedPage.getByText("ヒント").click();
     await expect(body).toBeVisible();
   });
 
@@ -216,8 +217,12 @@ test.describe("§6 法務文書", () => {
       // ログイン画面へ飛ばされていないこと（proxy の matcher に入れると起きる）
       await expect(page).toHaveURL(new RegExp(`${path}$`));
       await expect(page.getByRole("heading", { name: heading })).toBeVisible();
-      // 運営者の表記は、文書として成立するための必須項目（lib/legal.ts）
+      // 運営者の表記は、文書として成立するための必須項目（lib/legal.ts）。
+      // **屋号はサービス名と同じ文字列**で画面のあちこちに出るため、
+      // 表記そのものより「氏名・住所を請求で開示する」一文の有無を見る。
+      // この一文が消えると、屋号だけが残って法32条の求める状態から外れる
       await expect(page.getByText(OPERATOR_NAME).first()).toBeVisible();
+      await expect(page.getByText(OPERATOR_DISCLOSURE)).toBeVisible();
     });
   }
 
@@ -235,9 +240,25 @@ test.describe("§6 法務文書", () => {
     }
   });
 
-  test("E-459 新規登録画面に同意の一文がある", async ({ page }) => {
+  /**
+   * 同意はチェックで取る（2026-08-19 にみなし同意から変更）。
+   *
+   * **見るのは文面ではなくゲートのほう。** 文言だけを見ていると、
+   * チェック欄を残したまま `disabled` を外す変更が素通りする。
+   * 素通りしても画面は正常に見え、**同意していない人が登録できる**。
+   */
+  test("E-459 同意にチェックを入れるまで登録できない", async ({ page }) => {
     await page.goto("/register");
-    await expect(page.getByText("同意したものとみなします")).toBeVisible();
+    const submit = page.getByRole("button", { name: "登録する" });
+    const agree = page.getByLabel("利用規約とプライバシーポリシーに同意する");
+
+    await expect(submit).toBeDisabled();
+    await agree.check();
+    await expect(submit).toBeEnabled();
+
+    // 2つの文書へは、同意する前に読める
+    await expect(page.getByRole("link", { name: "利用規約" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "プライバシーポリシー" })).toBeVisible();
   });
 
   /**
@@ -283,6 +304,20 @@ test.describe("§6 メモ欄", () => {
   const MEMO_LABEL = "メモ（採点には送りません）";
   const MEMO_TEXT = "目印QX7 ─ ここで total の値を追う";
 
+  /**
+   * メモ欄を開く。
+   *
+   * **横に並べられる幅（1200px 以上）では初めから開いている**ので、そのときは何もしない。
+   * 狭い画面では折りたたまれており、開かないと入力できない（MemoPad.tsx の SIDE_BY_SIDE）。
+   * 開閉ボタンが出ているかどうかで判断するので、**この関数は
+   * 「広い画面では折りたたみボタンが出ない」ことの検査も兼ねている** ──
+   * 両方で出るようになったら、広いほうでボタンを押して閉じてしまい、続く fill が落ちる。
+   */
+  async function openMemo(page: Page) {
+    const toggle = page.getByRole("button", { name: /メモ/ });
+    if (await toggle.isVisible()) await toggle.click();
+  }
+
   test("E-461 メモは開き直しても残り、回答の下書きと混ざらない", async ({
     authedPage,
     problems,
@@ -290,6 +325,7 @@ test.describe("§6 メモ欄", () => {
     const page = authedPage;
     await page.goto(`/problems/${problems[0].id}`);
 
+    await openMemo(page);
     await page.getByLabel(MEMO_LABEL).fill(MEMO_TEXT);
     await page.getByPlaceholder("回答を入力してください...").fill(ANSWER);
 
@@ -310,6 +346,7 @@ test.describe("§6 メモ欄", () => {
     const page = authedPage;
     await page.goto(`/problems/${problems[0].id}`);
 
+    await openMemo(page);
     await page.getByLabel(MEMO_LABEL).fill(MEMO_TEXT);
     await page.getByPlaceholder("回答を入力してください...").fill(ANSWER);
     await page.getByRole("button", { name: "回答する" }).click();

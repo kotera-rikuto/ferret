@@ -13,9 +13,14 @@ export default function RegisterPage() {
   const [error, setError] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  // 法務文書への同意。チェックが入るまで登録の経路を開かない
+  const [agreed, setAgreed] = useState(false);
 
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
+    // ボタンは disabled にしてあるが、ここでも見る。
+    // form は Enter でも送信できるので、片方だけだと素通りする経路が残る
+    if (!agreed) return;
     const supabase = createClient();
     setLoading(true);
     setError("");
@@ -33,6 +38,16 @@ export default function RegisterPage() {
   }
 
   async function handleOAuth(provider: "google" | "github") {
+    // **OAuth もここで止める。** ボタンはチェック欄より上にあるので、
+    // 見ただけでは同意が要ることが分からない。止めないと、
+    // OAuth を有効にした日から「同意を通らない登録経路」が1本できる
+    // （C2 の申し送り「OAuth を有効化したときに同意文の位置を見直す」はこれで済んだ）
+    if (!agreed) {
+      setError(
+        "利用規約とプライバシーポリシーをお読みのうえ、同意にチェックを入れてください。",
+      );
+      return;
+    }
     if (!OAUTH_ENABLED[provider]) {
       setError("この方法はまだ準備中です。メールアドレスでお進みください。");
       return;
@@ -145,29 +160,62 @@ export default function RegisterPage() {
             />
           </label>
           {error && <p className="text-danger text-sm">{error}</p>}
+          {/*
+           * 同意はチェックで取る（オーナー判断 2026-08-19。それまでは
+           * 「登録すると同意したものとみなします」の一文だった）。
+           *
+           * **ボタンより前に置く。** 押す前に読める位置に、押す操作の意味が
+           * 書かれている必要がある（フッターの共通リンクではこの役を兼ねられない）。
+           *
+           * **文を `<label>` で包んでいないのは、中にリンクがあるため。**
+           * label の中のリンクを押すと、リンクを開くと同時にチェックも切り替わる。
+           * 読むつもりで押した人が、気づかないうちに同意した状態になる。
+           * 代わりに `aria-label` で名前を与えてある。
+           *
+           * リンクを別タブで開くのは、**書きかけのメールアドレスとパスワードを
+           * 消さないため**（この画面には下書きの保存が無い）。
+           */}
+          <div className="flex items-start gap-2.5">
+            <input
+              type="checkbox"
+              checked={agreed}
+              onChange={(e) => {
+                setAgreed(e.target.checked);
+                // 「チェックを入れてください」と出したまま、
+                // 入れた後も残り続けないようにする
+                if (e.target.checked) setError("");
+              }}
+              aria-label="利用規約とプライバシーポリシーに同意する"
+              className="mt-0.5 size-4 shrink-0 accent-brand"
+            />
+            <p className="text-[11px] font-bold leading-relaxed text-muted">
+              <Link
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-deep underline"
+              >
+                利用規約
+              </Link>
+              と
+              <Link
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-brand-deep underline"
+              >
+                プライバシーポリシー
+              </Link>
+              に同意します
+            </p>
+          </div>
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || !agreed}
             className="rounded-2xl bg-brand border-b-5 border-brand-deep text-white font-extrabold tracking-wide py-3.5 active:translate-y-[3px] active:border-b-2 disabled:bg-locked disabled:border-locked-edge disabled:text-locked-ink"
           >
             {loading ? "送信中..." : "登録する"}
           </button>
-          {/*
-           * 同意の一文はボタンの直下に置く。
-           * **押す前に読める位置に、押す操作の意味を書く**必要があるため、
-           * フッターの共通リンク（LegalFooter）ではこの役を兼ねられない。
-           */}
-          <p className="text-[11px] font-bold leading-relaxed text-muted text-center">
-            登録すると
-            <Link href="/terms" className="text-brand-deep underline mx-0.5">
-              利用規約
-            </Link>
-            と
-            <Link href="/privacy" className="text-brand-deep underline mx-0.5">
-              プライバシーポリシー
-            </Link>
-            に同意したものとみなします。
-          </p>
         </form>
 
         <p className="text-muted text-sm font-bold text-center">
