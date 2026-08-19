@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import { chapterOf } from "@/lib/stages/chapters";
 import {
@@ -37,6 +43,24 @@ export type Stage = {
  */
 const ROW_H = 180;
 
+/**
+ * 狭い画面（lg 未満）の1行ぶんの高さ。
+ *
+ * マップの列は lg 以上で約 664px、lg 未満は画面幅そのまま（375px 端末で 327px）と
+ * **半分以下**になる。横位置は割合なので列が狭まると丸どうしが近づき、
+ * 幅 144px のラベルと、現在地の「スタート」吹き出し（丸の 48px 上）が
+ * **1つ上の行のラベルに 53×36px 重なる**（375px で実測。lg 以上では起きない）。
+ *
+ * 横に逃がす余地が無いので縦に開ける。必要な間隔は
+ * 「1つ上のノードの下端（丸 76 + すきま 8 + ラベル 76 = 160）」を
+ * 「吹き出しの上端（次の行の頭から -8 -48）」が越えないこと、すなわち
+ * `ROW_H - 56 ≥ 160` → **216 以上**。余裕を見て 224 にしてある。
+ */
+const ROW_H_NARROW = 224;
+
+/** 上の `ROW_H_NARROW` の説明と対になる境目。Tailwind の `lg`（1024px）と同じ */
+const NARROW_QUERY = "(max-width: 1023px)";
+
 /** 節の上端から先頭ノードまで。現在地の「スタート」吹き出し（丸の 53px 上）を収める高さ */
 const PAD_TOP = 76;
 
@@ -64,6 +88,26 @@ const NODE_H = 168;
 const XS = [50, 28, 52, 72, 48, 28, 52, 72, 48, 28];
 const xOf = (order: number) => XS[(order - 1) % XS.length];
 
+/**
+ * 狭い画面かどうか。**行の高さが SVG の座標にも入るので CSS では切り替えられない**
+ * （`y1` / `y2` は幾何属性で、メディアクエリの対象にならない）。
+ *
+ * サーバー描画では常に false ＝ lg 以上の値を返す。パソコンでの出力は
+ * この変更の前と1バイトも変わらない。狭い画面では最初の描画のあとに詰め直すが、
+ * 起動時は `scrollToCurrent` が現在地まで飛ぶので、その動きに紛れる。
+ */
+function useNarrow(): boolean {
+  return useSyncExternalStore(
+    (onChange) => {
+      const mql = window.matchMedia(NARROW_QUERY);
+      mql.addEventListener("change", onChange);
+      return () => mql.removeEventListener("change", onChange);
+    },
+    () => window.matchMedia(NARROW_QUERY).matches,
+    () => false,
+  );
+}
+
 type ChapterGroup = {
   no: number | null;
   title: string;
@@ -90,6 +134,7 @@ function groupByChapter(stages: Stage[]): ChapterGroup[] {
 export function StageMap({ stages }: { stages: Stage[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Stage | null>(null);
+  const rowH = useNarrow() ? ROW_H_NARROW : ROW_H;
 
   const groups = groupByChapter(stages);
   // 下から上に登るマップなので、後の章ほど上に描く
@@ -191,7 +236,10 @@ export function StageMap({ stages }: { stages: Stage[] }) {
     sync();
     window.addEventListener("scroll", sync, { passive: true });
     return () => window.removeEventListener("scroll", sync);
-  }, [scrollToCurrent]);
+    // rowH を依存に入れてある。狭い画面では最初の描画が lg 以上の値（サーバーと同じ）で、
+    // その直後に詰め直されて**全ノードの縦位置が動く**。入れておかないと
+    // 着地の計算が動く前の座標で走り、現在地が画面の外に取り残される
+  }, [scrollToCurrent, rowH]);
 
   function handleStart() {
     if (!selected) return;
@@ -222,7 +270,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
           const rows = [...group.stages].sort((a, b) => b.order - a.order);
           // 下端は「最後のノードが収まる位置」で決める。行数 × ROW_H だと
           // ROW_H とノードの高さの差だけ余白が出たり、逆にはみ出したりする
-          const height = (rows.length - 1) * ROW_H + PAD_TOP + NODE_H;
+          const height = (rows.length - 1) * rowH + PAD_TOP + NODE_H;
 
           return (
             <div key={group.no ?? `extra-${gi}`}>
@@ -245,9 +293,9 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                       <line
                         key={s.id}
                         x1={`${xOf(next.order)}%`}
-                        y1={PAD_TOP + (i + 1) * ROW_H}
+                        y1={PAD_TOP + (i + 1) * rowH}
                         x2={`${xOf(s.order)}%`}
-                        y2={PAD_TOP + i * ROW_H + 38}
+                        y2={PAD_TOP + i * rowH + 38}
                         strokeWidth={6}
                         strokeLinecap="round"
                         strokeDasharray={done ? undefined : "1 15"}
@@ -270,7 +318,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                         isOpen ? "z-40" : ""
                       }`}
                       style={{
-                        top: PAD_TOP + i * ROW_H - (isCurrent ? 8 : 0),
+                        top: PAD_TOP + i * rowH - (isCurrent ? 8 : 0),
                         left: `${xOf(s.order)}%`,
                       }}
                     >

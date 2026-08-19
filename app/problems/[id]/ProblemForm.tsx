@@ -117,8 +117,20 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
 
       {error && <p className="text-danger text-sm">{error}</p>}
 
-      {/* 送信は下部固定フッター。スクロール位置に関係なく常に押せる場所に置く */}
-      <footer className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-panel">
+      {/*
+       * 送信は下部固定フッター。スクロール位置に関係なく常に押せる場所に置く。
+       *
+       * **狭い画面では固定しない**（E8・オーナー判断 2026-08-19）。
+       * `position: fixed` の要素は仮想キーボードが出ても画面の下端に貼り付いたままなので、
+       * スマホでは回答を書き始めた瞬間に「回答する」がキーボードの裏へ入る。
+       * ここは**回答欄のすぐ下**に流し、キーボードと一緒にスクロールさせる。
+       * 注記の文言は短くしない（仕様書 §9.5 の法務要件は常時表示を求めており、
+       * 縮めた一文に差し替える判断はこのタスクの範囲外）。
+       *
+       * 固定と非固定で見た目が割れないよう、枠線と背景も同じ境目で切り替える。
+       * 流しているあいだは画面幅いっぱいの帯にする理由が無く、上の入力欄と揃うほうが自然
+       */}
+      <footer className="mt-2 border-t-2 border-line pt-4 lg:fixed lg:inset-x-0 lg:bottom-0 lg:z-30 lg:mt-0 lg:bg-panel lg:pt-0">
         {/*
          * **並び順に意味がある（E-455）。**
          *
@@ -129,12 +141,15 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
          * 見た目の左右は order で保つので、目で見える並びは変わらない。
          *
          * 読み上げの順が変わる点は、回答欄の aria-describedby で補っている（上の textarea）。
+         *
+         * 狭い画面では横に並べる幅が無いので縦に積む。**積んでも順序は変えない** ──
+         * order は縦並びでも効くので、目に見える並びは「注記 → ボタン」のまま保たれる。
          */}
-        <div className="mx-auto flex max-w-3xl items-center justify-between gap-6 px-6 py-4">
+        <div className="mx-auto flex max-w-3xl flex-col items-stretch gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6 lg:px-6 lg:py-4">
           <button
             onClick={handleSubmit}
             disabled={tooShort || tooLong || loading}
-            className="order-2 whitespace-nowrap rounded-2xl border-b-5 border-brand-deep bg-brand px-12 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2 disabled:cursor-not-allowed disabled:border-locked-edge disabled:bg-locked disabled:text-locked-ink disabled:active:translate-y-0 disabled:active:border-b-5"
+            className="order-2 w-full whitespace-nowrap rounded-2xl border-b-5 border-brand-deep bg-brand px-12 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2 disabled:cursor-not-allowed disabled:border-locked-edge disabled:bg-locked disabled:text-locked-ink disabled:active:translate-y-0 disabled:active:border-b-5 lg:w-auto"
           >
             回答する
           </button>

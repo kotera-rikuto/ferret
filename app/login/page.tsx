@@ -89,7 +89,15 @@ export default function LoginPage() {
     // 縦2段（カード + 法務フッター）。1段目が余りを取る grid にしてあるので、
     // フッターを足してもカードは画面の中央に置かれたまま。
     // 「← もどる」は fixed なので段を占めない
-    <div className="min-h-screen grid grid-rows-[1fr_auto] justify-items-center px-6 py-10">
+    // 列を `minmax(0,1fr)` で明示するのは、**幅320px でカードが画面から溢れるため**（E8）。
+    // 暗黙の1列は `auto` ＝ `minmax(min-content, max-content)` で、
+    // **最小値がカードの min-content（実測310px）から下がらない。**
+    // 幅320px では使える幅が 272px しかないので、310px の列がそのまま 38px 溢れていた
+    // （375px 以上では使える幅が min-content を上回るので起きない）。
+    // 新規登録（`register`）が同じ作りで溢れないのは、あちらが flex で組んであるから。
+    // `minmax(0,1fr)` で最小値を 0 にすると列は入れ物に収まり、
+    // `max-w-sm`（384px）に届く幅では従来どおり 384px で中央 ── パソコンでの見た目は変わらない
+    <div className="min-h-screen grid grid-cols-[minmax(0,1fr)] grid-rows-[1fr_auto] justify-items-center px-6 py-10">
       <Link
         href="/"
         className="fixed top-6 left-7 text-sm font-extrabold text-muted hover:text-ink"
