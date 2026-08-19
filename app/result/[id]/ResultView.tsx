@@ -443,7 +443,7 @@ export function ResultView({
               placeholder="理由を入力してください..."
               className="resize-y rounded-xl border-2 border-line bg-panel px-3.5 py-3 text-sm leading-relaxed outline-none focus:border-brand placeholder:text-locked-ink"
             />
-            {reportError && <p className="text-red-600 text-xs">{reportError}</p>}
+            {reportError && <p className="text-danger text-xs">{reportError}</p>}
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-muted">
                 {comment.trim().length < COMMENT_MIN_CHARS

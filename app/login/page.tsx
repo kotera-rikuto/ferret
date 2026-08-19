@@ -156,7 +156,7 @@ export default function LoginPage() {
               className="rounded-xl border-2 border-line bg-panel px-4 py-3 text-sm font-bold outline-none focus:border-brand placeholder:text-locked-ink placeholder:font-medium"
             />
           </label>
-          {shownError && <p className="text-red-600 text-sm">{shownError}</p>}
+          {shownError && <p className="text-danger text-sm">{shownError}</p>}
           <button
             type="submit"
             disabled={loading}

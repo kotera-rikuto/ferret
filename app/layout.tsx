@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { M_PLUS_Rounded_1c, JetBrains_Mono } from "next/font/google";
+import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "@/lib/theme";
+import { ThemeSync } from "@/components/theme/ThemeSync";
 import "./globals.css";
 
 // 丸ゴシックが学習アプリのトーンの土台（design/README.md）。
@@ -28,11 +30,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
+    // data-theme は暗い配色の入口（app/globals.css）。サーバーは既定（明るい）で返し、
+    // 覚えてある人のぶんだけ下の script が最初の描画より前に書き換える。
+    // suppressHydrationWarning が要るのはそのため ── React が組み立て直すときに
+    // 「自分が書いた覚えのない値が入っている」と判断して、せっかく当てた配色を
+    // 巻き戻してしまう（Next.js のドキュメント preventing-flash-before-hydration）
     <html
       lang="ja"
+      data-theme={DEFAULT_THEME}
+      suppressHydrationWarning
       className={`${mplusRounded.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
+      <body className="min-h-full flex flex-col">
+        <ThemeSync />
+        {children}
+      </body>
     </html>
   );
 }

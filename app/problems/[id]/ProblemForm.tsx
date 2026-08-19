@@ -103,12 +103,12 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
                 ? `${length - ANSWER_MAX_CHARS} 文字オーバー`
                 : " "}
         </span>
-        <span className={tooLong ? "text-red-600" : "text-muted"}>
+        <span className={tooLong ? "text-danger" : "text-muted"}>
           {length} / {ANSWER_MAX_CHARS}
         </span>
       </div>
 
-      {error && <p className="text-red-600 text-sm">{error}</p>}
+      {error && <p className="text-danger text-sm">{error}</p>}
 
       {/* 送信は下部固定フッター。スクロール位置に関係なく常に押せる場所に置く */}
       <footer className="fixed inset-x-0 bottom-0 z-30 border-t-2 border-line bg-panel">

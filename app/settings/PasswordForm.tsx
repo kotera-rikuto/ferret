@@ -121,11 +121,11 @@ export function PasswordForm({ email }: { email: string }) {
 
         {/* 入力中の案内。押せない理由が分かるように、ボタンの無効化とセットで出す */}
         {mismatch && (
-          <p className="text-xs font-bold text-red-600">
+          <p className="text-xs font-bold text-danger">
             2つのあたらしいパスワードがそろっていません。
           </p>
         )}
-        {error && <p className="text-sm text-red-600">{error}</p>}
+        {error && <p className="text-sm text-danger">{error}</p>}
         {done && (
           <p className="text-sm font-bold text-brand-deep">パスワードを変更しました。</p>
         )}
