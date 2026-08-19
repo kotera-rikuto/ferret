@@ -90,6 +90,22 @@ const BANNER_CLEARANCE = 8;
  */
 const NODE_H = 168;
 
+/**
+ * 章の区切り（「ここから 第N章」）が縦に占める高さ。
+ * 内訳は 上の余白 36（`my-9`）+ 帯 20（`h-5`）+ 下の余白 36（`my-9`）。
+ *
+ * **章を跨ぐ道の長さがこの値で決まる。** 道は節（`<section>`）の中の SVG に描くので、
+ * 節の外＝区切りの帯を跨ぐ長さを、こちら側が数字で知っている必要がある。
+ *
+ * 帯の高さを `h-5` で固定しているのは、文字の行の高さ（13px × 1.5 = 19.5）に
+ * 頼ると**フォントや文字サイズを変えた日に道の端が丸から静かに外れる**ため。
+ * **下の markup のクラスと対応する値なので、片方だけ変えないこと**
+ * （`tests/unit/stage-map.test.ts` の U-820 が対応を見ている）。
+ */
+const CHAPTER_GAP_MARGIN = 36;
+const CHAPTER_LABEL_H = 20;
+const CHAPTER_GAP = CHAPTER_GAP_MARGIN * 2 + CHAPTER_LABEL_H;
+
 /** 蛇行の横位置（%）。order で引くので、途中に問題を差し込んでも並びが崩れない */
 const XS = [50, 28, 52, 72, 48, 28, 52, 72, 48, 28];
 const xOf = (order: number) => XS[(order - 1) % XS.length];
@@ -280,6 +296,15 @@ export function StageMap({ stages }: { stages: Stage[] }) {
           // ROW_H とノードの高さの差だけ余白が出たり、逆にはみ出したりする
           const height = (rows.length - 1) * rowH + PAD_TOP + NODE_H;
 
+          // 章を跨ぐ道の相手。1つ下の節（＝手前の章）の**最上段**のノード。
+          // group.stages は order 昇順なので、末尾がその章でいちばん先のステージ＝最上段。
+          // この節の最下段（rows の末尾）と order が隣り合うので、道が繋がる
+          const nextGroup = displayGroups[gi + 1];
+          const below = nextGroup
+            ? nextGroup.stages[nextGroup.stages.length - 1]
+            : null;
+          const bottom = rows[rows.length - 1];
+
           return (
             <div key={group.no ?? `extra-${gi}`}>
               <section
@@ -311,6 +336,34 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                       />
                     );
                   })}
+
+                  {/*
+                   * 章を跨ぐ1本。**これが無いと、区切りの上下で道が途切れる**
+                   * （実測で 335px、丸2つぶん以上なにも無い区間ができていた。2026-08-19）。
+                   * 節ごとに線を引く作りなので、節と節の間だけ誰も描いていなかった。
+                   *
+                   * **上の節に描く。** 節は position:relative なので、後に来る節のほうが
+                   * 上に描かれる ── 下の節から引くと区切りの帯や見出しの上を跨いでしまう。
+                   * 上から引けば帯の下を通る。SVG は overflow-visible なので節の外へ出せる。
+                   */}
+                  {below && (
+                    <line
+                      x1={`${xOf(below.order)}%`}
+                      y1={height + CHAPTER_GAP + PAD_TOP}
+                      x2={`${xOf(bottom.order)}%`}
+                      y2={PAD_TOP + (rows.length - 1) * rowH + 38}
+                      strokeWidth={6}
+                      strokeLinecap="round"
+                      strokeDasharray={
+                        below.status === "cleared" ? undefined : "1 15"
+                      }
+                      className={
+                        below.status === "cleared"
+                          ? "stroke-path-done"
+                          : "stroke-path-todo"
+                      }
+                    />
+                  )}
                 </svg>
 
                 {rows.map((s, i) => {
@@ -416,9 +469,20 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                 })}
               </section>
 
+              {/*
+               * 章の区切り。**高さは CHAPTER_GAP の内訳と揃えてある**
+               * （`my-9` = 36 × 2、`h-5` = 20）。章を跨ぐ道の長さがこの値で決まる。
+               *
+               * `relative z-10` は、章を跨ぐ道より上に描くため。見出しに
+               * 地の色（`bg-bg`）を敷いてあるので、道が文字を横切っても読める。
+               */}
               {gi < displayGroups.length - 1 && (
-                <div className="mx-10 my-9 flex items-center gap-3.5 text-[13px] font-extrabold tracking-widest text-muted before:h-0.5 before:flex-1 before:rounded-full before:bg-line after:h-0.5 after:flex-1 after:rounded-full after:bg-line">
-                  {group.no !== null ? `ここから 第${group.no}章` : `ここから ${group.title}`}
+                <div className="relative z-10 mx-10 my-9 flex h-5 items-center gap-3.5 text-[13px] font-extrabold tracking-widest text-muted before:h-0.5 before:flex-1 before:rounded-full before:bg-line after:h-0.5 after:flex-1 after:rounded-full after:bg-line">
+                  <span className="bg-bg px-2">
+                    {group.no !== null
+                      ? `ここから 第${group.no}章`
+                      : `ここから ${group.title}`}
+                  </span>
                 </div>
               )}
             </div>
