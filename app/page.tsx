@@ -338,20 +338,12 @@ export default async function Home() {
                 </SecondaryCta>
               </div>
 
-              <ul className="flex flex-col gap-2 text-[13px] font-bold text-ink sm:flex-row sm:flex-wrap sm:gap-x-5">
-                {[
-                  // パソコン幅の左カラムは約528px。3つ合わせてここに収まる長さにしてある
-                  // （長いと2行に折れて、最後の1つだけが下に取り残される）
-                  "全機能を無料で使えます",
-                  "カードの登録なし",
-                  "JavaScript / TypeScript",
-                ].map((t) => (
-                  <li key={t} className="flex items-center gap-1.5">
-                    <IconCheck size={13} className="text-brand" />
-                    {t}
-                  </li>
-                ))}
-              </ul>
+              {/*
+                ボタンの下に「無料で使えます / カード登録なし / JavaScript・TypeScript」の
+                3点を並べていたが、**オーナー判断で外した**（2026-08-22）。
+                同じことは §06「先に伝えておくこと」とよくある質問に書いてあり、
+                主役では惹句とボタンに視線を集めたいため。
+              */}
             </div>
 
             {/* 主役の右。**本物の問題画面と同じ部品**でコードと設問を出す */}
