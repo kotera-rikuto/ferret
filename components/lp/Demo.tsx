@@ -83,7 +83,7 @@ export async function Demo({
           </Card>
         </Step>
 
-        <Step no={2} label="日本語で説明する">
+        <Step no={2} label="日本語で書く">
           <Card className="flex flex-col gap-2 p-5 sm:p-6">
             {/* 本物の回答欄と同じ枠・同じ行間にしてある（app/problems/[id]/ProblemForm.tsx） */}
             <div className="rounded-2xl border-2 border-line bg-bg-deep px-4.5 py-4 text-[15px] leading-loose font-medium">
@@ -96,7 +96,7 @@ export async function Demo({
         </Step>
       </div>
 
-      <Step no={3} label="読み取れたところが返ってくる">
+      <Step no={3} label="採点が返る">
         <Card className="flex flex-col gap-5 p-5 sm:p-6">
           <div className="flex gap-2.5 sm:gap-3.5">
             {score.map((s) => (

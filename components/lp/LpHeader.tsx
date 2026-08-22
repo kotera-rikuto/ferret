@@ -26,8 +26,8 @@ export function LpHeader() {
 
         <nav className="hidden items-center gap-7 text-[13px] font-bold text-ink md:flex">
           {[
-            { href: "#flow", label: "1問の流れ" },
-            { href: "#types", label: "6つの読み方" },
+            { href: "#flow", label: "使い方" },
+            { href: "#types", label: "問題" },
             { href: "#faq", label: "よくある質問" },
           ].map((n) => (
             <a
