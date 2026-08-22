@@ -36,6 +36,14 @@ export const DELETE_CONFIRM_WORD = "削除";
 export const DELETE_TARGETS = [
   { table: "problem_feedback", column: "user_id" },
   { table: "user_attempts", column: "user_id" },
+  // 採点回数の日次カウンタ（D1）。**ここに書かないと退会後も user_id が残る。**
+  // このテーブルは users への外部キーを持たないので cascade で消えない
+  // （全体の合計を同じ表の1行として持つため、users に無い id を入れる必要がある）。
+  //
+  // 消すことで「退会 → 再登録」でその日の枠が戻るが、
+  // 新しいメールアドレスで登録し直すのと手間が変わらないので抜け道は増えない。
+  // どの数を何アカウント分まで許すかは全体の上限（lib/ai/quota.ts）が握っている
+  { table: "ai_usage_daily", column: "user_id" },
   { table: "subscriptions", column: "user_id" },
   { table: "users", column: "id" },
 ] as const;

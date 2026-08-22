@@ -301,6 +301,39 @@ async function callGrader(
   };
 }
 
+/**
+ * 例外を ScoringUnavailableError に揃える。
+ *
+ * **`api_unavailable` と `api_error` を分けているのは採点回数の返却のため**（lib/ai/quota.ts）。
+ * OpenAI が 429 / 5xx を返したときはトークンが1つも課金されていないので、
+ * 確保した1回ぶんを返してよい。それ以外（タイムアウト・ネットワーク断）は
+ * 課金されたかどうかを判定できないので、返さない側に置く。
+ *
+ * 応答が返ってきた失敗（invalid_json / schema_mismatch など）は
+ * ScoringUnavailableError としてそのまま通す。こちらは課金済みなので返さない。
+ */
+function toScoringError(e: unknown): ScoringUnavailableError {
+  if (e instanceof ScoringUnavailableError) return e;
+  if (e instanceof OpenAI.APIError) {
+    const status = e.status;
+    if (status === 429 || (status !== undefined && status >= 500)) {
+      return new ScoringUnavailableError("api_unavailable", String(status));
+    }
+  }
+  return new ScoringUnavailableError("api_error", String(e));
+}
+
+/**
+ * この失敗では OpenAI にトークンが課金されていない。採点回数を戻してよい。
+ *
+ * **判定をここに置くのは、課金されたかを知っているのが採点側だから。**
+ * 呼び出し側（app/api/score/route.ts）でコード名を直接比べると、
+ * 失敗の種類を増やしたときに片方だけ直り、静かに枠を返す穴になる。
+ */
+export function isUnbilledFailure(e: ScoringUnavailableError): boolean {
+  return e.code === "api_unavailable";
+}
+
 /** 一時的な失敗のみ1回だけ再試行する。判定内容が変わる類の失敗は再試行しない */
 function isRetryable(e: unknown): boolean {
   if (e instanceof ScoringUnavailableError) {
@@ -332,18 +365,12 @@ export async function scoreAnswer(
   try {
     res = await callGrader(answer, problem);
   } catch (e) {
-    if (!isRetryable(e)) {
-      throw e instanceof ScoringUnavailableError
-        ? e
-        : new ScoringUnavailableError("api_error", String(e));
-    }
+    if (!isRetryable(e)) throw toScoringError(e);
     // 同じ seed で1回だけ
     try {
       res = await callGrader(answer, problem);
     } catch (e2) {
-      throw e2 instanceof ScoringUnavailableError
-        ? e2
-        : new ScoringUnavailableError("api_error", String(e2));
+      throw toScoringError(e2);
     }
   }
 

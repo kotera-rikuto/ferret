@@ -17,6 +17,7 @@ import type { DeepScoreOutput } from "@/lib/ai/compose";
 import {
   scoreAnswer,
   ScoringUnavailableError,
+  isUnbilledFailure,
   GRADER_VERSION,
   type ScoringInput,
 } from "@/lib/ai/scorer";
@@ -408,26 +409,40 @@ describe("§5-2 失敗の扱い", () => {
     expect(createMock).toHaveBeenCalledTimes(2);
   });
 
+  // 429 / 5xx は「OpenAI が受け取ったが応答本文を返していない」＝トークン0。
+  // ここだけ api_unavailable にして、採点回数を戻せる失敗として区別する（D1）
   it.each([
     ["500", 500],
     ["503", 503],
     ["429", 429],
-    ["ステータス不明", undefined],
-  ])("U-227/228 APIError（%s）は再試行する", async (_label, status) => {
+  ])("U-227/228 APIError（%s）は再試行し、課金されていない失敗になる", async (_label, status) => {
     createMock.mockRejectedValue(apiError(status));
-    await expectFailure("api_error");
+    const e = await expectFailure("api_unavailable");
+    expect(isUnbilledFailure(e)).toBe(true);
+    expect(createMock).toHaveBeenCalledTimes(2);
+  });
+
+  // ステータスが分からない失敗を課金されていない側に入れないこと。
+  // 入れると「失敗を誘発すれば枠を消費せずに何度でも叩ける」経路になる
+  it("U-234 APIError（ステータス不明）は再試行するが、枠は戻さない", async () => {
+    createMock.mockRejectedValue(apiError(undefined));
+    const e = await expectFailure("api_error");
+    expect(isUnbilledFailure(e)).toBe(false);
     expect(createMock).toHaveBeenCalledTimes(2);
   });
 
   it("U-229 APIError（400）は再試行しない", async () => {
     createMock.mockRejectedValue(apiError(400));
-    await expectFailure("api_error");
+    const e = await expectFailure("api_error");
+    expect(isUnbilledFailure(e)).toBe(false);
     expect(createMock).toHaveBeenCalledTimes(1);
   });
 
   it("U-230 タイムアウト・ネットワークエラーは再試行する", async () => {
     createMock.mockRejectedValue(new Error("ETIMEDOUT"));
-    await expectFailure("api_error");
+    // タイムアウトは課金されたか判定できない。安全側（戻さない）に置く
+    const e = await expectFailure("api_error");
+    expect(isUnbilledFailure(e)).toBe(false);
     expect(createMock).toHaveBeenCalledTimes(2);
   });
 
