@@ -794,13 +794,33 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
       expect(error).not.toBeNull();
     });
 
-    it("I-685 返却しても 0 より下にはならない", async () => {
+    /**
+     * **返却は consume と対称でなければならない。**
+     *
+     * 全体の行だけが減ると、その日に流せる総数が実際の消費より増える
+     * ── 天井が静かに上へずれる。二重返却でも同じ向きに崩れる。
+     * 最初の実装がここで落ちた（本人の行が無くても全体を減らしていた）ので、
+     * 20260822184000_refund_ai_quota_symmetric.sql で直した。
+     */
+    it("I-685 本人が取っていないぶんは返さない（全体だけ減らさない）", async () => {
       await clearUserRows();
       const before = await globalUsed();
       await refund(userA);
       await refund(userA);
-      // 行が無いところへの返却は何もしない。全体の値も動かさない
       expect(await globalUsed()).toBe(before);
+
+      // 1回取って2回返しても、減るのは取った1回ぶんだけ
+      await consume(userA, 5);
+      await refund(userA);
+      await refund(userA);
+      expect(await globalUsed()).toBe(before);
+
+      const { data } = await admin
+        .from("ai_usage_daily")
+        .select("used")
+        .eq("user_id", userA)
+        .maybeSingle();
+      expect(data?.used ?? 0).toBe(0);
     });
 
     it("I-686 anon / ログイン済みからは上限の関数を呼べない", async () => {
