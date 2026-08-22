@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -20,6 +21,19 @@ import { CodePanel } from "@/components/lp/CodePanel";
 import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
 import { IconComment, IconHandover, IconSpark } from "@/components/lp/icons";
+import { publicPageMetadata } from "@/lib/seo/site";
+
+/**
+ * 検索結果に出る唯一の入口。**title は書かない**（`layout.tsx` の既定値をそのまま使う）。
+ *
+ * `path` を渡しているのは canonical のため。本番は `ferretcode.com` の他に
+ * Vercel が配る `*.vercel.app` でも同じ画面が開くので、宣言が無いと
+ * 2つが別ページとして数えられ、評価が割れる。
+ *
+ * ⚠️ 本文の文言を変えたら `lib/seo/site.ts` の `SITE_DESCRIPTION` も直すこと。
+ * 画面とメタ情報が食い違っても**画面上は何も起きない**（気づけるのは検索結果だけ）。
+ */
+export const metadata: Metadata = publicPageMetadata({ path: "/" });
 
 /*
  * ============================================================================

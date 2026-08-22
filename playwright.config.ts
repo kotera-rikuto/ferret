@@ -91,6 +91,13 @@ export default defineConfig({
           ? (process.env.OPENAI_API_KEY ?? "")
           : "sk-e2e-stub-key",
         NEXT_PUBLIC_APP_URL: BASE_URL,
+        // D1 の1日上限を E2E では当てない。
+        // 既定（1人1日20問）だと、採点を伴うテストが1回の実行で超えうる ──
+        // 超えた回は「判定保留」になるので、落ちるのは上限のテストではなく
+        // **採点・リザルト・ふりかえりの全部**になり、原因が分かりにくい。
+        // 上限そのものの検証は単体（§19）と実DB（§13-6）でやっている
+        AI_SCORING_DAILY_LIMIT: "100000",
+        AI_SCORING_DAILY_LIMIT_GLOBAL: "100000",
       },
     },
   ],

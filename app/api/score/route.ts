@@ -5,6 +5,7 @@ import { loadProgress } from "@/lib/progress/unlock";
 import {
   scoreAnswer,
   ScoringUnavailableError,
+  isUnbilledFailure,
   GRADER_VERSION,
   type ScoringInput,
 } from "@/lib/ai/scorer";
@@ -13,7 +14,16 @@ import {
   PERFECT_THRESHOLD,
   ANSWER_MIN_CHARS,
   ANSWER_MAX_CHARS,
+  scoreKeywords,
+  KEYWORD_SLOT_COUNT,
+  type KeywordSlot,
 } from "@/lib/ai/compose";
+import {
+  consumeAiQuota,
+  refundAiQuota,
+  secondsUntilJstReset,
+  DAILY_LIMIT_PER_USER,
+} from "@/lib/ai/quota";
 import { answerHash } from "@/lib/ai/hash";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -152,8 +162,14 @@ function containsPii(s: string): boolean {
  * **API の枠を使い切らせて全ユーザーの採点を止めること**になる。
  *
  * これは「普通に使う分には絶対に当たらない」高さの安全網であって、
- * 商品としての上限（Free 1日3問 / Pro 月200問…）ではない。
- * そちらは課金開始時に別途入れる（このファイル末尾の TODO）。
+ * 1日あたりの上限そのものではない。そちらは lib/ai/quota.ts にある
+ * （D1・2026-08-22。全員一律 1日 DAILY_LIMIT_PER_USER 問 ＋ 全体の天井）。
+ *
+ * **この安全網は消さないし、数え方も揃えない。**
+ * あちらは「OpenAI を呼んだ回数」だけを数える。こちらは行の数を数えるので、
+ * 判定保留や解放用に入れた行まで含めて多めに当たる。多めに当たるのは安全側であり、
+ * 「連打で DB に行を作られること」自体を止めているのはこちらだけ
+ * （上限に達した後の判定保留も1回ごとに1行書く）。
  */
 const RATE_LIMITS = [
   { windowMs: 60_000, max: 10 },
@@ -218,6 +234,25 @@ async function checkRateLimit(
   }
 
   return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// 上限に達したときの文面
+// ---------------------------------------------------------------------------
+
+/**
+ * **「不合格」に見せない。** 層1だけでは最大20点でクリア閾値55に永久に届かないので、
+ * 点数を主役にすると理由の分からない不合格が並ぶことになる（tasks/D1）。
+ *
+ * ネガティブワードを使わないのは UI 全体の制約（CLAUDE.md）。
+ * 「使い切りました」ではなく「ここまでです」、拾えた数は肯定形で出す。
+ */
+function provisionalMessage(hits: number): string {
+  const head = `きょうの AI 採点はここまでです（1日 ${DAILY_LIMIT_PER_USER} 問）。あすの0時にまた続けられます。`;
+  // 0 のときは数を出さない。「4つのうち0つ」は事実だが、伝える価値がない
+  return hits > 0
+    ? `${head}いまの回答からは、だいじな言葉を ${KEYWORD_SLOT_COUNT} つのうち ${hits} つ見つけました。`
+    : `${head}回答はそのまま残してあります。`;
 }
 
 // ---------------------------------------------------------------------------
@@ -379,6 +414,9 @@ async function handleScoring(
 
   let row: Record<string, unknown>;
   let payload: Record<string, unknown>;
+  /** 判定保留のときだけ 429。それ以外は 200 */
+  let status = 200;
+  let headers: Record<string, string> | undefined;
 
   if (prev) {
     row = {
@@ -412,75 +450,175 @@ async function handleScoring(
       replayed: true,
     };
   } else {
-    let result;
-    try {
-      result = await scoreAnswer(answer, problem as unknown as ScoringInput);
-    } catch (e) {
-      // 「採点が動かなかった」を0点として保存しない。
-      // 行を作らないので履歴も汚れず、無料枠も消費しない
-      if (e instanceof ScoringUnavailableError) {
-        console.error("採点不成立", {
-          code: e.code,
-          problem_id: problem.id,
-          grader_version: GRADER_VERSION,
-          message: e.message,
-        });
-        return NextResponse.json(
-          {
-            error: "採点が混み合っています。入力はそのままなので、もう一度お試しください。",
-            code: "scoring_unavailable",
-          },
-          { status: 503 },
-        );
-      }
-      throw e;
+    // ------------------------------------------------------------------
+    // ここから先が実費の出る経路。**呼ぶ前に1回ぶん確保する**（lib/ai/quota.ts）。
+    //
+    // 位置に意味がある。
+    //   ・リプレイ（上の if）より後  → 同じ回答の再送で枠が減らない（API を呼んでいない）
+    //   ・scoreAnswer より前        → 呼んでから捨てると、その回の原価は出てしまう
+    // 確保は DB 側で行ロックを取って行うので、並列で叩かれても超えない
+    // （このファイル冒頭の inFlight はプロセス内の錠前で、サーバーが複数だと効かない）
+    // ------------------------------------------------------------------
+    const quota = await consumeAiQuota(admin, userId);
+
+    // 数えられなかったときは通さない（安全網と同じ判断）。
+    // 通すと「DB が不調なときだけ上限が無くなる」ことになる
+    if (quota.ok === "unavailable") {
+      return NextResponse.json(
+        {
+          error: "採点が混み合っています。入力はそのままなので、もう一度お試しください。",
+          code: "scoring_unavailable",
+        },
+        { status: 503 },
+      );
     }
 
-    row = {
-      user_id: userId,
-      problem_id: problem.id,
-      answer,
-      keyword_score: result.keywordScore,
-      deep_score: result.deepScore,
-      total_score: result.total,
-      ai_feedback: result.ai_feedback,
-      // 空文字ではなく NULL で入れる。「文章が無い」を1つの表し方に寄せておかないと、
-      // 画面と集計の両方で空文字と NULL の2通りを気にすることになる
-      ai_praise: result.ai_praise || null,
-      ai_next_focus: result.ai_next_focus || null,
-      scoring_method: result.scoring_method,
-      axes: {
+    // サービス全体の天井。**判定保留にしない。**
+    // 利用者の枠が尽きたわけではないので保留の行を作る意味がなく、
+    // 作ると発動中に全員ぶんの保留行が積もる。混み合っている扱いで返す
+    if (!quota.ok && quota.blockedBy === "global") {
+      // ログに出す唯一の目的は「上限を上げる判断ができるようにすること」。
+      // 黙って全員が 503 になると、原因が分からないまま利用者だけが困る
+      console.error("全体の1日上限に達したため採点を止めた", {
+        global_used: quota.globalUsed,
+        user_id: userId,
+      });
+      return NextResponse.json(
+        {
+          error: "採点が混み合っています。入力はそのままなので、もう一度お試しください。",
+          code: "scoring_unavailable",
+        },
+        { status: 503 },
+      );
+    }
+
+    if (!quota.ok) {
+      // ------------------------------------------------------------------
+      // 本人の枠切れ。層2（AI）を飛ばして層1（キーワード）だけで返す。
+      //
+      // **リザルト画面へ遷移させない。** app/result/[id]/page.tsx は
+      // is_provisional = false で絞ったうえで「行が無ければ問題画面へ戻す」ので、
+      // 判定保留を保存して遷移すると問題画面に跳ね返されるだけになる。
+      // 429 で返せば ProblemForm が回答を保持したままその場に文面を出す。
+      // ------------------------------------------------------------------
+      const keyword = scoreKeywords(answer, problem.keywords as KeywordSlot[]);
+      const hits = keyword.hits.filter(Boolean).length;
+      const message = provisionalMessage(hits);
+
+      row = {
+        user_id: userId,
+        problem_id: problem.id,
+        answer,
+        keyword_score: keyword.score,
+        // 層2を回していないので0。NULL にしない（DB の範囲制約は 0..80 で、
+        // 集計側で NULL と 0 の2通りを気にすることになる）
+        deep_score: 0,
+        total_score: keyword.score,
+        // この欄しか無い過去の行があるので必ず埋める（ideas/db仕様.md）
+        ai_feedback: message,
+        // 2枠は AI の文章のためのもの。テンプレートを分けて入れる意味がない
+        ai_praise: null,
+        ai_next_focus: null,
+        scoring_method: "keyword_only",
+        // 4観点の判定はしていないので NULL（ideas/db仕様.md の取り決め）。
+        // 拾えた語は usage 側に置く ── 中途半端な axes を作ると
+        // 振り返り画面が「4観点があるつもり」で読むことになる
+        axes: null,
+        grader_version: GRADER_VERSION,
+        answer_hash: hash,
+        // **これが本体。** クリア判定・XP・リザルトはこのフラグで除外される
+        is_provisional: true,
+        contradiction: false,
+        usage: { quota_exceeded: true, keyword_hits: keyword.hits, replayed: false },
+      };
+      payload = {
+        // ProblemForm は !res.ok のとき error をそのまま出す。
+        // 「エラー」ではないので、画面側は code を見て見た目を分ける
+        error: message,
+        code: "quota_exceeded",
+        provisional: true,
+        keyword_score: keyword.score,
+        keyword_hits: hits,
+        keyword_slots: KEYWORD_SLOT_COUNT,
+      };
+      status = 429;
+      headers = { "Retry-After": String(secondsUntilJstReset()) };
+    } else {
+      let result;
+      try {
+        result = await scoreAnswer(answer, problem as unknown as ScoringInput);
+      } catch (e) {
+        // 「採点が動かなかった」を0点として保存しない。
+        // 行を作らないので履歴も汚れない
+        if (e instanceof ScoringUnavailableError) {
+          // 確保した1回ぶんを返すのは、**トークンが課金されていないと分かる失敗だけ。**
+          // 全部で返すと、失敗を誘発できる入力を持った相手が枠を消費せずに
+          // 何度でも OpenAI を叩けることになる（判定は scorer.ts 側にある）
+          if (isUnbilledFailure(e)) await refundAiQuota(admin, userId);
+
+          console.error("採点不成立", {
+            code: e.code,
+            problem_id: problem.id,
+            grader_version: GRADER_VERSION,
+            message: e.message,
+          });
+          return NextResponse.json(
+            {
+              error: "採点が混み合っています。入力はそのままなので、もう一度お試しください。",
+              code: "scoring_unavailable",
+            },
+            { status: 503 },
+          );
+        }
+        throw e;
+      }
+
+      row = {
+        user_id: userId,
+        problem_id: problem.id,
+        answer,
+        keyword_score: result.keywordScore,
+        deep_score: result.deepScore,
+        total_score: result.total,
+        ai_feedback: result.ai_feedback,
+        // 空文字ではなく NULL で入れる。「文章が無い」を1つの表し方に寄せておかないと、
+        // 画面と集計の両方で空文字と NULL の2通りを気にすることになる
+        ai_praise: result.ai_praise || null,
+        ai_next_focus: result.ai_next_focus || null,
+        scoring_method: result.scoring_method,
+        axes: {
+          axes: result.axes,
+          keyword_hits: result.keywordHits,
+          evidence_capped: result.evidenceCapped,
+          // compose.ts が「発生率を監視する」としている値。
+          // 保存しないと集計できないので一緒に入れる。
+          // axes は JSONB なのでカラム追加は要らない
+          fabrication_suspected: result.fabricationSuspected,
+          // どの誤読に当たったか（"none" / "1" / "2" / "3"）。
+          // 点数には関わらないが、これを貯めないと「この問題は回答者の3割が
+          // 同じ読み違いをしている」という集計ができない（残課題 §3）。
+          // リプレイ時はこの axes をそのまま複製するので、再送でも記録が消えない
+          matched_reject: result.matched_reject,
+        },
+        grader_version: result.grader_version,
+        answer_hash: result.answer_hash,
+        is_provisional: false,
+        contradiction: result.contradiction,
+        usage: result.usage,
+      };
+      payload = {
+        score: result.total,
+        keyword_score: result.keywordScore,
+        deep_score: result.deepScore,
+        feedback: result.ai_feedback,
+        praise: result.ai_praise || null,
+        next_focus: result.ai_next_focus || null,
         axes: result.axes,
-        keyword_hits: result.keywordHits,
-        evidence_capped: result.evidenceCapped,
-        // compose.ts が「発生率を監視する」としている値。
-        // 保存しないと集計できないので一緒に入れる。
-        // axes は JSONB なのでカラム追加は要らない
-        fabrication_suspected: result.fabricationSuspected,
-        // どの誤読に当たったか（"none" / "1" / "2" / "3"）。
-        // 点数には関わらないが、これを貯めないと「この問題は回答者の3割が
-        // 同じ読み違いをしている」という集計ができない（残課題 §3）。
-        // リプレイ時はこの axes をそのまま複製するので、再送でも記録が消えない
-        matched_reject: result.matched_reject,
-      },
-      grader_version: result.grader_version,
-      answer_hash: result.answer_hash,
-      is_provisional: false,
-      contradiction: result.contradiction,
-      usage: result.usage,
-    };
-    payload = {
-      score: result.total,
-      keyword_score: result.keywordScore,
-      deep_score: result.deepScore,
-      feedback: result.ai_feedback,
-      praise: result.ai_praise || null,
-      next_focus: result.ai_next_focus || null,
-      axes: result.axes,
-      cleared: result.cleared,
-      perfect: result.perfect,
-      replayed: false,
-    };
+        cleared: result.cleared,
+        perfect: result.perfect,
+        replayed: false,
+      };
+    }
   }
 
   // 結果をDBに保存。
@@ -498,12 +636,16 @@ async function handleScoring(
     );
   }
 
-  return NextResponse.json(payload);
+  return NextResponse.json(payload, headers ? { status, headers } : { status });
 }
 
-// TODO(課金開始前に必須): プラン別のAI採点上限。
-//   Free 1日3問 / Pro 月200問 / Pro Plus 月500問。
-//   超過時は層2をスキップし、is_provisional = true・scoring_method = 'keyword_only'
-//   で保存する（層1は最大20点でクリア閾値55に届かないため、不合格ではなく判定保留にする）。
-//   カウントのクエリは ideas/db仕様.md の「レート制限のクエリ」を参照。
-//   上の RATE_LIMITS は使いすぎを止める安全網であって、商品としての上限ではない。
+// 1日あたりの上限は入れた（D1・2026-08-22。lib/ai/quota.ts）。**プラン別ではなく全員一律。**
+//
+// TODO(D2・課金開始時): プランごとの上限に変える。
+//   Free 1日3問 / Pro 月200問 / Pro Plus 月500問（ideas/仕様書.md §3）。
+//   変えるのは lib/ai/quota.ts の DAILY_LIMIT_PER_USER を users.plan から引く形にするだけで、
+//   このファイルは触らなくてよいようにしてある（判定保留の経路はそのまま使える）。
+//   月次にするなら consume_ai_quota の日付の持ち方（JST の日単位）も変わる。
+//
+// **全体の天井（DAILY_LIMIT_GLOBAL）はプランを入れても残すこと。**
+// アカウントを量産されたときに効くのはそちらだけで、プラン別の上限は1つも効かない。

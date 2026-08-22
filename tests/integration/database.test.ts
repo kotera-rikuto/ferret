@@ -651,6 +651,229 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
       expect(error).toBeNull();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // 13-6 採点回数の上限（D1）
+  // -------------------------------------------------------------------------
+
+  /**
+   * **ここだけはモックにできない。**
+   *
+   * 「並列で叩かれても上限を超えない」を担保しているのは
+   * consume_ai_quota の中の `for update`（行ロック）だけで、
+   * アプリ側のコードをどれだけテストしてもそこは確かめられない。
+   *
+   * ⚠️ **この節は実DBの ai_usage_daily を触る。**
+   * サービス全体の行（user_id = 全ゼロ）は本番の使用量そのものなので、
+   * 成功した確保は必ず refund_ai_quota で戻し、最後に元の値へ戻ったことを確かめる。
+   * テストユーザーの行は消す。
+   */
+  describe("13-6 ai_usage_daily と consume_ai_quota", () => {
+    const GLOBAL_ROW = "00000000-0000-0000-0000-000000000000";
+    /** 全体の天井には当てない（本番の使用量を巻き込まないため、十分に大きく取る） */
+    const NO_GLOBAL_CAP = 1_000_000;
+
+    async function consume(userId: string, userLimit: number, globalLimit = NO_GLOBAL_CAP) {
+      const { data, error } = await admin.rpc("consume_ai_quota", {
+        p_user_id: userId,
+        p_user_limit: userLimit,
+        p_global_limit: globalLimit,
+      });
+      return { row: (data as Record<string, unknown>[] | null)?.[0], error };
+    }
+
+    async function refund(userId: string) {
+      const { error } = await admin.rpc("refund_ai_quota", { p_user_id: userId });
+      expect(error).toBeNull();
+    }
+
+    async function globalUsed(): Promise<number> {
+      const { data } = await admin.rpc("peek_ai_quota", { p_user_id: userA });
+      return Number((data as Record<string, unknown>[])[0].global_used);
+    }
+
+    /** テストユーザーの行だけ消す。**全体行は消さない**（本番の使用量なので） */
+    async function clearUserRows() {
+      const { error } = await admin
+        .from("ai_usage_daily")
+        .delete()
+        .in("user_id", [userA, userB]);
+      if (error) throw new Error(`使用量の行を消せません: ${error.message}`);
+    }
+
+    /** 全体行の開始値。最後に元へ戻ったかを見る（I-688） */
+    let globalAtStart = 0;
+
+    beforeAll(async () => {
+      await clearUserRows();
+      globalAtStart = await globalUsed();
+    });
+    afterAll(clearUserRows);
+
+    it("I-680 上限内なら通り、使用数が1つ増える", async () => {
+      await clearUserRows();
+      const first = await consume(userA, 3);
+      expect(first.error).toBeNull();
+      expect(first.row).toMatchObject({ allowed: true, user_used: 1 });
+
+      const second = await consume(userA, 3);
+      expect(second.row).toMatchObject({ allowed: true, user_used: 2 });
+
+      await refund(userA);
+      await refund(userA);
+    });
+
+    it("I-681 上限に達したら増やさずに止める", async () => {
+      await clearUserRows();
+      await consume(userA, 1);
+      const over = await consume(userA, 1);
+
+      expect(over.row).toMatchObject({ allowed: false, blocked_by: "user", user_used: 1 });
+
+      // **止めた回で used が増えていないこと。**
+      // 増やしてから拒否すると、上限に達した後の連打で数字だけが伸びる
+      const { data } = await admin
+        .from("ai_usage_daily")
+        .select("used")
+        .eq("user_id", userA)
+        .single();
+      expect(data?.used).toBe(1);
+
+      await refund(userA);
+    });
+
+    /**
+     * **この1件がこのタスクの中心。**
+     *
+     * 同時に20本投げて、上限3ならちょうど3本だけ通ること。
+     * 素の `count → 判定` では全部が同じ数を読んで20本通る。
+     */
+    it("I-682 並列で叩いても上限を超えない", async () => {
+      await clearUserRows();
+      const LIMIT = 3;
+      const results = await Promise.all(
+        Array.from({ length: 20 }, () => consume(userA, LIMIT)),
+      );
+
+      for (const r of results) expect(r.error).toBeNull();
+      const allowed = results.filter((r) => r.row?.allowed === true);
+      expect(allowed).toHaveLength(LIMIT);
+
+      // 通った回の user_used は 1..LIMIT が1つずつ（同じ番号が2回出ない＝二重計上なし）
+      expect(allowed.map((r) => Number(r.row?.user_used)).sort()).toEqual([1, 2, 3]);
+
+      const { data } = await admin
+        .from("ai_usage_daily")
+        .select("used")
+        .eq("user_id", userA)
+        .single();
+      expect(data?.used).toBe(LIMIT);
+
+      // 通った回ぶんだけ戻す（全体行を元の値に保つ）
+      for (let i = 0; i < allowed.length; i++) await refund(userA);
+    });
+
+    it("I-683 全体の天井に達したら本人の枠が残っていても止まる", async () => {
+      await clearUserRows();
+      const before = await globalUsed();
+      // 全体の上限を「いまの使用数」に合わせると、次の1回で必ず天井に当たる
+      const over = await consume(userA, 100, before);
+      expect(over.row).toMatchObject({ allowed: false, blocked_by: "global" });
+      // 本人の行も増えていない（片方だけ進むと日をまたぐまでズレたままになる）
+      const { data } = await admin
+        .from("ai_usage_daily")
+        .select("used")
+        .eq("user_id", userA)
+        .maybeSingle();
+      expect(data?.used ?? 0).toBe(0);
+    });
+
+    it("I-684 全体行の id を本人として渡すと拒否される", async () => {
+      // 通ると「全体の枠を個人の枠として使う」ことになる
+      const { error } = await consume(GLOBAL_ROW, 10);
+      expect(error).not.toBeNull();
+    });
+
+    /**
+     * **返却は consume と対称でなければならない。**
+     *
+     * 全体の行だけが減ると、その日に流せる総数が実際の消費より増える
+     * ── 天井が静かに上へずれる。二重返却でも同じ向きに崩れる。
+     * 最初の実装がここで落ちた（本人の行が無くても全体を減らしていた）ので、
+     * 20260822184000_refund_ai_quota_symmetric.sql で直した。
+     */
+    it("I-685 本人が取っていないぶんは返さない（全体だけ減らさない）", async () => {
+      await clearUserRows();
+      const before = await globalUsed();
+      await refund(userA);
+      await refund(userA);
+      expect(await globalUsed()).toBe(before);
+
+      // 1回取って2回返しても、減るのは取った1回ぶんだけ
+      await consume(userA, 5);
+      await refund(userA);
+      await refund(userA);
+      expect(await globalUsed()).toBe(before);
+
+      const { data } = await admin
+        .from("ai_usage_daily")
+        .select("used")
+        .eq("user_id", userA)
+        .maybeSingle();
+      expect(data?.used ?? 0).toBe(0);
+    });
+
+    it("I-686 anon / ログイン済みからは上限の関数を呼べない", async () => {
+      for (const client of [anon, asA]) {
+        const { error } = await client.rpc("consume_ai_quota", {
+          p_user_id: userA,
+          p_user_limit: 999,
+          p_global_limit: 999,
+        });
+        // 呼べてしまうと、他人の枠を焼く・全体行を膨らませて全員を止めるができる
+        expect(error).not.toBeNull();
+      }
+    });
+
+    it("I-687 anon / ログイン済みからは使用量の表を読めない・書けない", async () => {
+      await clearUserRows();
+      await consume(userA, 5); // used = 1 の行を作る
+
+      const { data } = await asA.from("ai_usage_daily").select("used");
+      // RLS にポリシーが1つも無いので0件になる（自分の行すら見えない）
+      expect(data ?? []).toHaveLength(0);
+
+      // ⚠️ **UPDATE はエラーにならない。**
+      // ポリシーが無いと「対象行が0件」になるだけで、PostgREST は 204 を返す。
+      // つまり `error` を見ると**通ったように見える**（2026-08-22 に実DBで確認）。
+      // 守れているかは**値で確かめる**しかない
+      await asA.from("ai_usage_daily").update({ used: 0 }).eq("user_id", userA);
+      const after = await admin
+        .from("ai_usage_daily")
+        .select("used")
+        .eq("user_id", userA)
+        .single();
+      // 0 に戻せていたら、その日の上限は好きなだけ延長できる
+      expect(after.data?.used).toBe(1);
+
+      // INSERT は拒否される（別の日付の行を作って枠を増やすこともできない）
+      const ins = await asA
+        .from("ai_usage_daily")
+        .insert({ jst_date: "2020-01-01", user_id: userA, used: 0 });
+      expect(ins.error).not.toBeNull();
+
+      await refund(userA);
+    });
+
+    /**
+     * **上のケースが refund を漏らしていないことの確認。**
+     * ここが落ちたら、テストが本番の使用量を削っている（または増やしている）。
+     * 全体行はサービス全体の数字なので、テストの前後で動いていてはいけない。
+     */
+    it("I-688 全体の使用量をテストの前後で動かしていない", async () => {
+      expect(await globalUsed()).toBe(globalAtStart);
+    });
+  });
 });
 
 describe.skipIf(RUN)("§13 DB 制約と RLS", () => {

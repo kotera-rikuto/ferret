@@ -11,6 +11,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import OpenAI from "openai";
 import {
   makeClients,
   defaultState,
@@ -883,10 +884,197 @@ describe("§5 失敗の扱い", () => {
 // §6 課金時に入れるプラン別の上限
 // ---------------------------------------------------------------------------
 
-describe("§6 プラン別の上限（課金開始前に必須）", () => {
-  it.todo("I-230 Free ユーザーの4問目は層2をスキップして判定保留で保存する");
-  it.todo("I-231 上限到達を不合格ではなく判定保留としてレスポンスに示す");
-  it.todo("I-232 リプレイは無料枠を消費しない");
-  it.todo("I-233 判定保留は無料枠のカウントに入らない");
-  it.todo("I-234 Pro の月201問目も同様にフォールバックする");
+/**
+ * 1日あたりの上限（D1・2026-08-22）。**プラン別ではなく全員一律。**
+ *
+ * 数えているのは user_attempts ではなく専用の表（ai_usage_daily）で、
+ * 確保は SQL 側の行ロックで行う。ここで見るのは
+ * 「DB がどう返したときにルートがどう振る舞うか」だけ。
+ *
+ * 通す方向へ倒れる経路を1つも作らないことが、このまとまりの目的。
+ */
+describe("§6 1日あたりの上限", () => {
+  /** consume_ai_quota に渡された引数 */
+  function consumeCalls() {
+    return spy.rpcs.filter(([fn]) => fn === "consume_ai_quota");
+  }
+  function refundCalls() {
+    return spy.rpcs.filter(([fn]) => fn === "refund_ai_quota");
+  }
+
+  const OVER_USER = {
+    quota: { allowed: false, blocked_by: "user", user_used: 20, global_used: 30 },
+  };
+
+  it("I-230 上限に達したら層2を呼ばず、判定保留として保存する", async () => {
+    setup(OVER_USER);
+    const { res, json } = await post(VALID);
+
+    // AI を呼んでいないこと。**ここが原価の話の本体**
+    expect(createMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(429);
+    expect(json.code).toBe("quota_exceeded");
+
+    expect(spy.inserted).toHaveLength(1);
+    const row = spy.inserted[0];
+    expect(row.is_provisional).toBe(true);
+    expect(row.scoring_method).toBe("keyword_only");
+    // 4観点の判定はしていない。中途半端な内訳を残さない
+    expect(row.axes).toBeNull();
+    // 層1だけなので合計 = キーワード点。ANSWER は4スロット全部に当たるので20点
+    expect(row.deep_score).toBe(0);
+    expect(row.total_score).toBe(row.keyword_score);
+    // 回答そのものは残す（あす出し直せるように）
+    expect(row.answer).toBe(ANSWER);
+    expect(row.answer_hash).toEqual(expect.any(String));
+  });
+
+  it("I-230b 判定保留の保存に失敗したら 500（成功に見せない）", async () => {
+    silenceConsole();
+    setup({ ...OVER_USER, insertError: { message: "disk full" } });
+    const { res } = await post(VALID);
+    expect(res.status).toBe(500);
+  });
+
+  it("I-231 不合格には見せない（点数・合否を返さず、Retry-After を付ける）", async () => {
+    setup(OVER_USER);
+    const { res, json } = await post(VALID);
+
+    // クリア判定を返さない。返すと画面が合否として描いてしまう
+    expect(json.cleared).toBeUndefined();
+    expect(json.score).toBeUndefined();
+    expect(json.provisional).toBe(true);
+    // 枠が戻るまでの秒数。JST 0時までなので必ず1日以内
+    const retry = Number(res.headers.get("Retry-After"));
+    expect(retry).toBeGreaterThan(0);
+    expect(retry).toBeLessThanOrEqual(24 * 60 * 60);
+  });
+
+  it("I-231b 案内文にネガティブワードを使わない（UI 全体の制約）", async () => {
+    setup(OVER_USER);
+    const { json } = await post(VALID);
+    const text = String(json.error);
+    for (const ng of ["失敗", "不足", "使い切", "上限に達", "できません", "エラー"]) {
+      expect(text).not.toContain(ng);
+    }
+    // 保存する文章も同じものにしてある（振り返りに残るのはこちら）
+    expect(spy.inserted[0].ai_feedback).toBe(text);
+  });
+
+  it("I-231c キーワードが1つも当たらない回は数を出さない", async () => {
+    setup(OVER_USER);
+    // 「4つのうち0つ」は事実だが伝える価値がなく、言い方も硬くなる
+    const { json } = await post({
+      problem_id: UNLOCKED_ID,
+      answer: "どう動くのかまだつかめていないので、あすもう一度読んでみます",
+    });
+    expect(String(json.error)).not.toContain("0 つ");
+    expect(String(json.error)).toContain("回答はそのまま残してあります");
+    expect(spy.inserted[0].keyword_score).toBe(0);
+  });
+
+  it("I-232 リプレイは枠を消費しない（OpenAI を呼んでいないため）", async () => {
+    setup({
+      replay: {
+        total_score: 73,
+        keyword_score: 15,
+        deep_score: 58,
+        ai_feedback: "前回のフィードバックです。",
+        axes: { axes: [] },
+        contradiction: false,
+      },
+    });
+    const { res } = await post(VALID);
+    expect(res.status).toBe(200);
+    expect(consumeCalls()).toHaveLength(0);
+  });
+
+  it("I-233 判定保留の回は枠を戻さず、二重に消費もしない", async () => {
+    setup(OVER_USER);
+    await post(VALID);
+    // 確保の問い合わせは1回だけ。保留の行を書いたあとに数え直さない
+    expect(consumeCalls()).toHaveLength(1);
+    // 戻すのは「課金されていない失敗」のときだけ。上限はそれに当たらない
+    expect(refundCalls()).toHaveLength(0);
+  });
+
+  it("I-234 全体の天井に達したら 503 で、行を作らない", async () => {
+    const spies = silenceConsole();
+    setup({
+      quota: { allowed: false, blocked_by: "global", user_used: 2, global_used: 500 },
+    });
+    const { res, json } = await post(VALID);
+
+    expect(res.status).toBe(503);
+    expect(json.code).toBe("scoring_unavailable");
+    expect(createMock).not.toHaveBeenCalled();
+    // **判定保留にしない。** 利用者の枠の問題ではないので、
+    // 発動中に全員ぶんの保留行が積もるのを避ける
+    expect(spy.inserted).toHaveLength(0);
+    // 上限を上げる判断ができるように、発動はログに残す
+    expect(spies.error).toHaveBeenCalled();
+  });
+
+  it.each([
+    ["数えられなかった", { quotaError: { message: "connection lost" } }],
+    ["値が返らなかった", { quota: null }],
+  ])("I-235/236 枠を %s ときは通さず 503", async (_label, patch) => {
+    silenceConsole();
+    setup(patch as Partial<DbState>);
+    const { res, json } = await post(VALID);
+    expect(res.status).toBe(503);
+    expect(json.code).toBe("scoring_unavailable");
+    // ここで通すと「DB が不調なときだけ上限が消える」ことになる
+    expect(createMock).not.toHaveBeenCalled();
+    expect(spy.inserted).toHaveLength(0);
+  });
+
+  it("I-237 確保は OpenAI を呼ぶ前に行う（呼んでから捨てると原価が出る）", async () => {
+    const order: string[] = [];
+    createMock.mockImplementation(async () => {
+      order.push("openai");
+      return openAiOk();
+    });
+    setup();
+    // rpc の記録は spy に入るので、呼び出し順は spy と order の突き合わせで見る
+    await post(VALID);
+    expect(consumeCalls()).toHaveLength(1);
+    expect(order).toEqual(["openai"]);
+    // 確保が先であることは「確保が通らない回に OpenAI が呼ばれない」で担保される
+    setup(OVER_USER);
+    order.length = 0;
+    await post(VALID);
+    expect(order).toEqual([]);
+  });
+
+  it("I-238 安全網に当たった回は枠を消費しない", async () => {
+    setup({ rateRows: recentAttempts(10) });
+    const { res } = await post(VALID);
+    expect(res.status).toBe(429);
+    // 連打を弾いただけで枠が減ると、外から他人の枠を削れることになる
+    expect(consumeCalls()).toHaveLength(0);
+  });
+
+  it("I-239 課金されていない失敗（OpenAI が 429 / 5xx）は枠を戻す", async () => {
+    silenceConsole();
+    const ApiError = (OpenAI as unknown as { APIError: new (status?: number) => Error })
+      .APIError;
+    createMock.mockRejectedValue(new ApiError(503));
+
+    const { res } = await post(VALID);
+    expect(res.status).toBe(503);
+    expect(refundCalls()).toEqual([["refund_ai_quota", { p_user_id: USER_ID }]]);
+  });
+
+  it("I-239b 応答が返ってきた失敗では枠を戻さない", async () => {
+    silenceConsole();
+    // JSON として壊れた応答。トークンは課金されているので戻さない。
+    // ここで戻すと「壊れた応答を誘発できる相手は無制限に叩ける」ことになる
+    createMock.mockResolvedValue({
+      choices: [{ message: { content: "壊れたJSON", refusal: null }, finish_reason: "stop" }],
+    });
+    const { res } = await post(VALID);
+    expect(res.status).toBe(503);
+    expect(refundCalls()).toHaveLength(0);
+  });
 });

@@ -44,15 +44,30 @@ export function isCrossSiteRequest(request: NextRequest): boolean {
  * 戻り先が自分たちで決めた1つに固定される。未設定なら従来どおりの挙動。
  */
 export function appBaseUrl(request: NextRequest): string {
+  return configuredAppOrigin() ?? new URL(request.url).origin;
+}
+
+/**
+ * 「自分のサイトのURLはこれ」と設定してある値（`https://ferretcode.com`）。
+ * **設定されていない・壊れているなら `null`。**
+ *
+ * `appBaseUrl` はリクエスト側へ落とせるが、リクエストの無い場所
+ * （`app/robots.ts` / `app/sitemap.ts` / `app/layout.tsx` のメタ情報）は落とし先が無く、
+ * 「分からない」を分からないまま扱う必要がある。**その判断の出どころをここ1か所にしてある。**
+ *
+ * ⚠️ **`NEXT_PUBLIC_APP_URL` は Vercel の Production にしか入っていない**（C5 の判断）。
+ * プレビュー配信とローカルでは常に `null` が返る前提で呼ぶこと。
+ * 使う側の扱いは `lib/seo/site.ts` を見る。
+ */
+export function configuredAppOrigin(): string | null {
   const configured = process.env.NEXT_PUBLIC_APP_URL;
-  if (configured) {
-    try {
-      return new URL(configured).origin;
-    } catch {
-      // 設定が壊れている場合はリクエスト側へフォールバック
-    }
+  if (!configured) return null;
+  try {
+    return new URL(configured).origin;
+  } catch {
+    // 設定が壊れている（URL として読めない）。値を信じるより「無い」ほうが安全
+    return null;
   }
-  return new URL(request.url).origin;
 }
 
 /**
