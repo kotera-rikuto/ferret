@@ -1,6 +1,20 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { Mascot } from "@/components/ui/Mascot";
+import { publicPageMetadata } from "@/lib/seo/site";
+
+/**
+ * 検索結果に出る唯一の入口。**title は書かない**（`layout.tsx` の既定値をそのまま使う）。
+ *
+ * `path` を渡しているのは canonical のため。本番は `ferretcode.com` の他に
+ * Vercel が配る `*.vercel.app` でも同じ画面が開くので、宣言が無いと
+ * 2つが別ページとして数えられ、評価が割れる。
+ *
+ * ⚠️ 本文の文言を変えたら `lib/seo/site.ts` の `SITE_DESCRIPTION` も直すこと。
+ * 画面とメタ情報が食い違っても**画面上は何も起きない**（気づけるのは検索結果だけ）。
+ */
+export const metadata: Metadata = publicPageMetadata({ path: "/" });
 
 // primary は「はじめる」（新規登録）、ログインは secondary。
 // 新規獲得を優先する学習アプリの定石に合わせている（design/README.md）

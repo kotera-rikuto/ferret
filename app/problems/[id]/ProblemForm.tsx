@@ -23,6 +23,14 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  /**
+   * 1日の上限に達したときの案内（判定保留）。**error と分けてある。**
+   *
+   * 同じ状態にすると赤字の「エラー」として出る。上限は失敗ではないし、
+   * ネガティブに見せない制約もある（CLAUDE.md）。文面はサーバーが返す
+   * （app/api/score/route.ts の provisionalMessage。上限値を画面に書かないため）
+   */
+  const [quotaNotice, setQuotaNotice] = useState("");
   // 注記を回答欄の説明として結び付けるための id（下の noticeId の用途は E-455 の注参照）
   const noticeId = useId();
 
@@ -54,6 +62,7 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
     if (tooShort || tooLong) return;
     setLoading(true);
     setError("");
+    setQuotaNotice("");
     try {
       const res = await fetch("/api/score", {
         method: "POST",
@@ -66,6 +75,17 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
         // 「採点中にエラーが発生しました」に潰すと、文字数不足なのか
         // 通信障害なのかが分からず、直しようがなくなる
         const body = await res.json().catch(() => null);
+
+        // 上限に達した回は AI を呼んでいないので点数が出ない（判定保留）。
+        // リザルト画面へ進めないのは、あちらが is_provisional = false で絞ったうえで
+        // 「行が無ければ問題画面へ戻す」ため ── 進めても跳ね返されるだけになる。
+        // **下書きも消さない。** あすそのまま出せるようにしておく
+        if (body?.code === "quota_exceeded" && body?.error) {
+          setQuotaNotice(body.error);
+          setLoading(false);
+          return;
+        }
+
         setError(
           body?.error ??
             "採点が完了しませんでした。入力はそのままなので、もう一度お試しください。",
@@ -116,6 +136,17 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
       </div>
 
       {error && <p className="text-danger text-sm">{error}</p>}
+
+      {/* 判定保留の案内。赤字にせず、注記と同じ落ち着いた見た目で出す */}
+      {quotaNotice && (
+        <p
+          role="status"
+          className="flex items-start gap-2 rounded-2xl border-2 border-line bg-panel px-4 py-3.5 text-sm font-bold leading-relaxed text-muted"
+        >
+          <IconInfo size={16} className="mt-0.5 shrink-0" />
+          <span>{quotaNotice}</span>
+        </p>
+      )}
 
       {/*
        * 送信は下部固定フッター。スクロール位置に関係なく常に押せる場所に置く。

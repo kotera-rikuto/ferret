@@ -55,6 +55,22 @@ export type DbState = {
   deleteErrors: Record<string, { message: string }>;
   /** auth.admin.deleteUser が返すエラー。null なら成功 */
   authDeleteError: { message: string } | null;
+  /**
+   * consume_ai_quota（採点回数の確保・D1）が返す行。
+   * **null にすると「関数が値を返さなかった」の再現**になる（上限が無効にならないことを見る）。
+   */
+  quota:
+    | {
+        allowed: boolean;
+        blocked_by: string | null;
+        user_used: number;
+        global_used: number;
+      }
+    | null;
+  /** consume_ai_quota / peek_ai_quota が返すエラー。null なら成功 */
+  quotaError: { message: string } | null;
+  /** peek_ai_quota が返すきょうの使用数（ステージ画面の残数表示） */
+  quotaUsed: { user_used: number; global_used: number };
 };
 
 export type DbSpy = {
@@ -82,6 +98,8 @@ export type DbSpy = {
   authDeleted: string[];
   /** session 側の signOut に渡されたオプション */
   signOuts: unknown[];
+  /** rpc の [関数名, 引数]。**呼ばれた順に入る**（採点より前に確保しているかを見る） */
+  rpcs: Array<[string, unknown]>;
 };
 
 export function emptySpy(): DbSpy {
@@ -98,6 +116,7 @@ export function emptySpy(): DbSpy {
     deleted: [],
     authDeleted: [],
     signOuts: [],
+    rpcs: [],
   };
 }
 
@@ -187,6 +206,35 @@ function makeAdmin(state: DbState, spy: DbSpy) {
           };
         },
       };
+    },
+    /**
+     * 採点回数の確保・返却・参照（D1・supabase/migrations/*_ai_usage_daily.sql）。
+     * 本物は行ロックを取って数えるが、ここで見たいのは
+     * 「上限の返事に対してルートがどう振る舞うか」だけなので値を差し替える。
+     */
+    rpc(fn: string, args?: unknown) {
+      spy.rpcs.push([fn, args]);
+      if (fn === "consume_ai_quota") {
+        return Promise.resolve({
+          data: state.quota ? [state.quota] : null,
+          error: state.quotaError,
+        });
+      }
+      if (fn === "peek_ai_quota") {
+        return Promise.resolve({
+          data: [state.quotaUsed],
+          error: state.quotaError,
+        });
+      }
+      if (fn === "refund_ai_quota") {
+        return Promise.resolve({ data: null, error: null });
+      }
+      // 知らない関数を黙って成功させると、名前を打ち間違えたときに
+      // 「上限が効いていないのにテストは緑」になる
+      return Promise.resolve({
+        data: null,
+        error: { message: `未対応の rpc: ${fn}` },
+      });
     },
     // 退会でアカウント本体を消す口。service_role でしか呼べない
     auth: {
@@ -300,6 +348,10 @@ export function defaultState(patch: Partial<DbState> = {}): DbState {
     upsertError: null,
     deleteErrors: {},
     authDeleteError: null,
+    // 既定は「1回ぶん確保できた」。上限のテストだけが上書きする
+    quota: { allowed: true, blocked_by: null, user_used: 1, global_used: 1 },
+    quotaError: null,
+    quotaUsed: { user_used: 0, global_used: 0 },
     ...patch,
   };
 }

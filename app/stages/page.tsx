@@ -5,6 +5,7 @@ import { loadProgress } from "@/lib/progress/unlock";
 import { PERFECT_THRESHOLD } from "@/lib/ai/compose";
 import { calcStreak, toJstDate } from "@/lib/progress/streak";
 import { levelFromXp, totalXp } from "@/lib/progress/level";
+import { peekAiQuota } from "@/lib/ai/quota";
 import { StageMap, type Stage } from "@/components/stage/StageMap";
 import { IconCheck, IconFlame } from "@/components/ui/icons";
 import { AppSidebar } from "@/components/layout/AppSidebar";
@@ -62,6 +63,13 @@ export default async function StagesPage() {
     (attemptDates ?? []).map((a) => toJstDate(a.created_at)),
     toJstDate(new Date()),
   );
+
+  // きょうの AI 採点の残数。**強制と同じ値を読む**（lib/ai/quota.ts）。
+  // 別のクエリで数えると「0 なのに採点できる」「残っているのに止まる」という
+  // 矛盾表示になる。だから残数の表示だけを先に作らないことになっていた
+  // （design/移植残タスク.md §3）。日付の境目も SQL 側の JST で揃う。
+  // 読めなかったときは null が返るので、枠そのものを出さない
+  const quota = await peekAiQuota(admin, user.id);
 
   return (
     <div className="mx-auto grid min-h-screen w-full max-w-[1280px] grid-cols-1 gap-8 px-6 lg:grid-cols-[280px_minmax(0,1fr)_280px]">
@@ -190,6 +198,35 @@ export default async function StagesPage() {
           </div>
         </div>
 
+        {/* きょうの AI 採点。モックは肉球3つ（Free 1日3問の前提）だが、
+            いまの上限は全員一律で3より多いので粒では並べず、
+            他の枠と同じバーにしてある（design/移植残タスク.md §3）。
+            数字は lib/ai/quota.ts から来る。ここに書くと上限を変えたときにズレる */}
+        {quota && (
+          <div className="rounded-2xl border-2 border-line bg-panel p-5">
+            <h3 className="mb-3 text-sm font-extrabold">きょうの AI 採点</h3>
+            <div className="mb-2 flex items-baseline justify-between text-xs font-bold text-muted">
+              <span>のこり</span>
+              <span className="text-xl font-extrabold text-ink">
+                {quota.remaining}
+                <span className="text-xs font-bold text-muted"> / {quota.limit}</span>
+              </span>
+            </div>
+            <div className="h-3 overflow-hidden rounded-full bg-bg-deep">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-brand to-brand-soft"
+                style={{ width: `${(quota.remaining / quota.limit) * 100}%` }}
+              />
+            </div>
+            {/* 0 のときだけ言い方を変える。「使い切りました」とは書かない */}
+            <p className="mt-2.5 text-[11px] font-bold text-muted">
+              {quota.remaining === 0
+                ? "あすの0時にまた続けられます"
+                : "深夜0時にもどります"}
+            </p>
+          </div>
+        )}
+
         <div className="rounded-2xl border-2 border-line bg-panel p-5">
           <h3 className="mb-3 text-sm font-extrabold">すすみぐあい</h3>
           <div className="mb-2 flex items-baseline justify-between text-xs font-bold text-muted">
@@ -211,7 +248,7 @@ export default async function StagesPage() {
         <div className="rounded-2xl border-b-5 border-brand-deep bg-gradient-to-br from-brand to-brand-soft p-5 text-white">
           <h3 className="mb-1.5 text-sm font-extrabold">Pro で全ステージ解放</h3>
           <p className="mb-3.5 text-xs font-bold leading-relaxed opacity-95">
-            すべてのカリキュラムと AI 採点 月200問。認定証 PDF もついてくる。
+            すべてのカリキュラムと AI 採点。認定証 PDF もついてくる。
           </p>
           <button
             disabled

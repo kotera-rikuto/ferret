@@ -16,6 +16,7 @@ import {
   ANSWER,
 } from "./support/fixtures";
 import type { Page } from "@playwright/test";
+import { SITE_TITLE } from "../../lib/seo/site";
 import { OPERATOR_DISCLOSURE, OPERATOR_NAME } from "../../lib/legal";
 
 /** lib/ai/scorer.ts の NG_WORDS のうち、画面に出てはいけないもの */
@@ -34,8 +35,17 @@ const NG_WORDS = [
 test.describe("§6 表示", () => {
   test("E-450 ブラウザのタブに出るタイトル", async ({ page }) => {
     await page.goto("/");
-    // create-next-app の既定値（Create Next App）は解消済み（app/layout.tsx の metadata）
-    await expect(page).toHaveTitle("Ferret");
+    // create-next-app の既定値（Create Next App）は解消済み（app/layout.tsx の metadata）。
+    // 定数を照合しているのは、これが**検索結果の見出しそのもの**だから
+    // （C8。文言は lib/seo/site.ts に1本化してある）
+    await expect(page).toHaveTitle(SITE_TITLE);
+  });
+
+  test("E-450b ログイン画面のタイトルは重ならない", async ({ page }) => {
+    await page.goto("/login");
+    // layout.tsx の title.template が「| Ferret」を付ける。
+    // 画面側にも書くと「ログイン | Ferret | Ferret」になる（C8・U-841 と対）
+    await expect(page).toHaveTitle("ログイン | Ferret");
   });
 
   test("E-451 コードはダークテーマで表示される", async ({ authedPage, problems }) => {

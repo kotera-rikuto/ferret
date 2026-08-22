@@ -18,6 +18,7 @@ import {
   UNLOCKED_ID,
   LOCKED_ID,
   USER_ID,
+  silenceConsole,
   type AttemptRow,
   type DbState,
   type DbSpy,
@@ -151,6 +152,24 @@ describe("§10-1 /stages", () => {
 
   it("I-374b 問題の取得が null でも落ちない", async () => {
     setup({ problemList: null });
+    expect(await outcome(() => StagesPage())).toBe("RENDERED");
+  });
+
+  /**
+   * きょうの AI 採点の残数（D1）。
+   * **強制と同じ値を読むこと**が目的で、画面が自分で数えると
+   * 「0 なのに採点できる」「残っているのに止まる」という矛盾表示になる。
+   */
+  it("I-387 残数は採点と同じ関数から読む（service_role 経由）", async () => {
+    await StagesPage();
+    expect(spy.rpcs).toContainEqual(["peek_ai_quota", { p_user_id: USER_ID }]);
+    // 画面が user_attempts を数え直していないこと（読むのは解放判定とストリークの2回だけ）
+    expect(spy.sessionTables).toEqual(["user_attempts", "user_attempts"]);
+  });
+
+  it("I-388 残数が読めなくても画面は出る（枠だけ出さない）", async () => {
+    setup({ quotaError: { message: "connection lost" } });
+    silenceConsole();
     expect(await outcome(() => StagesPage())).toBe("RENDERED");
   });
 });

@@ -124,6 +124,27 @@ describe("§11 静的検査", () => {
   });
 
   /**
+   * **AI を呼ぶ経路を新しく作ったときに、上限の確保を通し忘れないため。**
+   *
+   * 上限は「呼ぶ直前に1回ぶん確保する」形で入れてある（lib/ai/quota.ts）。
+   * 別の API から scoreAnswer を呼ぶと、そこだけ無制限の入口になる。
+   * 順序も見る ── 呼んだ後に確保しても、その回の原価はもう出ている。
+   */
+  it("I-400 AI採点を呼ぶ経路は必ず採点回数の確保を通している", () => {
+    const callers = SOURCES.filter(
+      (f) => f.path.startsWith("app/") && f.code.includes("await scoreAnswer("),
+    );
+    expect(callers.length).toBeGreaterThan(0);
+    for (const f of callers) {
+      expect(f.code, `${f.path} が確保を通さずに採点している`).toContain("consumeAiQuota");
+      expect(
+        f.code.indexOf("consumeAiQuota"),
+        `${f.path} は採点した後に確保している`,
+      ).toBeLessThan(f.code.indexOf("await scoreAnswer("));
+    }
+  });
+
+  /**
    * 保護画面を新しく作ったとき、proxy の matcher に足し忘れると
    * ページ側のガードだけが残る。動くので気づけないが、
    * DB へのクエリが走ってから弾かれることになる。

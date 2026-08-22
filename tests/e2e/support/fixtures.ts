@@ -13,6 +13,7 @@
 import { test as base, expect, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { derivedPassword } from "../../support/password";
+import { toJstDate } from "../../../lib/progress/streak";
 
 export { expect };
 
@@ -323,6 +324,35 @@ export async function profileRowExists(userId: string): Promise<boolean> {
 export async function clearAttempts(userId: string) {
   const { error } = await admin().from("user_attempts").delete().eq("user_id", userId);
   if (error) throw new Error(`回答履歴の削除に失敗: ${error.message}`);
+  await clearAiUsage(userId);
+}
+
+/**
+ * この利用者が使った採点回数（D1）を取り消す。
+ *
+ * **行を消すだけでは足りない。** `ai_usage_daily` にはサービス全体の合計を持つ行があり
+ * （`user_id` が全ゼロ）、採点1回ごとに本人の行と一緒に増える。
+ * E2E は1回の実行で何十回も採点するので、消し忘れると
+ * **テストを回すほど本番の1日500回が削られていく**（スタブなので費用は出ないが、天井は本物）。
+ *
+ * `refund_ai_quota` を使った回数ぶん呼んで、本人と全体の両方を元に戻す。
+ */
+export async function clearAiUsage(userId: string) {
+  const db = admin();
+  // 戻せるのは**きょう（JST）の行だけ**。関数がきょうの行しか触らないため。
+  // 日付の出し方はアプリと同じものを使う（lib/progress/streak.ts）
+  const { data } = await db
+    .from("ai_usage_daily")
+    .select("used")
+    .eq("user_id", userId)
+    .eq("jst_date", toJstDate(new Date()))
+    .maybeSingle();
+
+  for (let i = 0; i < (data?.used ?? 0); i++) {
+    await db.rpc("refund_ai_quota", { p_user_id: userId });
+  }
+  // 過去の日付の行はそのまま消してよい（全体の合計はもう関係ない）
+  await db.from("ai_usage_daily").delete().eq("user_id", userId);
 }
 
 /** 採点を通さずに入れるクリア済みの回答行。`grader_version` で下ごしらえだと分かるようにしてある */

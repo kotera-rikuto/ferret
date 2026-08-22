@@ -226,10 +226,10 @@ where user_id = $1 and problem_id = $2 and is_provisional = false;
 
 **`is_provisional = false` で絞る理由:** レート上限時のフォールバック（層1のみ・最大20点）はクリア閾値55に永久に届かない。不合格として扱うと上限到達ユーザーに理由不明の全問不合格が並ぶため、判定保留としてクリア判定から除外する。
 
-### レート制限のクエリ（Free プラン・v3 で条件追加）
+### ~~レート制限のクエリ（Free プラン・v3 で条件追加）~~ ── **採らなかった（D1・2026-08-22）**
 
 ```sql
--- 今日（JST）に AI 採点を消費した回数
+-- 【使っていない】今日（JST）に AI 採点を消費した回数
 select count(*)
 from public.user_attempts
 where user_id = $1
@@ -238,9 +238,59 @@ where user_id = $1
   and (usage ->> 'replayed') is distinct from 'true';
 ```
 
-別テーブル不要。このカウントが 3 以上なら AI 採点を行わない（Free プラン）。
+**「別テーブル不要」としていたが、この方式では上限を守れない。** 実装は `ai_usage_daily` に置き換えた（下の節）。理由は2つ。
 
-**v2 からの変更:** 全試行をカウントしていたため、**API を1回も呼んでいないリプレイ（同一回答の再送）や層1のみの試行まで無料枠を消費していた。** `scoring_method = 'ai'` かつリプレイでないものだけを数える。
+1. **`count → 判定 → 採点` が不可分ではない。** 並列で来たリクエストは全部が同じ古い件数を読んで通り抜ける。Vercel は同時に複数のインスタンスが動くので、アプリ側のメモリに錠前を置いても効かない（`app/api/score/route.ts` の `inFlight` はプロセス内だけの補助）。
+2. **行の数は採点の回数ではない。** 採点を経由せずに入れた行（`problems/unlock-seed.mjs` の解放用）も `scoring_method = 'ai'` なので枠を食う。逆に**採点が失敗すると行が作られない**ので、失敗を誘発するループは1件も数えられずに OpenAI を叩ける。
+
+**このクエリ自体は集計用としては正しい**（「きょう何回 AI 採点が成立したか」を後から数えるのに使える）。強制には使わない。
+
+---
+
+## ai_usage_daily
+
+**【D1 で追加・2026-08-22】** AI 採点の1日（JST）あたりの使用量。上限の強制と残数の表示が同じ数字を見るための唯一の場所。
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `jst_date` | DATE | 日本時間の日付。**決めるのは必ず SQL 側**（`(now() at time zone 'Asia/Tokyo')::date`）。アプリ側で計算すると「表示は昨日・強制は今日」のズレが入る |
+| `user_id` | UUID | 主キーの一部。**`users` への外部キーは張らない** ── サービス全体の合計を同じ表の1行（全ゼロの UUID）で持つため |
+| `used` | INTEGER | その日に成立した AI 採点の回数（0 以上） |
+| `updated_at` | TIMESTAMPTZ | 最終更新 |
+
+主キーは `(jst_date, user_id)`。RLS は有効で**ポリシーは0件**（`problems` と同じ扱い）。anon に UPDATE を許すと自分の `used` を 0 に戻せる ── 上限がそのまま無効になる。
+
+**古い行は消していない。** 1ユーザー1日1行しか増えず、残しておくと「日ごとの利用状況」がそのまま読める。
+
+### 関数（`supabase/migrations/20260822174900_ai_usage_daily.sql`）
+
+| 関数 | 役割 |
+|---|---|
+| `consume_ai_quota(user_id, user_limit, global_limit)` | **OpenAI を呼ぶ直前に1回だけ呼ぶ。** 全体 → 本人の順に行ロックを取り、両方が上限未満のときだけ両方を +1 する。返り値は `(allowed, blocked_by, user_used, global_used)` |
+| `refund_ai_quota(user_id)` | 確保を1回ぶん戻す。**呼ぶのは「トークンが課金されていない」と分かった失敗だけ。** 本人の行が実際に減ったときだけ全体の行も減らす（`20260822184000` で修正。**全体だけが減ると、その日に流せる総数が実際の消費より増える** ── 天井が静かに上へずれる。実DBの `I-685` が踏んだ） |
+| `peek_ai_quota(user_id)` | 増やさずに読む。ステージ画面の残数表示用 |
+
+**要点は `for update`（行ロック）。** これが並列リクエストを直列化する。素の `select` に変えると、同時に来た2件が同じ `used` を読んで両方通る。
+
+**上限値は引数で渡す**（アプリ側の `lib/ai/quota.ts` が持つ）。SQL にも定数を書くと、片方だけ変えたときに画面の残数と実際の強制がズレる。
+
+**EXECUTE 権限は `service_role` だけ。** Postgres は関数の EXECUTE を既定で PUBLIC に配り、Supabase の既定権限では `anon` / `authenticated` にも付く。取り上げないと、ブラウザの anon キーから `consume_ai_quota(<他人の id>, 1, 1)` を叩いて他人の枠を焼ける（全体行を膨らませれば全員を止められる）。マイグレーションの末尾で `revoke` している。
+
+関数は `security definer` に**しない**。ポリシーが0件なので、万一 EXECUTE が漏れても RLS で INSERT が拒否されて例外になり、**通す方向には倒れない**。definer にするとその場合に「他人の枠を焼ける関数」になる。
+
+### 何を1回と数えるか
+
+| 行・事象 | 数える | 理由 |
+|---|---|---|
+| AI 採点が成立した | ✅ | 原価が出ている |
+| OpenAI が 429 / 5xx を返した | ❌ 戻す | トークンが1つも課金されていない |
+| 応答は返ったが使えなかった（JSON 壊れ・スキーマ違い等） | ✅ 戻さない | 課金済み。**ここを戻すと、失敗を誘発できる相手が無制限に叩ける** |
+| タイムアウト | ✅ 戻さない | 課金されたか判定できないので安全側に置く |
+| 同一回答のリプレイ | ❌ | API を呼んでいない |
+| 判定保留（`is_provisional = true`） | ❌ | 層2を回していない。上限超過の結果そのもの |
+| 手で入れた行（解放用の seed など） | ❌ | この表を通らないので構造的に数えられない |
+
+**退会したら消す**（`lib/account.ts` の `DELETE_TARGETS`）。外部キーが無いので cascade では消えない。
 
 ---
 
@@ -267,6 +317,8 @@ Stripe のサブスクリプション情報。Pro・Pro Plus へのアップグ�
 users
  ├─── user_attempts (user_id)
  └─── subscriptions (user_id)
+      （ai_usage_daily は user_id を持つが**外部キーは張らない**。
+        全体の合計を全ゼロの UUID の行で持つため。退会時の削除は明示的に行う）
 
 problems
  └─── user_attempts (problem_id)
@@ -284,6 +336,7 @@ problems
 | `users` | SELECT 自分の行のみ | `plan` の自己書き換えを防ぐ |
 | `subscriptions` | SELECT 自分の行のみ | 書き込みは Stripe Webhook（service_role）のみ |
 | `problems` | **ポリシーなし** | SELECT を許すと anon キーで `model_answer` を直接読めてしまう。サーバー経由（admin + カラム明示）でのみ読む |
+| `ai_usage_daily` | **ポリシーなし** | 【D1】UPDATE を許すと自分の使用数を 0 に戻せる（上限が無効になる）。SELECT も許さない ── サーバー経由の残数表示だけで足りる |
 
 ```sql
 create policy "自分の回答だけ閲覧できる" on public.user_attempts

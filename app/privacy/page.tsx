@@ -7,6 +7,7 @@ import {
   OPERATOR_NAME,
   PROCESSORS,
 } from "@/lib/legal";
+import { publicPageMetadata } from "@/lib/seo/site";
 
 /**
  * プライバシーポリシー。
@@ -22,11 +23,13 @@ import {
  * ログイン不要のページ。`proxy.ts` の matcher に足さないこと。
  */
 
-export const metadata: Metadata = {
-  title: "プライバシーポリシー | Ferret",
+// 「| Ferret」は layout.tsx の title.template が付ける。ここに書くと二重になる
+export const metadata: Metadata = publicPageMetadata({
+  path: "/privacy",
+  title: "プライバシーポリシー",
   description:
     "Ferret が取得する情報、利用目的、外部のAIサービスへの送信について定めた方針",
-};
+});
 
 export default function PrivacyPage() {
   return (
