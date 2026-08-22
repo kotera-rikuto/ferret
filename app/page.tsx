@@ -302,8 +302,14 @@ export default async function Home() {
                 見出しは1つだけ。ロゴと惹句を同じ h1 に入れてあるので、
                 読み上げでは「Ferret 他人のコードが読める、AI時代のエンジニアに。」になる
               */}
-              <h1 className="flex flex-col gap-3">
-                <span className="text-xs font-extrabold tracking-[0.42em] text-brand-deep">
+              <h1 className="flex flex-col gap-4">
+                {/*
+                  ロゴの行。**字間を詰めて大きくしてある**（2026-08-22・オーナー指摘）。
+                  12px + 字間 0.42em では、すぐ上のチップ（11px だが下地があるぶん重い）に
+                  負けて、ブランド名ではなく小さな注記に見えていた。
+                  20px まで上げ、字間は 0.26em に詰めて塊として見えるようにしている。
+                */}
+                <span className="text-xl font-extrabold tracking-[0.26em] text-brand-deep">
                   Ferret
                 </span>
                 {/*
@@ -383,8 +389,8 @@ export default async function Home() {
           <SectionHead
             index="01"
             label="なぜ「読む」なのか"
-            title="書く速さより、読んで決める回数が増えました。"
-            lead="コードは前より速く出てくるようになりました。増えたのは、出てきたものを読んで、通すかどうかを決める回数のほうです。読む力は、そこで効きます。"
+            title="AI時代に求められるのは、コードを書く力より読む力。"
+            lead="AI の発達によって、エンジニアに求められる力が変わってきました。出てきたコードの良し悪しを判断できる人こそ、これからの時代に必要になります。"
           />
           <div className="mt-10 grid gap-5 sm:grid-cols-3 lg:gap-6">
             {SCENES.map(({ Icon, title, body }) => (
