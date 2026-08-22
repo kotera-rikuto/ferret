@@ -161,7 +161,7 @@ test.describe("§1 ログインの失敗と案内", () => {
 
     await page.goto("/register");
     await page.getByLabel("メールアドレス").fill(fresh);
-    await page.getByLabel("パスワード").fill("FerretE2E2026!");
+    await page.getByLabel("パスワード").fill(TEST_USER.password);
     // 2026-08-19 から、同意にチェックを入れるまで登録ボタンは押せない（E-459）
     await page.getByLabel("利用規約とプライバシーポリシーに同意する").check();
     await page.getByRole("button", { name: "登録する" }).click();

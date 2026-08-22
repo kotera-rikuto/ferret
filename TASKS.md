@@ -102,7 +102,8 @@
 - [x] **middleware のリダイレクトを有効化** — 保護範囲を `/stages` `/problems` `/result` `/review` に拡大。`?next=` でログイン後に元の場所へ戻す
 - [x] **エラーメッセージを実際の理由に**（`lib/auth/errors.ts`）— 「登録に失敗しました」では原因が分からない
 - [x] **OAuth ボタンを「準備中」表示に** — 未設定のまま押すと無反応に見えていた（`OAUTH_ENABLED` で管理）
-- [x] 開発用アカウント作成 — `dev@ferret.test` / `FerretDev2026!`（admin API でメール確認済みとして作成）
+- [x] 開発用アカウント作成 — `dev@ferret.test`（admin API でメール確認済みとして作成）。
+  **パスワードは `.env.local` に置く**（2026-08-22・C5 で平文の記載を削除。リポジトリが Public なため）
 
 ### その後（2026-08-17〜19）
 

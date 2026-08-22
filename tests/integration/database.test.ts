@@ -20,6 +20,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config as loadEnv } from "dotenv";
+import { derivedPassword } from "../support/password";
 
 const OPT_IN = process.env.RUN_DB_TESTS === "1";
 
@@ -116,9 +117,26 @@ function validAttempt(userId: string, problemId: number, patch: Record<string, u
   };
 }
 
+/**
+ * RLS を確かめるための2アカウント。**パスワードは特権キーから導出する**
+ *（2026-08-22・C5。理由は `tests/support/password.ts`）。
+ *
+ * getter にしてあるのは、`RUN_DB_TESTS=1` のときだけ `.env.local` を読む作りのため。
+ * 読み込み時に評価すると、通常の `npm test`（特権キー無し）で落ちる。
+ */
 const USERS = {
-  a: { email: "db-test-a@ferret.test", password: "FerretDbTestA2026!" },
-  b: { email: "db-test-b@ferret.test", password: "FerretDbTestB2026!" },
+  a: {
+    email: "db-test-a@ferret.test",
+    get password() {
+      return derivedPassword("db-test-a");
+    },
+  },
+  b: {
+    email: "db-test-b@ferret.test",
+    get password() {
+      return derivedPassword("db-test-b");
+    },
+  },
 };
 
 let admin: SupabaseClient;
@@ -140,6 +158,14 @@ async function ensureUser(email: string, password: string): Promise<string> {
   const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 200 });
   const found = list?.users.find((u) => u.email === email);
   if (!found) throw new Error(`テストユーザーを用意できません: ${email}`);
+
+  // **既にあるアカウントのパスワードを毎回入れ替える。**
+  // 導出方式に切り替えた時点で、以前の値のまま残っているアカウントはログインできない。
+  // ここで揃えておけば手作業が要らない
+  const { error } = await admin.auth.admin.updateUserById(found.id, { password });
+  if (error) {
+    throw new Error(`テストユーザーのパスワードを更新できません（${email}）: ${error.message}`);
+  }
   return found.id;
 }
 

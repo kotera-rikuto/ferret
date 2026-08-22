@@ -10,7 +10,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 const USER_ID = "11111111-1111-1111-1111-111111111111";
 const EMAIL = "owner@ferret.test";
-const PASSWORD = "FerretDev2026!";
+const PASSWORD = "mock-password-not-real";
 
 const { signInMock, createClientSpy } = vi.hoisted(() => ({
   signInMock: vi.fn(),

@@ -12,6 +12,7 @@
 
 import { test as base, expect, type Page } from "@playwright/test";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { derivedPassword } from "../../support/password";
 
 export { expect };
 
@@ -106,9 +107,16 @@ export const stub = {
 // テストデータ
 // ---------------------------------------------------------------------------
 
+/**
+ * E2E がログインに使う共有アカウント。
+ * パスワードは特権キーから導出する（`tests/support/password.ts` に理由）。
+ * メールアドレスは秘密ではないので既定値を置く。
+ */
 export const TEST_USER = {
   email: process.env.E2E_USER_EMAIL ?? "e2e@ferret.test",
-  password: process.env.E2E_USER_PASSWORD ?? "FerretE2E2026!",
+  get password(): string {
+    return process.env.E2E_USER_PASSWORD ?? derivedPassword("e2e-user");
+  },
 };
 
 /** 採点対象の回答。スタブの evidence がこの文字列に実在することが前提 */
@@ -249,6 +257,16 @@ export async function ensureUser(): Promise<string> {
   const { data: list } = await db.auth.admin.listUsers({ page: 1, perPage: 200 });
   const found = list?.users.find((u) => u.email === TEST_USER.email);
   if (!found) throw new Error("テストユーザーが見つかりません");
+
+  // **既にあるアカウントのパスワードを毎回入れ替える。**
+  // 導出方式（derivedPassword）に切り替えた時点で、以前の値のまま残っている
+  // アカウントはログインできない。ここで揃えておけば手作業が要らない
+  const { error: updateError } = await db.auth.admin.updateUserById(found.id, {
+    password: TEST_USER.password,
+  });
+  if (updateError) {
+    throw new Error(`テストユーザーのパスワードを更新できません: ${updateError.message}`);
+  }
   return found.id;
 }
 

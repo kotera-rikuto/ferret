@@ -22,7 +22,7 @@ import {
 import { DELETE_CONFIRM_WORD, DELETE_TARGETS } from "@/lib/account";
 
 const USER_EMAIL = "owner@ferret.test";
-const PASSWORD = "FerretDev2026!";
+const PASSWORD = "mock-password-not-real";
 
 const { getUserMock, verifyPasswordMock, holder } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
