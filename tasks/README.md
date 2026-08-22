@@ -171,6 +171,18 @@ npm run build         # 本番と同じ形で組み立てられるか
 > （テスト側は `OPENAI_STUB_PORT` を見ておらず、既定の 4010 を叩くため）。
 > なお **DB は共有のまま**なので、同時実行では相手の回答履歴を壊しうる点は変わらない。
 
+### 本番（https://ferretcode.com）で確認するとき
+
+**dev サーバーと同じ手順では通らない。** 2026-08-22・D1 で2回踏んだ。
+
+- **ホスト名は `localhost`。** dev サーバーは `127.0.0.1` からの `/_next/` を
+  `allowedDevOrigins` で弾く（`playwright.config.ts` の冒頭にも同じ注がある）
+- **本番はハイドレーションが後から来る。** 入力欄を先に埋めると **React が空に戻し、
+  空のまま送信される**（ログインなら Supabase が 400 `missing email or phone` を返す）。
+  `waitForLoadState("networkidle")` の後に埋め、`inputValue()` で入ったことを確かめてから押す
+- **専用のユーザーを作って使い、最後に消す。** `e2e@ferret.test` を使うと
+  他セッションの `npm run test:e2e` が測定中に回答履歴と問題を書き換える
+
 ### データベースの中身を見る
 
 Supabase の管理画面 → **SQL Editor** で直接見られる。
