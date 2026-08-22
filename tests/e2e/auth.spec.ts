@@ -123,18 +123,17 @@ test.describe("§1 ログインの失敗と案内", () => {
     }
   });
 
-  test("E-114 タイトル画面は未ログインでも開ける", async ({ page }) => {
+  test("E-114 ルートの画面は未ログインでも開ける", async ({ page }) => {
     await page.goto("/");
     await expect(page.getByRole("heading", { name: "Ferret" })).toBeVisible();
-    // ボタンの文言はデザイン移植で変わった（「新規登録」「ログイン」→ 下の2つ）。
-    // 見たいのは**入口が2つあること**なので、行き先で確かめる
-    await expect(page.getByRole("link", { name: "はじめる" })).toHaveAttribute(
-      "href",
-      "/register",
-    );
-    await expect(
-      page.getByRole("link", { name: "アカウントをお持ちの方" }),
-    ).toHaveAttribute("href", "/login");
+    // 見たいのは**入口が2つあること**なので、行き先で確かめる。
+    //
+    // **文言で引くのをやめ、行き先を数える形にした（2026-08-22・M2）。**
+    // ここが LP になり、登録への入口が上部バー・主役・末尾の3か所に増えた。
+    // 文言で1つに絞ると「同じ名前のリンクが複数ある」で落ちる ──
+    // 画面が正しくてもテストが落ちる形。LP 自体の通しは tests/e2e/lp.spec.ts。
+    expect(await page.locator('a[href="/register"]').count()).toBeGreaterThan(0);
+    expect(await page.locator('a[href="/login"]').count()).toBeGreaterThan(0);
   });
 
   test("E-115 ログインと新規登録を行き来できる", async ({ page }) => {
