@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { IconArrowRight } from "@/components/lp/icons";
+import { Reveal } from "@/components/lp/Reveal";
 
 /*
  * LP の骨格になる部品。**新しい色は作らない**（app/globals.css のトークンだけを使う）。
@@ -74,14 +75,12 @@ export function SectionHead({
 }) {
   return (
     /*
-     * `animate-rise` + `data-reveal` で、スクロールして入ってきたときに
-     * 節の頭がせり上がる（定義は app/globals.css）。**LP だけで使う。**
-     * 見出しだけに絞ってあり、カードや本文には配っていない ──
+     * スクロールして入ってきたときに節の頭がせり上がる（`Reveal`）。
+     * **見出しだけに絞ってあり、カードや本文には配っていない** ──
      * 動きを増やすほど「作り物」に見えるので、節の切り替わりだけを示す。
      */
-    <div
-      data-reveal
-      className={`animate-rise flex flex-col gap-4 ${
+    <Reveal
+      className={`flex flex-col gap-4 ${
         align === "center" ? "items-center text-center" : "items-start"
       }`}
     >
@@ -114,7 +113,7 @@ export function SectionHead({
           {lead}
         </p>
       ) : null}
-    </div>
+    </Reveal>
   );
 }
 

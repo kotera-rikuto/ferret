@@ -17,6 +17,7 @@ import {
   SectionHead,
 } from "@/components/lp/parts";
 import { LpHeader } from "@/components/lp/LpHeader";
+import { Reveal } from "@/components/lp/Reveal";
 import { CodePanel } from "@/components/lp/CodePanel";
 import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
@@ -591,7 +592,7 @@ export default async function Home() {
               alt=""
               className="w-28 animate-float drop-shadow-[0_10px_24px_rgba(74,59,40,0.18)] sm:w-32"
             />
-            <div data-reveal className="animate-rise flex flex-col gap-4">
+            <Reveal className="flex flex-col gap-4">
               <h2 className="text-2xl leading-snug font-extrabold sm:text-4xl">
                 <span className="inline-block">まずは1問、</span>
                 <span className="inline-block">読んでみてください。</span>
@@ -599,7 +600,7 @@ export default async function Home() {
               <p className="text-[15px] leading-loose font-medium">
                 ステージ1は10行のコードです。読んで、思ったことを書くだけ。
               </p>
-            </div>
+            </Reveal>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
               <PrimaryCta href="/register">無料で始める</PrimaryCta>
               <SecondaryCta href="/login">ログイン</SecondaryCta>
