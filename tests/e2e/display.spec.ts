@@ -528,21 +528,41 @@ test.describe("§6 狭い画面", () => {
     ).toBe(Math.round(header.height));
   });
 
-  test("E-468 タイトル画面はマスコットと説明が横に並ぶ", async ({ page }) => {
+  /**
+   * 最初の画面（`/`）。
+   *
+   * **もとは「マスコットと説明が横に並ぶこと」を見ていた。** E11 の時点では
+   * ロゴとボタン2つだけのタイトル画面で、狭い画面だと縦に積まれていたため。
+   * **その画面は M2（2026-08-22）が LP に置き換えて存在しなくなった** ──
+   * LP の主役にマスコットは居らず、キャラクターはデモのカードの中で設問の隣に立つ。
+   *
+   * そこで見る中身を差し替えてある。**LP は幅375px 以下で誰も測っていない画面**で、
+   * ここが唯一の網になる（`E-453/454` と `E-453b` は問題・ステージ・リザルトだけ）。
+   * マスコットの重なりは M2 側もコメントで気にしている箇所（絶対配置で覗かせると
+   * 狭い画面で設問の文字に重なる）なので、位置関係もここで固定する。
+   */
+  test("E-468 LP（最初の画面）が狭い画面で崩れない", async ({ page }) => {
+    for (const width of [375, 320]) {
+      await page.setViewportSize({ width, height: 667 });
+      await page.goto("/");
+      const overflow = await page.evaluate(
+        () =>
+          document.documentElement.scrollWidth -
+          document.documentElement.clientWidth,
+      );
+      expect(overflow, `幅 ${width} で横に溢れている`).toBeLessThanOrEqual(1);
+    }
+
+    // デモのカードの中で、マスコットが設問の文字に重なっていないこと。
+    // 縦に積まれても（横に並ばなくても）落とさない ── 見たいのは重なりのほう
     await page.setViewportSize(NARROW);
     await page.goto("/");
-
-    const mascot = (await page.locator("img").first().boundingBox())!;
-    const copy = (await page.locator("h1").boundingBox())!;
-    // 横に並んでいれば、マスコットの右端がコピーの左端より左にある
-    expect(mascot.x + mascot.width, "縦に積まれている").toBeLessThanOrEqual(copy.x);
-
-    const overflow = await page.evaluate(
-      () =>
-        document.documentElement.scrollWidth -
-        document.documentElement.clientWidth,
-    );
-    expect(overflow, "横に溢れている").toBe(0);
+    const mascot = page.locator("img[alt='フェレット']").first();
+    const question = mascot.locator("xpath=following-sibling::p").first();
+    const m = (await mascot.boundingBox())!;
+    const q = (await question.boundingBox())!;
+    const 重なり = Math.min(m.x + m.width, q.x + q.width) - Math.max(m.x, q.x);
+    expect(重なり, "マスコットが設問の文字に重なっている").toBeLessThanOrEqual(0);
   });
 
   test("E-469 狭い画面から「ふりかえり」と「せってい」に辿れる", async ({
