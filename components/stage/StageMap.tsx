@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { chapterOf } from "@/lib/stages/chapters";
 import {
@@ -34,44 +28,42 @@ export type Stage = {
 };
 
 /**
- * 1行ぶんの高さ。**ノードが収まる高さ（NODE_H）を下回らせないこと。**
+ * 1行ぶんの高さは **CSS 変数 `--row-h`**（下の `ROW_H_CLASS`）。TS の定数ではない。
  *
- * モック（`design/stages-desktop-light.html`）は 145 だが、あれは
- * 「try/catch の流れ」のような短いタイトル前提の値。実データのタイトルは
- * 「スタックトレースを読む ─ ログから原因の行を特定する」のように3行へ折り返すため、
- * 145 ではラベルが次の行の丸に重なり、章の最後では節の下端を 20px はみ出していた（実測）。
- */
-const ROW_H = 180;
-
-/**
- * 狭い画面（lg 未満）の1行ぶんの高さ。
+ * - **パソコン（lg 以上）は 180。** モック（`design/stages-desktop-light.html`）は 145 だが、
+ *   あれは「try/catch の流れ」のような短いタイトル前提の値。実データのタイトルは
+ *   「スタックトレースを読む ─ ログから原因の行を特定する」のように3行へ折り返すため、
+ *   145 ではラベルが次の行の丸に重なり、章の最後では節の下端を 20px はみ出していた（実測）。
+ * - **狭い画面（lg 未満）は 224。** マップの列は lg 以上で約 664px、lg 未満は画面幅そのまま
+ *   （375px 端末で 327px）と**半分以下**になる。横位置は割合なので列が狭まると丸どうしが近づき、
+ *   幅 144px のラベルと、現在地の「スタート」吹き出し（丸の 48px 上）が
+ *   **1つ上の行のラベルに 53×36px 重なる**（375px で実測。lg 以上では起きない）。
+ *   横に逃がす余地が無いので縦に開ける。必要な間隔は「1つ上のノードの下端
+ *   （丸 76 + すきま 8 + ラベル 76 = 160）」を「吹き出しの上端（次の行の頭から -8 -48）」が
+ *   越えないこと、すなわち `--row-h - 56 ≥ 160` → **216 以上**。余裕を見て 224。
  *
- * マップの列は lg 以上で約 664px、lg 未満は画面幅そのまま（375px 端末で 327px）と
- * **半分以下**になる。横位置は割合なので列が狭まると丸どうしが近づき、
- * 幅 144px のラベルと、現在地の「スタート」吹き出し（丸の 48px 上）が
- * **1つ上の行のラベルに 53×36px 重なる**（375px で実測。lg 以上では起きない）。
+ * **JS で選ばないこと（E11）。** 2026-08-19〜21 は `matchMedia` で選んでいたが、
+ * サーバー描画は画面幅を知らないので広い側（180）で返すしかなく、**狭い画面では
+ * 一度 180 で描いたあとに詰め直していた。** CPU を 1/8 に絞って測ると、
+ * 375px では **約 900ms のあいだ 180 の配置が見えたまま**で、そのあと
+ * 文書の高さが 21,069 → 24,925px（+3,856px）に伸びて**全ノードが動いていた。**
+ * CSS 変数なら最初の描画から正しい値で出る。
  *
- * 横に逃がす余地が無いので縦に開ける。必要な間隔は
- * 「1つ上のノードの下端（丸 76 + すきま 8 + ラベル 76 = 160）」を
- * 「吹き出しの上端（次の行の頭から -8 -48）」が越えないこと、すなわち
- * `ROW_H - 56 ≥ 160` → **216 以上**。余裕を見て 224 にしてある。
+ * ⚠️ **Tailwind は class 名を文字として探す。** テンプレートリテラルで組み立てると
+ * `--row-h` の宣言そのものが CSS に出力されず、`calc()` が全部無効になって
+ * マップが1点に潰れる。だからこの文字列は**リテラルで持つ**
+ * （対応は `tests/unit/stage-map.test.ts` の U-823 が見ている）。
  */
-const ROW_H_NARROW = 224;
-
-/**
- * 上の `ROW_H_NARROW` の説明と対になる境目。**Tailwind の `lg` と同じ文字列を持ち、
- * 「狭い」は否定で出す。**`(max-width: 1023px)` と書くと厳密な補集合にならず、
- * 拡大表示などで幅が 1023.5px になったときに**どちらの条件も外れる**
- * （`lg:` が当たらないのに行の高さはパソコン側、という食い違いが出る）。
- * `MemoPad.tsx` の `SIDE_BY_SIDE` も同じ文字列（片方だけ動かさないこと）。
- */
-const WIDE_QUERY = "(min-width: 64rem)";
+const ROW_H_CLASS = "[--row-h:224px] lg:[--row-h:180px]";
 
 /** 節の上端から先頭ノードまで。現在地の「スタート」吹き出し（丸の 53px 上）を収める高さ */
 const PAD_TOP = 76;
 
-/** 章バナーの `sticky top-4`。着地位置の計算でバナーが占める帯を出すのに使う */
-const STICKY_TOP = 16;
+/**
+ * ノードの上端から丸の中心まで（丸 76 の半分）。道の端をここに合わせる。
+ * **道は行の高さに依存するので、`--row-h` を使った `calc()` の中に出てくる。**
+ */
+const CIRCLE_MID = 38;
 
 /**
  * 丸をバナーの下へ逃がすときに空ける余裕。
@@ -110,28 +102,6 @@ const CHAPTER_GAP = CHAPTER_GAP_MARGIN * 2 + CHAPTER_LABEL_H;
 const XS = [50, 28, 52, 72, 48, 28, 52, 72, 48, 28];
 const xOf = (order: number) => XS[(order - 1) % XS.length];
 
-/**
- * 狭い画面かどうか。**行の高さが SVG の座標にも入るので CSS では切り替えられない**
- * （`y1` / `y2` は幾何属性で、メディアクエリの対象にならない）。
- *
- * サーバー描画では常に false ＝ lg 以上の値を返す。パソコンでの出力は
- * この変更の前と1バイトも変わらない。狭い画面では最初の描画のあとに詰め直すが、
- * 起動時は `scrollToCurrent` が現在地まで飛ぶので、その動きに紛れる。
- */
-function useNarrow(): boolean {
-  const wide = useSyncExternalStore(
-    (onChange) => {
-      const mql = window.matchMedia(WIDE_QUERY);
-      mql.addEventListener("change", onChange);
-      return () => mql.removeEventListener("change", onChange);
-    },
-    () => window.matchMedia(WIDE_QUERY).matches,
-    // サーバー描画は「広い」に寄せる。パソコンでの出力を従来と一致させるため
-    () => true,
-  );
-  return !wide;
-}
-
 type ChapterGroup = {
   no: number | null;
   title: string;
@@ -158,7 +128,6 @@ function groupByChapter(stages: Stage[]): ChapterGroup[] {
 export function StageMap({ stages }: { stages: Stage[] }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Stage | null>(null);
-  const rowH = useNarrow() ? ROW_H_NARROW : ROW_H;
 
   const groups = groupByChapter(stages);
   // 下から上に登るマップなので、後の章ほど上に描く
@@ -188,15 +157,24 @@ export function StageMap({ stages }: { stages: Stage[] }) {
    * 中央に置いただけでは足りない。バナーの帯にどの丸が来るかは**画面の高さ次第**で、
    * 実測でも 900px 高では 14.5px かかっていた。かかっていたら下へずらして必ず全部見せる。
    *
-   * **`ROW_H` ≥ バナーの高さ + 丸の直径（76）+ `BANNER_CLEARANCE` が前提。**
+   * **`--row-h` ≥ バナーの高さ + 丸の直径（76）+ `BANNER_CLEARANCE` が前提。**
    * これが成り立つ限り帯にかかる丸は多くても1つなので、ずらして別の丸が新たにかかることはない
-   * （行間 180 ≥ 81 + 76 + 8 = 165。バナーを高くするなら `ROW_H` も上げること）。
+   * （行間 180 ≥ 81 + 76 + 8 = 165。バナーを高くするなら `--row-h` も上げること）。
+   *
+   * **バナーが貼り付く位置は `getComputedStyle` で引く（E11）。** 狭い画面では
+   * 上に数字の帯（`app/stages/page.tsx`）が居座るのでバナーは `top-4` ではなく
+   * その下に貼り付く。ここに数字を書き写すと、帯の高さを変えた日に
+   * **着地の計算だけが古い値のまま**残り、現在地の丸がバナーの裏に入る。
    */
   const scrollToCurrent = useCallback((behavior: ScrollBehavior) => {
     const node = currentNodeRef.current;
     if (!node) return;
-    const bannerHeight = bannerRef.current?.getBoundingClientRect().height ?? 0;
-    const bannerBottom = STICKY_TOP + bannerHeight;
+    const banner = bannerRef.current;
+    const bannerHeight = banner?.getBoundingClientRect().height ?? 0;
+    const stickyTop = banner
+      ? parseFloat(getComputedStyle(banner).top) || 0
+      : 0;
+    const bannerBottom = stickyTop + bannerHeight;
     const rect = node.getBoundingClientRect();
     const visibleCenter = bannerBottom + (window.innerHeight - bannerBottom) / 2;
 
@@ -216,7 +194,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
       const box = circle.getBoundingClientRect();
       // ずらした後の画面内の位置に置き換えて判定する
       const y = box.top + window.scrollY - top;
-      if (y < bannerBottom + BANNER_CLEARANCE && y + box.height > STICKY_TOP) {
+      if (y < bannerBottom + BANNER_CLEARANCE && y + box.height > stickyTop) {
         top = clamp(top - (bannerBottom + BANNER_CLEARANCE - y));
         break;
       }
@@ -260,10 +238,10 @@ export function StageMap({ stages }: { stages: Stage[] }) {
     sync();
     window.addEventListener("scroll", sync, { passive: true });
     return () => window.removeEventListener("scroll", sync);
-    // rowH を依存に入れてある。狭い画面では最初の描画が lg 以上の値（サーバーと同じ）で、
-    // その直後に詰め直されて**全ノードの縦位置が動く**。入れておかないと
-    // 着地の計算が動く前の座標で走り、現在地が画面の外に取り残される
-  }, [scrollToCurrent, rowH]);
+    // 行の高さは CSS 変数（`ROW_H_CLASS`）なので、最初の描画から確定している。
+    // 2026-08-19〜21 は JS で選んでいて、描いたあとに全ノードが動くため
+    // `rowH` を依存に足して2回走らせていた。もう要らない（E11）
+  }, [scrollToCurrent]);
 
   function handleStart() {
     if (!selected) return;
@@ -272,12 +250,28 @@ export function StageMap({ stages }: { stages: Stage[] }) {
 
   return (
     <>
-      {/* 章バナー: スクロールに追従して現在見えている章を示す */}
+      {/*
+       * 章バナー: スクロールに追従して現在見えている章を示す。
+       *
+       * **狭い画面では上の数字の帯の下に貼り付く**（`top-16` = 60px の帯 + 4px。
+       * 帯は `app/stages/page.tsx` にある。片方だけ動かさないこと）。
+       * lg 以上は帯が出ないので従来どおり `top-4`。
+       */}
       <div
         ref={bannerRef}
-        className="sticky top-4 z-20 flex items-center justify-between rounded-2xl border-b-5 border-brand-deep bg-gradient-to-br from-brand to-brand-soft px-6 py-4 text-white shadow-[0_8px_22px_rgba(196,112,0,0.18)]"
+        className="sticky top-16 z-20 flex items-center justify-between rounded-2xl border-b-5 border-brand-deep bg-gradient-to-br from-brand to-brand-soft px-6 py-4 text-white shadow-[0_8px_22px_rgba(196,112,0,0.18)] lg:top-4"
       >
-        <div>
+        {/*
+         * **高さを2行ぶん（`min-h-11` = 44px）で固定する（E11）。**
+         * 章の番号は `chapterOf` が null を返す order（動作確認用の 999 など）で消えるので、
+         * 素直に書くとバナーが 81px ⇄ 65px で伸び縮みし、**その下のマップ全体が 16px 跳ねる。**
+         * バナーは貼り付いているので、スクロールして章の外に入った瞬間に起きる。
+         *
+         * 空の行を置くのではなく箱の高さを決めているのは、番号が無いときに
+         * 「見出しの上に説明のつかない空白の行がある」形にしないため（1行のまま中央に来る）。
+         * 44px は `py-4` と `border-b-5` を除いた2行ぶんの実測値。
+         */}
+        <div className="flex min-h-11 flex-col justify-center">
           {banner.no !== null && (
             <span className="block text-xs font-extrabold tracking-widest opacity-90">
               第{banner.no}章
@@ -288,13 +282,13 @@ export function StageMap({ stages }: { stages: Stage[] }) {
         <IconBook size={26} />
       </div>
 
-      <div className="relative">
+      <div className={`relative ${ROW_H_CLASS}`}>
         {displayGroups.map((group, gi) => {
           // 章の中も上ほど先のステージ（order 降順）
           const rows = [...group.stages].sort((a, b) => b.order - a.order);
-          // 下端は「最後のノードが収まる位置」で決める。行数 × ROW_H だと
-          // ROW_H とノードの高さの差だけ余白が出たり、逆にはみ出したりする
-          const height = (rows.length - 1) * rowH + PAD_TOP + NODE_H;
+          // 下端は「最後のノードが収まる位置」で決める。行数 × 行の高さだと
+          // 行の高さとノードの高さの差だけ余白が出たり、逆にはみ出したりする
+          const height = `calc(var(--row-h) * ${rows.length - 1} + ${PAD_TOP + NODE_H}px)`;
 
           // 章を跨ぐ道の相手。1つ下の節（＝手前の章）の**最上段**のノード。
           // group.stages は order 昇順なので、末尾がその章でいちばん先のステージ＝最上段。
@@ -316,55 +310,90 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                 className="relative"
                 style={{ height }}
               >
-                {/* 道。クリアして通った区間は実線、その先は点線 */}
-                <svg className="pointer-events-none absolute inset-0 h-full w-full overflow-visible">
-                  {rows.map((s, i) => {
-                    const next = rows[i + 1];
-                    if (!next) return null;
-                    const done = next.status === "cleared";
-                    return (
+                {/*
+                 * 道。クリアして通った区間は実線、その先は点線。
+                 *
+                 * **1区間 = 1つの入れ物 + 1本の線。** ひとつの SVG にまとめて
+                 * `y1` / `y2` を px で書くほうが素直だが、**幾何属性は CSS で表せない** ──
+                 * 行の高さがメディアクエリで変わる（`ROW_H_CLASS`）ので、
+                 * それをやると行の高さを JS で選ぶしかなくなり、E11 で直した
+                 * 「描いたあとに全ノードが動く」に戻る。
+                 *
+                 * 入れ物の上下端を丸の中心に合わせておけば、線は入れ物の中で
+                 * **0% → 100%** を結ぶだけでよく、px の座標が要らない。
+                 * 横位置（`x1` / `x2`）は入れ物が `inset-x-0` ＝ 節と同じ幅なので、
+                 * これまでと同じ割合がそのまま使える。
+                 */}
+                {rows.map((s, i) => {
+                  const next = rows[i + 1];
+                  if (!next) return null;
+                  const done = next.status === "cleared";
+                  return (
+                    <div
+                      key={s.id}
+                      className="pointer-events-none absolute inset-x-0"
+                      style={{
+                        top: `calc(var(--row-h) * ${i} + ${PAD_TOP + CIRCLE_MID}px)`,
+                        height: `calc(var(--row-h) - ${CIRCLE_MID}px)`,
+                      }}
+                    >
+                      <svg className="h-full w-full overflow-visible">
+                        <line
+                          x1={`${xOf(next.order)}%`}
+                          y1="100%"
+                          x2={`${xOf(s.order)}%`}
+                          y2="0"
+                          strokeWidth={6}
+                          strokeLinecap="round"
+                          strokeDasharray={done ? undefined : "1 15"}
+                          className={done ? "stroke-path-done" : "stroke-path-todo"}
+                        />
+                      </svg>
+                    </div>
+                  );
+                })}
+
+                {/*
+                 * 章を跨ぐ1本。**これが無いと、区切りの上下で道が途切れる**
+                 * （実測で 335px、丸2つぶん以上なにも無い区間ができていた。2026-08-19）。
+                 * 節ごとに線を引く作りなので、節と節の間だけ誰も描いていなかった。
+                 *
+                 * **上の節に描く。** 節は position:relative なので、後に来る節のほうが
+                 * 上に描かれる ── 下の節から引くと区切りの帯や見出しの上を跨いでしまう。
+                 * 上から引けば帯の下を通る。入れ物は overflow-visible なので節の外へ出せる。
+                 *
+                 * **この区間の長さだけは行の高さに依らない。** 下端は次の節の先頭ノード
+                 * （節の下端 + 区切り + `PAD_TOP`）、上端はこの節の最下段の丸の中心なので、
+                 * 引き算すると行の高さが打ち消えて `PAD_TOP + NODE_H + CHAPTER_GAP - CIRCLE_MID` になる。
+                 */}
+                {below && (
+                  <div
+                    className="pointer-events-none absolute inset-x-0"
+                    style={{
+                      top: `calc(var(--row-h) * ${rows.length - 1} + ${PAD_TOP + CIRCLE_MID}px)`,
+                      height: PAD_TOP + NODE_H + CHAPTER_GAP - CIRCLE_MID,
+                    }}
+                  >
+                    <svg className="h-full w-full overflow-visible">
                       <line
-                        key={s.id}
-                        x1={`${xOf(next.order)}%`}
-                        y1={PAD_TOP + (i + 1) * rowH}
-                        x2={`${xOf(s.order)}%`}
-                        y2={PAD_TOP + i * rowH + 38}
+                        x1={`${xOf(below.order)}%`}
+                        y1="100%"
+                        x2={`${xOf(bottom.order)}%`}
+                        y2="0"
                         strokeWidth={6}
                         strokeLinecap="round"
-                        strokeDasharray={done ? undefined : "1 15"}
-                        className={done ? "stroke-path-done" : "stroke-path-todo"}
+                        strokeDasharray={
+                          below.status === "cleared" ? undefined : "1 15"
+                        }
+                        className={
+                          below.status === "cleared"
+                            ? "stroke-path-done"
+                            : "stroke-path-todo"
+                        }
                       />
-                    );
-                  })}
-
-                  {/*
-                   * 章を跨ぐ1本。**これが無いと、区切りの上下で道が途切れる**
-                   * （実測で 335px、丸2つぶん以上なにも無い区間ができていた。2026-08-19）。
-                   * 節ごとに線を引く作りなので、節と節の間だけ誰も描いていなかった。
-                   *
-                   * **上の節に描く。** 節は position:relative なので、後に来る節のほうが
-                   * 上に描かれる ── 下の節から引くと区切りの帯や見出しの上を跨いでしまう。
-                   * 上から引けば帯の下を通る。SVG は overflow-visible なので節の外へ出せる。
-                   */}
-                  {below && (
-                    <line
-                      x1={`${xOf(below.order)}%`}
-                      y1={height + CHAPTER_GAP + PAD_TOP}
-                      x2={`${xOf(bottom.order)}%`}
-                      y2={PAD_TOP + (rows.length - 1) * rowH + 38}
-                      strokeWidth={6}
-                      strokeLinecap="round"
-                      strokeDasharray={
-                        below.status === "cleared" ? undefined : "1 15"
-                      }
-                      className={
-                        below.status === "cleared"
-                          ? "stroke-path-done"
-                          : "stroke-path-todo"
-                      }
-                    />
-                  )}
-                </svg>
+                    </svg>
+                  </div>
+                )}
 
                 {rows.map((s, i) => {
                   const isCurrent = s.status === "current";
@@ -379,7 +408,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                         isOpen ? "z-40" : ""
                       }`}
                       style={{
-                        top: PAD_TOP + i * rowH - (isCurrent ? 8 : 0),
+                        top: `calc(var(--row-h) * ${i} + ${PAD_TOP - (isCurrent ? 8 : 0)}px)`,
                         left: `${xOf(s.order)}%`,
                       }}
                     >

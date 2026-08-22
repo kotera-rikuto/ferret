@@ -398,3 +398,155 @@ test.describe("§6 メモ欄", () => {
     await expect(page.getByPlaceholder("回答を入力してください...")).toHaveValue("");
   });
 });
+
+/**
+ * 狭い画面（E11）。**幅はテストの中で 375px に固定する** ──
+ * このファイルは desktop と mobile の2つのプロジェクトで走るので、
+ * プロジェクト任せにすると同じ検査が別の幅で2回走ることになる。
+ *
+ * ここで見るのは「パソコンにあるものが狭い画面にもあるか」と
+ * 「貼り付けた帯どうしが重なっていないか」。**どれも壊れても画面は正常に見える。**
+ */
+test.describe("§6 狭い画面", () => {
+  const NARROW = { width: 375, height: 667 };
+
+  /** マップの入れ物（節を持つ div）。行の高さの CSS 変数がここに載っている */
+  const MAP_ROOT = "main > div:has(section)";
+
+  test("E-464 レベル・つづけた日数・すすみぐあいが画面の中に見えている", async ({
+    authedPage,
+  }) => {
+    const page = authedPage;
+    await page.setViewportSize(NARROW);
+    await page.goto("/stages");
+    // 起動時の現在地へのスクロールが終わってから測る。
+    // **貼り付いていなければここで画面の外に出る**（マップは 25,000px ある）
+    await page.waitForTimeout(800);
+
+    const bar = page.locator("main > div.sticky").first();
+    await expect(bar).toBeInViewport();
+
+    const box = (await bar.boundingBox())!;
+    expect(box.y, "帯が画面の上に貼り付いていない").toBeLessThan(4);
+
+    // 3つの数字が帯の中にある。文字ではなく帯の中身で見る
+    // （レベルも「すすみぐあい」も数字だけなので、文字列では引けない）
+    await expect(bar.getByText("レベル")).toBeVisible();
+    await expect(bar.locator("svg")).toHaveCount(2); // ほのお + チェック
+    // つづけた日数は 0 日でも数字を出さない（0 を罰に見せない既存の扱い）
+    const streakText = await bar.innerText();
+    expect(streakText).toMatch(/日連続|きょう解くと/);
+  });
+
+  test("E-465 マップの行の高さは CSS だけで決まる（開いた直後に跳ねない）", async ({
+    authedPage,
+  }) => {
+    const page = authedPage;
+
+    // サーバーが返した HTML そのものを見る。位置が px で焼き込まれていたら、
+    // 狭い画面では描いたあとに詰め直すことになり、全ノードが動く
+    const html = await (await page.request.get("/stages")).text();
+    expect(html, "節の高さが --row-h から計算されていない").toContain(
+      "calc(var(--row-h)",
+    );
+    expect(html, "行の高さの宣言が HTML に出ていない").toContain("--row-h:224px");
+
+    // 同じ HTML から、幅だけで別の行の高さが出ること
+    for (const [width, expected] of [
+      [375, "224px"],
+      [1024, "180px"],
+    ] as const) {
+      await page.setViewportSize({ width, height: 800 });
+      await page.goto("/stages");
+      const rowH = await page
+        .locator(MAP_ROOT)
+        .evaluate((el) => getComputedStyle(el).getPropertyValue("--row-h").trim());
+      expect(rowH, `幅 ${width} の行の高さ`).toBe(expected);
+    }
+  });
+
+  test("E-466 章バナーが数字の帯の下に貼り付く（重ならない）", async ({
+    authedPage,
+  }) => {
+    const page = authedPage;
+    await page.setViewportSize(NARROW);
+    await page.goto("/stages");
+    await page.waitForTimeout(800);
+
+    const bar = (await page.locator("main > div.sticky").first().boundingBox())!;
+    const banner = (await page
+      .locator("main div.sticky", { has: page.locator("svg") })
+      .filter({ hasText: /第\d+章|とくべつ/ })
+      .first()
+      .boundingBox())!;
+
+    expect(banner.y, "章バナーが数字の帯に重なっている").toBeGreaterThanOrEqual(
+      bar.y + bar.height,
+    );
+  });
+
+  test("E-467 メモ欄はコードを読む位置と回答を書く位置の両方から使える", async ({
+    authedPage,
+    problems,
+  }) => {
+    const page = authedPage;
+    await page.setViewportSize(NARROW);
+    await page.goto(`/problems/${problems[0].id}`);
+
+    const header = (await page.locator("header").boundingBox())!;
+    const memo = page.locator("div.order-first");
+    const toggle = memo.getByRole("button");
+
+    // 1. コードより上にある（読みながら書ける）
+    const code = (await page.locator("[data-code-panel]").first().boundingBox())!;
+    const memoBox = (await memo.boundingBox())!;
+    expect(memoBox.y, "メモがコードより下にある").toBeLessThan(code.y);
+
+    // 2. 開いた状態でも回答欄までスクロールしてもメモが画面に残る
+    await toggle.click();
+    await page.getByLabel(/^メモ/).fill("total は 0 から始まる");
+    await page.getByPlaceholder("回答を入力してください...").scrollIntoViewIfNeeded();
+    await page.waitForTimeout(200);
+    await expect(memo).toBeInViewport();
+    await expect(page.getByLabel(/^メモ/)).toHaveValue("total は 0 から始まる");
+
+    // 3. 貼り付く位置がヘッダーの真下（MemoPad.tsx の NARROW_STICKY_TOP）
+    const stuck = (await memo.boundingBox())!;
+    expect(
+      Math.round(stuck.y),
+      "メモの帯がヘッダーの高さと合っていない",
+    ).toBe(Math.round(header.height));
+  });
+
+  test("E-468 タイトル画面はマスコットと説明が横に並ぶ", async ({ page }) => {
+    await page.setViewportSize(NARROW);
+    await page.goto("/");
+
+    const mascot = (await page.locator("img").first().boundingBox())!;
+    const copy = (await page.locator("h1").boundingBox())!;
+    // 横に並んでいれば、マスコットの右端がコピーの左端より左にある
+    expect(mascot.x + mascot.width, "縦に積まれている").toBeLessThanOrEqual(copy.x);
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow, "横に溢れている").toBe(0);
+  });
+
+  test("E-469 狭い画面から「ふりかえり」と「せってい」に辿れる", async ({
+    authedPage,
+  }) => {
+    const page = authedPage;
+    await page.setViewportSize(NARROW);
+    await page.goto("/stages");
+
+    await page.getByRole("link", { name: "ふりかえり" }).click();
+    await page.waitForURL("**/review");
+    await page.getByRole("link", { name: "せってい" }).click();
+    await page.waitForURL("**/settings");
+    await page.getByRole("link", { name: "ステージ" }).click();
+    await page.waitForURL("**/stages");
+  });
+});

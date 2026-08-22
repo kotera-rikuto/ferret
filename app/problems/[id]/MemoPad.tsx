@@ -41,7 +41,8 @@ const COUNTER_FROM = 0.8;
  * 縦に積むとどちらか一方しか満たせず、もう一方はスクロールが要る。
  *
  * 境目は **`lg`（1024px）＝アプリ共通のデスクトップの線**。この画面だけ独自の値を
- * 持たせない（他の画面も lg 未満で簡易ヘッダーに切り替わる）。**スマホは折りたたみ。**
+ * 持たせない（他の画面も lg 未満で簡易ヘッダーに切り替わる）。
+ * **狭い画面は「開閉できる帯を画面の上に貼り付ける」**（E11。下の注）。
  * 1024〜1088px の間は読む列が 720 から少し縮むが、コードは枠の中で横スクロールする。
  *
  * ⚠️ **この文字列は Tailwind の `lg:` と同じ幅を指していないといけない。**
@@ -50,6 +51,15 @@ const COUNTER_FROM = 0.8;
  * 対になっているのは `page.tsx` と `ProblemForm.tsx` の `lg:`。
  */
 const SIDE_BY_SIDE = "(min-width: 64rem)";
+
+/**
+ * 狭い画面での貼り付け位置。**問題画面のヘッダーの高さ**（`page.tsx` の
+ * `sticky top-0` な `<header>`。上下の余白 14×2 + 中身 40 + 下線 2 = 70px）。
+ *
+ * ここが合っていないと、メモの帯がヘッダーの裏に潜るか、下に隙間が空く。
+ * 数字の対応は `tests/e2e/display.spec.ts` の E-467 が見ている。
+ */
+const NARROW_STICKY_TOP = "top-[70px]";
 
 function subscribeSideBySide(onChange: () => void) {
   const query = window.matchMedia(SIDE_BY_SIDE);
@@ -91,9 +101,16 @@ export function MemoPad({ problemId }: { problemId: number }) {
   const restored = edited === null && Boolean(storedMemo);
 
   // 横に並んでいるときは畳む意味がないので常に開く。
-  // 縦のときは、**すでに書いたものがあれば開いた状態で出す** ──
-  // 閉じたままだと、前回のメモが画面のどこにも見えないまま問題を解くことになる
-  const open = sideBySide || (manuallyOpen ?? Boolean(storedMemo));
+  //
+  // **狭いときは閉じて出す（E11）。** 2026-08-19〜21 は「すでに書いたものがあれば
+  // 開いて出す」だったが、メモを画面の上に貼り付けた（下の注）ことで
+  // **保存済みメモの有無で最初の描画が 128px ずれる**ようになった ──
+  // `localStorage` はサーバーからは見えないので、開くかどうかが決まるのは
+  // ハイドレーションの後で、その瞬間にコードが下へ飛ぶ。
+  // 代わりに、書いたものがあることは帯の目印（下の `hasStored`）で知らせる。
+  const open = sideBySide || (manuallyOpen ?? false);
+  // 閉じているときだけ出す目印。開いていれば中身そのものが見えている
+  const hasStored = Boolean(storedMemo) && !open;
 
   function handleChange(value: string) {
     // 保存に失敗しても入力は画面に残す。先に state を更新しておくことで、
@@ -127,7 +144,25 @@ export function MemoPad({ problemId }: { problemId: number }) {
   );
 
   return (
-    <div className="flex flex-col gap-2 rounded-2xl border-2 border-line bg-panel px-5 py-4 lg:sticky lg:top-24 lg:w-72 lg:shrink-0">
+    /*
+     * **狭い画面では画面の上に貼り付ける（E11・オーナー判断 2026-08-22）。**
+     *
+     * 「コードでも答案でも使える」がメモ欄の要件。パソコンでは横に並べた列を
+     * `sticky` にすることでそれを満たしているが、狭い画面には横に並べる幅が無い。
+     * 縦に積むと**置いた場所の片方でしか使えない** ── 回答欄の下に置いていた
+     * 2026-08-21 までは、コードを読んでいる位置からメモが 500px 下にあった（375px で実測）。
+     *
+     * 上に貼り付けると、コードを読んでいる間もスクロールして回答を書く間も
+     * 同じ帯が画面の上に残る。**縦の代償は閉じている間 44px、開いて 172px**（375px で実測）。
+     *
+     * `order-first` は**見た目だけ**先頭に出すため。**DOM の順は回答欄より後ろのまま**で、
+     * 回答欄から Tab を押したときに当たるのがメモにならない（E-455 で直した導線）。
+     * `z-10` はコードのパネルの上に来るため。**lg では `z-auto` に戻す**
+     * （横に並んでいて重ならないので、パソコン側の重なり順を変えない）。
+     */
+    <div
+      className={`sticky ${NARROW_STICKY_TOP} order-first z-10 flex flex-col gap-2 rounded-2xl border-2 border-line bg-panel px-5 py-2.5 lg:py-4 lg:top-24 lg:order-none lg:z-auto lg:w-72 lg:shrink-0`}
+    >
       {sideBySide ? (
         <p className="flex items-center gap-2 text-sm font-extrabold">{label}</p>
       ) : (
@@ -139,6 +174,14 @@ export function MemoPad({ problemId }: { problemId: number }) {
           className="flex items-center gap-2 text-sm font-extrabold"
         >
           {label}
+          {/* 閉じていても「前に書いたものがある」ことが分かるようにする。
+              開いた状態で出すのをやめた代わりの合図（上の hasStored の注） */}
+          {hasStored && (
+            <span
+              aria-label="書いたメモがあります"
+              className="size-1.5 shrink-0 rounded-full bg-brand"
+            />
+          )}
           <IconChevronDown
             size={16}
             className={`ml-auto transition-transform ${open ? "rotate-180" : ""}`}
@@ -157,8 +200,11 @@ export function MemoPad({ problemId }: { problemId: number }) {
           rows={4}
           aria-label="メモ（採点には送りません）"
           // 回答欄と見た目を変えてある。同じ白い枠を2つ並べると、
-          // どちらに書けば採点されるのかが見て分からない
-          className="resize-y rounded-xl bg-bg-deep px-4 py-3 text-sm leading-loose outline-none focus:ring-2 focus:ring-brand placeholder:text-locked-ink lg:h-64"
+          // どちらに書けば採点されるのかが見て分からない。
+          //
+          // 狭い画面では低くする（`h-28`）。画面の上に貼り付いているので、
+          // ここが高いぶんだけコードの見える範囲が削られる
+          className="resize-y rounded-xl bg-bg-deep px-4 py-3 text-sm leading-loose outline-none focus:ring-2 focus:ring-brand placeholder:text-locked-ink h-28 lg:h-64"
         />
 
         <div className="flex items-center justify-between text-xs font-bold text-muted">

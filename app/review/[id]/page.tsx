@@ -6,7 +6,7 @@ import { CLEAR_THRESHOLD } from "@/lib/ai/compose";
 import { highlightCode, PRE_CLASS } from "@/lib/code/highlight";
 import { parseStoredAxes, VERDICT_LABELS } from "@/lib/review/axes";
 import { AppSidebar } from "@/components/layout/AppSidebar";
-import { LogoutButton } from "@/components/auth/LogoutButton";
+import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Mascot } from "@/components/ui/Mascot";
 import { IconBook, IconCheck } from "@/components/ui/icons";
 
@@ -123,13 +123,7 @@ export default async function ReviewPage({
 
       <main className="flex w-full max-w-3xl flex-col gap-5 py-5 pb-16">
         {/* lg 未満はサイドバーが消えるので、戻り道とログアウトを最低限のヘッダーで代用する */}
-        <header className="flex items-center justify-between lg:hidden">
-          <Link href="/stages" className="flex items-center gap-2 text-xl font-extrabold">
-            <Mascot className="w-7 h-7" />
-            Ferret
-          </Link>
-          <LogoutButton />
-        </header>
+        <MobileHeader current="review" />
 
         <div className="flex flex-col gap-1.5">
           <Link

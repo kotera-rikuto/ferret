@@ -154,10 +154,14 @@ export default async function ProblemPage({
             <CodePanel label="実行結果" hint="実行するとこう出た" body={problem.context} />
           )}
 
-          {/* 設問。フェレットが問いかけている形にして、余白の多い画面に手がかりを置く */}
-          <div className="flex items-start gap-4">
-            <Mascot mood="thinking" className="hidden w-20 shrink-0 sm:block" />
-            <div className="relative flex-1 rounded-2xl border-2 border-line bg-panel px-5 py-4 sm:before:absolute sm:before:top-6 sm:before:-left-2.5 sm:before:size-4 sm:before:rotate-45 sm:before:border-b-2 sm:before:border-l-2 sm:before:border-line sm:before:bg-panel">
+          {/* 設問。フェレットが問いかけている形にして、余白の多い画面に手がかりを置く。
+              **狭い画面でも並べる（E11）。** 2026-08-21 まではフェレットを消していたが、
+              問いかけの形はこの画面の手がかりそのもの（一方的な指示文に見えないための作り）で、
+              消すとスマホだけ素の指示文になる。幅は 375px で実測して 48px
+              （マスコット48 + すきま12 = 60px を引いても吹き出しに 267px 残る） */}
+          <div className="flex items-start gap-3 sm:gap-4">
+            <Mascot mood="thinking" className="w-12 shrink-0 sm:w-20" />
+            <div className="relative flex-1 rounded-2xl border-2 border-line bg-panel px-5 py-4 before:absolute before:top-6 before:-left-2.5 before:size-4 before:rotate-45 before:border-b-2 before:border-l-2 before:border-line before:bg-panel">
               <p className="text-base font-extrabold leading-relaxed whitespace-pre-line">
                 {problem.question}
               </p>
@@ -200,9 +204,10 @@ export default async function ProblemPage({
         {/* メモ欄。**読む列の外**に置く（当初は回答欄の上・オーナー判断で 2026-08-19 に変更）。
             回答欄の上に縦に挟むと、コードを読み終えてから回答を書き始めるまでの間に
             メモの高さぶん画面が伸びて回答欄が下へ逃げる。横に置ける幅があるときは横へ、
-            足りないときは折りたたみ（MemoPad.tsx）。
+            **足りないときは画面の上に貼り付く開閉できる帯**（E11。MemoPad.tsx の注）。
             **DOM 上は回答欄より後ろ。** ここを回答欄より前に戻すと、回答欄から Tab を
-            押したときに当たるのがメモになり、E-455 で直した送信までの導線がまた1手増える。
+            押したときに当たるのがメモになり、E-455 で直した送信までの導線がまた1手増える
+            （狭い画面で上に見えているのは `order-first` の効果で、DOM の順は動いていない）。
             **問題データは渡していない。** メモは端末の中だけで完結し、
             採点にも保存にも一切関わらない（MemoPad.tsx の冒頭コメント） */}
         <MemoPad problemId={problem.id} />
