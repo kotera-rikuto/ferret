@@ -73,8 +73,15 @@ export function SectionHead({
   align?: "left" | "center";
 }) {
   return (
+    /*
+     * `animate-rise` + `data-reveal` で、スクロールして入ってきたときに
+     * 節の頭がせり上がる（定義は app/globals.css）。**LP だけで使う。**
+     * 見出しだけに絞ってあり、カードや本文には配っていない ──
+     * 動きを増やすほど「作り物」に見えるので、節の切り替わりだけを示す。
+     */
     <div
-      className={`flex flex-col gap-4 ${
+      data-reveal
+      className={`animate-rise flex flex-col gap-4 ${
         align === "center" ? "items-center text-center" : "items-start"
       }`}
     >

@@ -70,6 +70,18 @@
   --animate-fall: fall 2.6s ease-in 0.15s forwards;
 
   /*
+   * LP の見出しがせり上がって現れる（2026-08-22・M2）。
+   *
+   * **アプリの画面では使わない。** ここだけ動きの目的が違う ── アプリ側の動きは
+   * 「待っていることを伝える」「クリアを祝う」ためだが、これは読み物としての節の
+   * 切り替わりを見せるためのもの。だから配るのは LP の見出しだけにしてある。
+   *
+   * `both` を付けているのは、スクロール由来のタイムライン（下の [data-reveal]）で
+   * 「まだ画面に入っていない状態」を保つ必要があるため。
+   */
+  --animate-rise: rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  /*
    * マスコットの部品ごとの動き（E10・components/ui/MascotMotion.tsx）。
    *
    * 1枚の絵を揺らす `sniff` を置き換えたもの。絵をしっぽと本体に切り分けて
@@ -242,6 +254,18 @@
     }
   }
 
+  /* LP の見出し：わずかに下から上がってくる。動くのは1回だけ */
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(14px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
   /* リザルトの紙吹雪 */
   @keyframes fall {
     0% {
@@ -351,6 +375,30 @@ body {
  * 動いており、CSS では止められない（components/stage/StageMap.tsx）。
  * E10 の担当範囲外なので触っていない → 残タスクへ申し送り。
  */
+/*
+ * スクロールで見出しが現れるようにする（LP・2026-08-22・M2）。
+ *
+ * **JavaScript を1行も足していない。** `animation-timeline: view()` は
+ * 「その要素が画面に入った量」を進行度として使う仕組みで、ブラウザ側が持っている。
+ * IntersectionObserver で自前に監視すると、この演出のためだけに
+ * LP 全体がクライアント部品になる（サーバーで描き終わっている利点が消える）。
+ *
+ * **`animation-timeline` は必ず `animation` 短縮形より後に置くこと。**
+ * 短縮形はこの値を `auto` に戻す。Tailwind の `.animate-rise` は
+ * `@layer utilities` から出てくるので、**どのレイヤーにも入れない**この規則が
+ * 必ず後に評価される（暗い配色と「動きを減らす」設定と同じ理屈）。
+ *
+ * 対応していないブラウザ（いまは Safari・Firefox）ではこの2行が落ちるだけで、
+ * 読み込み時に1回せり上がる動きになる。**文字が出ないままにはならない。**
+ *
+ * `entry 0% cover 30%` は「下端から入り始めてから、画面の3割を覆うまで」。
+ * 画面の広い端末で最初から見えている節は進行度が100%（＝出たまま）になる。
+ */
+[data-reveal] {
+  animation-timeline: view();
+  animation-range: entry 0% cover 30%;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-float,
   .animate-halo,
@@ -361,7 +409,8 @@ body {
   .animate-mascot-tail,
   .animate-mascot-glint,
   .animate-mascot-cheer,
-  .animate-mascot-tail-flick {
+  .animate-mascot-tail-flick,
+  .animate-rise {
     animation: none !important;
   }
 

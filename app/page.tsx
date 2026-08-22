@@ -302,7 +302,7 @@ export default async function Home() {
           />
 
           <Container className="relative grid items-center gap-12 py-14 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:py-22">
-            <div className="flex flex-col items-start gap-6">
+            <div className="animate-rise flex flex-col items-start gap-6">
               <Chip>コードリーディング特化の学習サイト</Chip>
 
               {/*
@@ -362,7 +362,7 @@ export default async function Home() {
 
             {/* 主役の右。**本物の問題画面と同じ部品**でコードと設問を出す */}
             {/* min-w-0 が無いと、grid の列が中のコードの横幅に引っ張られて画面から溢れる */}
-            <div className="relative w-full min-w-0">
+            <div className="animate-rise relative w-full min-w-0">
               <Card className="flex flex-col gap-4 p-4 sm:p-5">
                 <CodePanel
                   label={DEMO.languageLabel}
@@ -550,9 +550,9 @@ export default async function Home() {
           </div>
         </Section>
 
-        {/* ══ 06 先に伝えておくこと ════════════════════════════════ */}
+        {/* ══ 06 注意点 ══════════════════════════════════════════ */}
         <Section>
-          <SectionHead index="06" label="注意" title="登録の前に、3つだけ" />
+          <SectionHead index="06" label="ご利用にあたって" title="注意点" />
           <Card className="mt-9 flex max-w-3xl flex-col gap-4 p-7 sm:p-9">
             <ul className="flex flex-col gap-4">
               {[
@@ -591,7 +591,7 @@ export default async function Home() {
               alt=""
               className="w-28 animate-float drop-shadow-[0_10px_24px_rgba(74,59,40,0.18)] sm:w-32"
             />
-            <div className="flex flex-col gap-4">
+            <div data-reveal className="animate-rise flex flex-col gap-4">
               <h2 className="text-2xl leading-snug font-extrabold sm:text-4xl">
                 <span className="inline-block">まずは1問、</span>
                 <span className="inline-block">読んでみてください。</span>
