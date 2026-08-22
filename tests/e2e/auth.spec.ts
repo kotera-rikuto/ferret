@@ -12,6 +12,7 @@ import {
   submitLoginForm,
   TEST_USER,
 } from "./support/fixtures";
+import { SHOW_OAUTH } from "../../lib/auth/errors";
 
 /**
  * ログイン画面の見出しは「ログイン」ではない。
@@ -95,12 +96,31 @@ test.describe("§1 ログインの失敗と案内", () => {
     await expect(page.getByLabel("メールアドレス")).toHaveValue(TEST_USER.email);
   });
 
-  test("E-109/110 未設定の OAuth は押しても無反応にならない", async ({ page }) => {
-    await page.goto("/login");
-    await page.getByRole("button", { name: /Googleでログイン/ }).click();
-    await expect(
-      page.getByText("この方法はまだ準備中です。メールアドレスでお進みください。"),
-    ).toBeVisible();
+  /**
+   * Google / GitHub は Supabase 側の設定が済むまで**画面に出さない**
+   * （オーナー判断 2026-08-22。それまでは「準備中」のチップ付きで置いてあり、
+   * 押すと案内が出る形だった）。
+   *
+   * 見るのは**入口が無いこと**と、**メールアドレスの入口だけが残っていること。**
+   * 区切りの「または」も一緒に消える（片方だけ残ると線が浮く）。
+   *
+   * 冒頭の1行は目覚まし。**`OAUTH_ENABLED` を true にした日にここで落ちる**ので、
+   * そのときは「押すと案内が出る」形（`git log` にある元のテスト）へ戻すこと。
+   */
+  test("E-109/110 未設定のあいだ OAuth の入口を出さない", async ({ page }) => {
+    expect(
+      SHOW_OAUTH,
+      "OAuth を有効にしたら、このテストを「押すと案内が出る」形に戻すこと",
+    ).toBe(false);
+
+    for (const path of ["/login", "/register"]) {
+      await page.goto(path);
+      await expect(page.getByRole("button", { name: /Google/ })).toHaveCount(0);
+      await expect(page.getByRole("button", { name: /GitHub/ })).toHaveCount(0);
+      await expect(page.getByText("または")).toHaveCount(0);
+      // 唯一の入口は残っている
+      await expect(page.getByLabel("メールアドレス")).toBeVisible();
+    }
   });
 
   test("E-114 タイトル画面は未ログインでも開ける", async ({ page }) => {

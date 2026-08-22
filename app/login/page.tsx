@@ -5,7 +5,7 @@ import Link from "next/link";
 import { LegalFooter } from "@/components/legal/LegalFooter";
 import { useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { authErrorMessage, OAUTH_ENABLED } from "@/lib/auth/errors";
+import { authErrorMessage, OAUTH_ENABLED, SHOW_OAUTH } from "@/lib/auth/errors";
 import { safeNextPath } from "@/lib/auth/redirect";
 import { IconGithub, IconGoogle } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
@@ -112,36 +112,45 @@ export default function LoginPage() {
         </div>
         <h1 className="text-lg font-extrabold text-center">おかえりなさい</h1>
 
-        <div className="flex flex-col gap-2.5">
-          <button
-            onClick={() => handleOAuth("google")}
-            className="flex items-center justify-center gap-2.5 rounded-2xl bg-panel border-2 border-line border-b-4 py-3 text-sm font-extrabold active:translate-y-[2px] active:border-b-2"
-          >
-            <IconGoogle />
-            Googleでログイン
-            {!OAUTH_ENABLED.google && (
-              <span className="text-[10px] font-extrabold text-locked-ink bg-locked px-2 py-0.5 rounded-full">
-                準備中
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => handleOAuth("github")}
-            className="flex items-center justify-center gap-2.5 rounded-2xl bg-panel border-2 border-line border-b-4 py-3 text-sm font-extrabold active:translate-y-[2px] active:border-b-2"
-          >
-            <IconGithub />
-            GitHubでログイン
-            {!OAUTH_ENABLED.github && (
-              <span className="text-[10px] font-extrabold text-locked-ink bg-locked px-2 py-0.5 rounded-full">
-                準備中
-              </span>
-            )}
-          </button>
-        </div>
+        {/* ソーシャルの入口は、Supabase 側の設定が済むまで出さない
+            （`SHOW_OAUTH`。オーナー判断 2026-08-22）。**消したのは表示だけ**で、
+            押したときの判定（handleOAuth の先頭）は残してある。
+            有効にするときは `lib/auth/errors.ts` の `OAUTH_ENABLED` を true にすれば
+            ここも「または」の区切りごと戻る */}
+        {SHOW_OAUTH && (
+          <>
+            <div className="flex flex-col gap-2.5">
+              <button
+                onClick={() => handleOAuth("google")}
+                className="flex items-center justify-center gap-2.5 rounded-2xl bg-panel border-2 border-line border-b-4 py-3 text-sm font-extrabold active:translate-y-[2px] active:border-b-2"
+              >
+                <IconGoogle />
+                Googleでログイン
+                {!OAUTH_ENABLED.google && (
+                  <span className="text-[10px] font-extrabold text-locked-ink bg-locked px-2 py-0.5 rounded-full">
+                    準備中
+                  </span>
+                )}
+              </button>
+              <button
+                onClick={() => handleOAuth("github")}
+                className="flex items-center justify-center gap-2.5 rounded-2xl bg-panel border-2 border-line border-b-4 py-3 text-sm font-extrabold active:translate-y-[2px] active:border-b-2"
+              >
+                <IconGithub />
+                GitHubでログイン
+                {!OAUTH_ENABLED.github && (
+                  <span className="text-[10px] font-extrabold text-locked-ink bg-locked px-2 py-0.5 rounded-full">
+                    準備中
+                  </span>
+                )}
+              </button>
+            </div>
 
-        <div className="flex items-center gap-3 text-xs font-bold text-muted before:content-[''] before:flex-1 before:h-0.5 before:bg-line before:rounded-full after:content-[''] after:flex-1 after:h-0.5 after:bg-line after:rounded-full">
-          または
-        </div>
+            <div className="flex items-center gap-3 text-xs font-bold text-muted before:content-[''] before:flex-1 before:h-0.5 before:bg-line before:rounded-full after:content-[''] after:flex-1 after:h-0.5 after:bg-line after:rounded-full">
+              または
+            </div>
+          </>
+        )}
 
         <form onSubmit={handleLogin} className="flex flex-col gap-3.5">
           <label className="flex flex-col gap-1.5">

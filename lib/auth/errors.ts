@@ -84,3 +84,19 @@ export const OAUTH_ENABLED = {
   google: false,
   github: false,
 } as const;
+
+/**
+ * ソーシャルの入口（Google / GitHub のボタンと「または」の区切り）を画面に出すか。
+ *
+ * **どちらも無効なあいだは出さない**（オーナー判断 2026-08-22）。
+ * それまでは「準備中」のチップを付けて置いてあったが、
+ * **押せるのに使えない入口**は、登録の前に一度は必ず踏まれる場所にある。
+ *
+ * ここを分けているのは、**画面から消すのと「押したときの案内」を別物として残す**ため。
+ * `handleOAuth` の中の `OAUTH_ENABLED` の判定は残してある ──
+ * 片方だけ有効にした日に、無効な側が素通りで Supabase へ飛ぶのを防ぐ。
+ *
+ * 型を `boolean` と書いてあるのは、両方 false の今 `false` 型に狭まって
+ * 「この条件は常に偽」と扱われるのを避けるため（有効化のときに書き換える箇所を増やさない）。
+ */
+export const SHOW_OAUTH: boolean = OAUTH_ENABLED.google || OAUTH_ENABLED.github;
