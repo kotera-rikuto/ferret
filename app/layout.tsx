@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import { M_PLUS_Rounded_1c, JetBrains_Mono } from "next/font/google";
 import { DEFAULT_THEME, THEME_INIT_SCRIPT } from "@/lib/theme";
+import {
+  OPEN_GRAPH_BASE,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+  SITE_TITLE,
+  siteOrigin,
+} from "@/lib/seo/site";
 import { InlineScript } from "@/components/theme/InlineScript";
 import { ThemeSync } from "@/components/theme/ThemeSync";
 import "./globals.css";
@@ -20,9 +27,36 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+// 本番URL。プレビュー配信とローカルでは null になる（理由は lib/seo/site.ts）
+const origin = siteOrigin();
+
+/**
+ * 全画面の共通のメタ情報 ── 検索結果の見出し・説明文と、SNS に貼られたときのカード。
+ * 文言の出どころは `lib/seo/site.ts`（4か所に散らないよう1本化してある）。
+ *
+ * **ここに `alternates`（canonical）を書かないこと。** Next.js は書かれていない項目を
+ * 下の階層へそのまま受け継がせるので、ここに1つ書くと `/terms` も `/privacy` も
+ * 「正しいURLはトップページ」と申告する ── 2枚ともトップの複製として扱われる。
+ * ページごとの宣言は `publicPageMetadata`（`lib/seo/site.ts`）が組み立てる。
+ */
 export const metadata: Metadata = {
-  title: "Ferret",
-  description: "他人のコードが読める、AI時代のエンジニアに。",
+  // 相対パスの解決基点。**固定値を書かない** ── プレビューが本番URLを名乗る。
+  // 未設定なら項目ごと出さない（Next.js 16 は基点の無い相対パスをビルドで弾く）
+  ...(origin ? { metadataBase: new URL(origin) } : {}),
+  title: {
+    default: SITE_TITLE,
+    // 各画面の title を「〜 | Ferret」の形に揃える。
+    // ⚠️ **画面側の title に「| Ferret」を書かないこと**（「利用規約 | Ferret | Ferret」になる）
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  openGraph: {
+    ...OPEN_GRAPH_BASE,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    // og:url はここに書かない。canonical と同じ理由で、全ページが
+    // トップのURLを名乗ってしまう。ページごとに publicPageMetadata が入れる
+  },
 };
 
 export default function RootLayout({

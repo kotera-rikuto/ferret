@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage } from "@/components/legal/LegalPage";
 import { CONTACT_EMAIL, OPERATOR_DISCLOSURE, PROCESSORS } from "@/lib/legal";
+import { publicPageMetadata } from "@/lib/seo/site";
 
 /**
  * 利用規約。
@@ -17,10 +18,12 @@ import { CONTACT_EMAIL, OPERATOR_DISCLOSURE, PROCESSORS } from "@/lib/legal";
  * ログイン不要のページ。`proxy.ts` の matcher に足さないこと。
  */
 
-export const metadata: Metadata = {
-  title: "利用規約 | Ferret",
+// 「| Ferret」は layout.tsx の title.template が付ける。ここに書くと二重になる
+export const metadata: Metadata = publicPageMetadata({
+  path: "/terms",
+  title: "利用規約",
   description: "コードリーディング訓練サービス Ferret の利用規約",
-};
+});
 
 export default function TermsPage() {
   return (
