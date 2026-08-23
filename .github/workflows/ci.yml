@@ -1,0 +1,79 @@
+# PR と main への push で毎回走る検査。lint → 型 → テスト（単体・結合）→ ビルド。
+#
+# **秘密情報を1つも使わない。** 単体・結合テストは Supabase も OpenAI もモックしており
+# （tests/README.md の3階層）、ビルドはダミー値で通ることを確認してある。
+# リポジトリが Public なので、これは fork からの PR でも CI が完走するという意味になる。
+#
+# ここに入れないもの:
+#   - E2E（Playwright）    実 Supabase が要る。CI 内でローカル Supabase を立てる形で別途（F6 の Phase 2）
+#   - test:db              同上。RUN_DB_TESTS=1 のときだけ動くので、ここでは 72 件が skip のまま
+#   - golden / @live       実 API・課金あり。自動で走る経路は作らない（手元で手動のまま）
+#
+# デプロイとの関係: main への push で Vercel が即公開する。**このワークフローは公開を止めない。**
+# 止めているのは main のブランチ保護（PR 必須 + このジョブの通過を merge 条件にする）のほう。
+
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# 同じブランチで走っている古い実行を打ち切る。連続 push で赤と緑が二重に付くのを防ぐ
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# 既定は read/write。このジョブは何も書かないので絞る
+permissions:
+  contents: read
+
+jobs:
+  # ジョブ ID がそのままブランチ保護の「必須チェック名」になる。
+  # **ここを変えたら保護設定の contexts も変えること**（ズレると永久に pending のチェックが残り、
+  # merge できなくなる）。name: を付けないのは、表示名と契約名を1つにしておくため
+  test:
+    runs-on: ubuntu-latest
+    # ハングした回に無料枠を6時間食わせない
+    timeout-minutes: 10
+
+    env:
+      # 万一モックの差し込みが外れて実 API を叩いたら、課金される前にここで落とす。
+      # getOpenAI() は遅延初期化なので、呼ばれた瞬間に例外になる（tests/README.md の事故防止策）
+      OPENAI_API_KEY: sk-ci-dummy
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          # .nvmrc の1行が CI と手元の唯一の出どころ。
+          # **Vercel はこのファイルを読まない**ので、あちらは管理画面の
+          # Project Settings → General → Node.js Version を同じ数字に合わせる
+          node-version-file: .nvmrc
+          cache: npm
+
+      # npm install ではなく ci。package-lock.json のとおりに入れ、
+      # ロックファイルとズレていたらその場で落とす
+      - run: npm ci
+
+      - run: npm run lint
+
+      # next build より先に型を見る。3秒で落ちる側を前に置く。
+      # スクリプトの実体は `next typegen && tsc --noEmit` ── next-env.d.ts は .gitignore 済みで
+      # 新品のチェックアウトには無く、素の tsc は画像の import を TS2307 で落とす
+      - run: npm run typecheck
+
+      # github-actions レポーターを足すと、落ちたテストが PR の差分に注釈として出る。
+      # dot は 850 行のログを畳むため（手元の verbose はそのまま）
+      - run: npm test -- --reporter=github-actions --reporter=dot
+
+      - run: npm run build
+        env:
+          # ビルドは実際の値を要らない。ただし next.config.ts が CSP の connect-src を
+          # NEXT_PUBLIC_SUPABASE_URL から組むので、空にすると本番と違う成果物を検証することになる。
+          # 本番の URL を入れて、生成物の形を揃えておく
+          NEXT_PUBLIC_SUPABASE_URL: https://ci-dummy.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-dummy-anon
+          SUPABASE_SERVICE_ROLE_KEY: ci-dummy-service
+          NEXT_PUBLIC_APP_URL: https://ferretcode.com
