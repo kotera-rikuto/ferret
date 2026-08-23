@@ -48,8 +48,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           # .nvmrc の1行が CI と手元の唯一の出どころ。
-          # **Vercel はこのファイルを読まない**ので、あちらは管理画面の
-          # Project Settings → General → Node.js Version を同じ数字に合わせる
+          # **Vercel はこのファイルを読まない。** あちらは管理画面の
+          # Project Settings → Build and Deployment → Node.js Version が正で、
+          # 2026-08-23 時点で `24.x`。**片方を変えたらもう片方も変えること**
+          # （ズレると「CI は緑なのに本番のビルドだけ落ちる」）
           node-version-file: .nvmrc
           cache: npm
 
