@@ -1,0 +1,42 @@
+#!/bin/sh
+# コミットを作る前に、これから刻まれる author / committer のメールを見る。
+#
+# **なぜ要るか:** git のメールは 環境変数（GIT_AUTHOR_EMAIL / GIT_COMMITTER_EMAIL）
+# ＞ リポジトリのローカル設定 ＞ グローバル設定 の順で決まる。
+# グローバルを個人アドレスにしても、上の2つが黙って上書きできる。
+# 実際 2026-08-19 と 08-22 の2件が勤務先アドレスで刻まれ、うち1件は公開まで行った
+# （2026-08-24 に履歴を書き換えて除去した。詳細は 残タスク.md §F）。
+#
+# **公開リポジトリなので、ここに勤務先アドレスは書かない。**
+# 「これ以外を弾く」許可制にしてあるのはそのため。
+#
+# 有効化（クローンごとに1回）:  git config core.hooksPath .githooks
+# 一時的に外したいとき:        git commit --no-verify
+
+ALLOWED='rikuto042700@icloud.com'
+
+# git var は「実際にこのコミットで使われる」値を返す。
+# 設定ファイルを読むだけでは環境変数の上書きを見逃す
+author=$(git var GIT_AUTHOR_IDENT | sed -n 's/.*<\(.*\)>.*/\1/p')
+committer=$(git var GIT_COMMITTER_IDENT | sed -n 's/.*<\(.*\)>.*/\1/p')
+
+fail=0
+for addr in "$author" "$committer"; do
+  case "$addr" in
+    "$ALLOWED") ;;
+    *) fail=1 ;;
+  esac
+done
+
+if [ "$fail" = "1" ]; then
+  echo "コミットを中止しました: 許可していないメールアドレスです" >&2
+  echo "  author   : $author" >&2
+  echo "  committer: $committer" >&2
+  echo "  許可     : $ALLOWED" >&2
+  echo >&2
+  echo "確認する順（強いほうから）:" >&2
+  echo "  env | grep -E 'GIT_AUTHOR_EMAIL|GIT_COMMITTER_EMAIL|^EMAIL='" >&2
+  echo "  git config --local  user.email" >&2
+  echo "  git config --global user.email" >&2
+  exit 1
+fi
