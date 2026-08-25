@@ -12,6 +12,7 @@ import {
   expect,
   stub,
   deepOutput,
+  markCleared,
   submitLoginForm,
   ANSWER,
 } from "./support/fixtures";
@@ -213,5 +214,65 @@ test.describe("§5 API を直接叩く", () => {
     });
     expect(res.status()).toBe(403);
     expect((await res.json()).code).toBe("problem_locked");
+  });
+});
+
+/**
+ * ここから2本は **F6（擬似攻撃）で足したもの**。
+ * どちらも「守れているか」だけでなく **OpenAI に届いていないこと**まで見る ──
+ * 弾けていても外部AIを呼んでいたら、実費は出ているし回答も送られている。
+ */
+test.describe("§5 外部AIへ渡す前に止める", () => {
+  test("E-417 個人情報を含む回答は 400 で、外部AIに届かない", async ({
+    authedPage,
+    problems,
+  }) => {
+    await stub.reset();
+    const res = await authedPage.request.post("/api/score", {
+      headers: {
+        "content-type": "application/json",
+        "sec-fetch-site": "same-origin",
+      },
+      data: {
+        problem_id: problems[0].id,
+        answer: `${ANSWER}。連絡先は taro.yamada@example.com です`,
+      },
+    });
+    expect(res.status()).toBe(400);
+
+    const { calls } = await stub.inspect();
+    expect(calls, "弾いたのに OpenAI を呼んでいる").toBe(0);
+  });
+
+  /**
+   * 使いすぎの安全網（1分10件 / 1時間60件 / 24時間300件）。
+   *
+   * **実際に10回採点しない。** 上限は `user_attempts` の行数をそのまま数えるので、
+   * 行だけ積んで11回目を叩けば同じ状態になる（下ごしらえの行は48時間前に置かれていて
+   * 窓に入らないため、ここで積んだぶんだけが数えられる）。
+   */
+  test("E-418 連打すると 429 で止まり、外部AIを呼ばない", async ({
+    authedPage,
+    userId,
+    problems,
+  }) => {
+    await stub.reset();
+    for (let i = 0; i < 10; i++) {
+      // 点数を変えるのは answer_hash を1件ずつ別にするため
+      await markCleared(userId, problems[0].id, 60 + i);
+    }
+
+    const res = await authedPage.request.post("/api/score", {
+      headers: {
+        "content-type": "application/json",
+        "sec-fetch-site": "same-origin",
+      },
+      data: { problem_id: problems[0].id, answer: ANSWER },
+    });
+    expect(res.status()).toBe(429);
+    expect(res.headers()["retry-after"]).toBeTruthy();
+
+    const { calls } = await stub.inspect();
+    expect(calls, "上限を超えたのに OpenAI を呼んでいる").toBe(0);
   });
 });
