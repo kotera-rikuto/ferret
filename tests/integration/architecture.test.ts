@@ -136,9 +136,15 @@ describe("§11 静的検査", () => {
     );
     expect(callers.length).toBeGreaterThan(0);
     for (const f of callers) {
-      expect(f.code, `${f.path} が確保を通さずに採点している`).toContain("consumeAiQuota");
+      // **呼び出しの形で探す。** 素の "consumeAiQuota" だと import 文（22行目・565文字目）に
+      // 当たってしまい、実際の呼び出し（13,177文字目）より前になる。
+      // それだと import がある限り順序の比較が常に真になり、
+      // 「確保を採点の後ろへ動かす」改修を素通りさせていた（2026-08-25 に判明）
+      expect(f.code, `${f.path} が確保を通さずに採点している`).toContain(
+        "await consumeAiQuota(",
+      );
       expect(
-        f.code.indexOf("consumeAiQuota"),
+        f.code.indexOf("await consumeAiQuota("),
         `${f.path} は採点した後に確保している`,
       ).toBeLessThan(f.code.indexOf("await scoreAnswer("));
     }
