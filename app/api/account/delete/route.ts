@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from "next/server";
  * 守りの構えは `/api/score` `/api/feedback` と揃えてある（送信元・Content-Type・
  * 本文サイズ・認証）。入口ごとに緩さが違うと、緩いほうが攻撃の入口になる。
  *
- * 消す範囲は法務文書（利用規約 第12条・プライバシーポリシー 第7条）が
+ * 消す範囲は法務文書（利用規約 第14条・プライバシーポリシー 第8条）が
  * 先に約束している。対象と順番は `lib/account.ts` の `DELETE_TARGETS` を正とする。
  */
 

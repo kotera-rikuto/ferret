@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
-import { LEGAL_EFFECTIVE_DATE, OPERATOR_NAME } from "@/lib/legal";
+import {
+  LEGAL_EFFECTIVE_DATE,
+  LEGAL_REVISED_DATE,
+  OPERATOR_NAME,
+} from "@/lib/legal";
 
 /**
  * 法務文書（利用規約・プライバシーポリシー）の共通の枠。
@@ -69,6 +73,12 @@ export function LegalPage({
             <div className="flex gap-2">
               <dt>制定日</dt>
               <dd>{LEGAL_EFFECTIVE_DATE}</dd>
+            </div>
+            {/* 改定日は制定日と別に出す。片方だけだと、
+                いつ効力を持ったのか／いつ変わったのかのどちらかが読めない */}
+            <div className="flex gap-2">
+              <dt>最終改定日</dt>
+              <dd>{LEGAL_REVISED_DATE}</dd>
             </div>
             <div className="flex gap-2">
               <dt>運営者</dt>
