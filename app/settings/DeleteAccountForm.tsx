@@ -79,7 +79,7 @@ export function DeleteAccountForm() {
         </button>
       ) : (
         <div className="flex flex-col gap-4">
-          {/* 何が消えるかを先に見せる。プライバシーポリシー第7条・利用規約第12条と同じ範囲 */}
+          {/* 何が消えるかを先に見せる。プライバシーポリシー第8条・利用規約第14条と同じ範囲 */}
           <div className="rounded-xl border-2 border-line bg-bg-deep p-4">
             <p className="mb-2 text-xs font-extrabold">消えるもの</p>
             <ul className="flex flex-col gap-1 text-xs font-bold leading-relaxed text-muted">
