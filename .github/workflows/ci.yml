@@ -44,6 +44,28 @@ jobs:
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          # メール検査で全履歴を見るため。既定の depth:1 だと1コミットしか来ない
+          fetch-depth: 0
+
+      # 勤務先アドレスが公開履歴に紛れ込むのを止める。
+      # **git のメールは 環境変数 ＞ ローカル設定 ＞ グローバル設定 の順で決まり、
+      # グローバルを直しても上の2つが黙って上書きできる。** 実際 2026-08-19 と 08-22 の
+      # 2件がすり抜け、1件は公開まで行った（2026-08-24 に履歴を書き換えて除去）。
+      # 手元は .githooks/pre-commit で止めるが、--no-verify でも外せる。ここが最後の網。
+      #
+      # **公開リポジトリなので、弾きたいアドレスは書かない**（許可制にしてある理由）。
+      # noreply@github.com は GitHub が作る merge コミットの committer
+      - name: コミットのメールを検査
+        run: |
+          bad=$(git log --format='%H %ae%n%H %ce' \
+            | grep -vE ' (rikuto042700@icloud\.com|noreply@github\.com|[A-Za-z0-9._-]+@users\.noreply\.github\.com)$' \
+            || true)
+          if [ -n "$bad" ]; then
+            echo "::error::許可していないメールアドレスのコミットがあります"
+            echo "$bad" | sort -u
+            exit 1
+          fi
 
       - uses: actions/setup-node@v5
         with:
