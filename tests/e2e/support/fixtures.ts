@@ -297,6 +297,31 @@ export async function createDisposableUser(label: string): Promise<DisposableUse
   return { id: data.user.id, email, password };
 }
 
+/**
+ * パスワード再設定のリンクに埋め込まれる確認用の値（token_hash）を、
+ * **メールを送らずに**取り出す（C9）。
+ *
+ * これが無いと、再設定の通しは「メールが届くのを待つ」テストになり自動で回せない。
+ * 管理APIの `generateLink` はリンクを組み立てて返すだけで送信はしないので、
+ * 送信の上限（1時間30通）も消費しない。
+ *
+ * 返すのは `token_hash` だけ。**リンクの形はアプリ側の約束**
+ * （`/auth/callback?token_hash=...&type=recovery`）なので、
+ * ここで組み立ててしまうとテストが Supabase の既定のリンクを見ることになり、
+ * 文面（supabase/templates/reset-password.html）と食い違っても気づけない。
+ */
+export async function recoveryTokenFor(email: string): Promise<string> {
+  const { data, error } = await admin().auth.admin.generateLink({
+    type: "recovery",
+    email,
+  });
+  const token = data?.properties?.hashed_token;
+  if (error || !token) {
+    throw new Error(`再設定リンクの発行に失敗: ${error?.message ?? "token_hash が空"}`);
+  }
+  return token;
+}
+
 /** 使い捨てアカウントの後片付け。退会が通っていれば既に居ないので、その場合は何もしない */
 export async function removeUser(userId: string) {
   const db = admin();

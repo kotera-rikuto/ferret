@@ -9,13 +9,13 @@
 | ファイル | 管理画面のどれ | 件名 | 状態 |
 |---|---|---|---|
 | `confirm-signup.html` | Confirm signup | `Ferret のメールアドレス確認` | ✅ 使用中 |
+| `reset-password.html` | Reset Password | `Ferret のパスワード再設定` | ✅ 使用中（C9） |
 
 **未着手の文面（既定の英語のまま）**
 
 | 管理画面のどれ | いつ使われる | 誰が日本語化するか |
 |---|---|---|
-| Reset Password | パスワード再設定 | **C3**（画面がまだ無いので、いま送られることは無い） |
-| Change Email Address | メールアドレス変更 | **C3**（同上） |
+| Change Email Address | メールアドレス変更 | メールアドレス変更の画面を作るとき（せってい画面は「準備中」の表示） |
 | Magic Link | パスワード無しのログイン | 未実装。導入を決めてから |
 | Invite user | 招待 | 使う予定なし |
 
@@ -38,7 +38,8 @@
 `{{ .TokenHash }}` はリンクそのものに確認用の値が入っているので、
 どの端末で開いてもログインできる。受け取り側は `app/auth/callback/route.ts`。
 
-**`type` に書ける値は決め打ち。** ルート側で `signup` と `email` だけを通している。
+**`type` に書ける値は決め打ち。** ルート側で `signup` / `email` / `recovery` だけを通している
+（`recovery` は C9 で足した。確認できたら `/reset-password` へ送る）。
 これは「行き先を決めていない種別のリンクでログインが成立するのを防ぐ」ためで、
 種別を足すときは**ルートとテストを同時に広げること**（`app/auth/callback/route.ts` のコメント）。
 
