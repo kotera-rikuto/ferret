@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
 import { Container, PrimaryCta } from "@/components/lp/parts";
+import { ChangelogMenu } from "@/components/changelog/ChangelogMenu";
 
 /**
- * LP の上部バー。**開閉するメニューは作らない。**
+ * LP の上部バー。**自前で開閉状態を持つメニューは作らない。**
  *
  * 折りたたみメニューを付けると、この節のためだけに LP 全体がクライアント部品になる
  * （開いているかどうかを覚える必要が出るため）。節への近道は本文を上から読めば
  * 全部通るので、狭い画面ではロゴと「無料で始める」だけを残す作りにした。
+ *
+ * **「更新情報」だけは開閉する**（`ChangelogMenu`・E12）。ただし状態を持つのは
+ * ブラウザ（`<details>`）で、こちらはサーバー部品のまま ── 上の決めには当たらない。
+ * ここに置いてあるのは、**上部バーが sticky なのでスクロール位置に関係なく開ける**から。
+ * 主役の下の帯（180px）を置き換えている。
  *
  * `anchorBase` は節への近道の書き出し。**LP 以外の画面でも使うため**に持たせている
  * （E12 で `/changelog` が同じ上部バーを使うようになった）。空なら `#flow` で同じ画面の中を、
@@ -45,7 +51,10 @@ export function LpHeader({ anchorBase = "" }: { anchorBase?: "" | "/" } = {}) {
           ))}
         </nav>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 sm:gap-4">
+          {/* ログインより先に置く。**狭い画面ではログインが消える**（下の hidden sm:block）ので、
+              後ろに置くとそこだけ順番が入れ替わって見える */}
+          <ChangelogMenu />
           <Link
             href="/login"
             className="hidden rounded-md text-[13px] font-extrabold text-brand-deep hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-deep sm:block"
