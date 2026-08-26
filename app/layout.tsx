@@ -6,6 +6,7 @@ import {
   SITE_DESCRIPTION,
   SITE_NAME,
   SITE_TITLE,
+  TWITTER_BASE,
   siteOrigin,
 } from "@/lib/seo/site";
 import { InlineScript } from "@/components/theme/InlineScript";
@@ -56,6 +57,16 @@ export const metadata: Metadata = {
     description: SITE_DESCRIPTION,
     // og:url はここに書かない。canonical と同じ理由で、全ページが
     // トップのURLを名乗ってしまう。ページごとに publicPageMetadata が入れる
+    //
+    // **og:image もここに書かない。** `app/opengraph-image.tsx` を置いてあるので
+    // Next.js がページごとに足す（C11）。ここに書くとそちらが使われなくなる
+  },
+  // X（Twitter）だけは「カードの型」を別に申告しないと、1200×630 の絵が
+  // 小さな四角に縮められる（`summary_large_image`。理由は TWITTER_BASE のコメント）
+  twitter: {
+    ...TWITTER_BASE,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
 };
 
