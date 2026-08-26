@@ -48,7 +48,9 @@ export type ChangelogCategory =
 export const CHANGELOG_CATEGORY_LABELS: Record<ChangelogCategory, string> = {
   release: "公開",
   feature: "機能追加",
-  problem: "問題追加",
+  // 「問題追加」ではなく「問題の更新」。**入れ替えにも使う**
+  // （2026-08-26 にステージ1〜3を差し替えた。増えていないのに「追加」と出るのは嘘になる）
+  problem: "問題の更新",
   legal: "規約の改定",
   fix: "不具合の修正",
 };
@@ -77,6 +79,19 @@ export type ChangelogEntry = {
  * だから公開日を記録の起点にして、そこに「できること」として並べている。
  */
 export const CHANGELOG: readonly ChangelogEntry[] = [
+  {
+    date: "2026-08-26",
+    category: "problem",
+    title: "ステージ1から3の問題を新しくしました",
+    body: "はじめて解く人が読み進めやすい内容に見直しました。これから始める方は、新しい3問から入ります。",
+  },
+  {
+    date: "2026-08-26",
+    category: "feature",
+    title: "パスワードを忘れてもログインできるようにしました",
+    body: "ログイン画面の「パスワードをお忘れですか」から、ご登録のメールアドレスへ再設定用のリンクをお送りします。リンクを開くと、あたらしいパスワードを決められます。",
+    link: { href: "/forgot-password", label: "パスワードを再設定する" },
+  },
   {
     date: "2026-08-25",
     category: "legal",
