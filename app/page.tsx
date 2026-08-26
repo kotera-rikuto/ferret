@@ -396,6 +396,37 @@ export default async function Home() {
           </Container>
         </section>
 
+        {/* ══ 更新情報 ══════════════════════════════════════════════ */}
+        {/*
+          **主役のすぐ下。番号を振らない。**
+
+          最初は末尾（節08）に置いていたが、**そこまで読む人はほとんどいない**
+          （オーナー指摘・2026-08-26）。ここで伝えたいのは「いまも動いているアプリだ」
+          ということで、それは**最初の画面で分からないと意味がない。**
+
+          見出しは「更新情報」だけ。惹句（「いま何が新しいか」「これからも変わっていきます」）は
+          外した ── 更新そのものが動いている証拠なので、説明を足すほど宣伝に見える。
+
+          **細い帯にしてあるのは、主役の惹句とボタンを押し下げないため。**
+          日付・種類・見出しの1行だけを並べ、本文は `/changelog` に置く。
+        */}
+        <section id="changelog" className="border-y-2 border-line bg-bg-deep">
+          <Container className="flex flex-col gap-3.5 py-7 sm:py-8">
+            <div className="flex items-baseline justify-between gap-4">
+              <h2 className="text-[11px] font-extrabold tracking-[0.16em] text-muted">
+                更新情報
+              </h2>
+              <Link
+                href="/changelog"
+                className="rounded-md text-[12px] font-extrabold whitespace-nowrap text-brand-deep hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-deep"
+              >
+                すべて見る →
+              </Link>
+            </div>
+            <ChangelogList entries={latestChangelog()} variant="row" />
+          </Container>
+        </section>
+
         {/* ══ 01 なぜ読む力なのか ═══════════════════════════════════ */}
         <Section tone="deep">
           <SectionHead
@@ -585,34 +616,6 @@ export default async function Home() {
           />
           <div className="mx-auto mt-10 max-w-3xl">
             <Faq items={FAQ} />
-          </div>
-        </Section>
-
-        {/* ══ 08 更新情報 ═════════════════════════════════════════ */}
-        {/* id を振ってあるのは `/#changelog` で直接ここへ来られるようにするため
-            （記事や告知から「更新情報」だけを指したいときの行き先）。
-            上部バーの並びには足していない ── あちらは節への近道が3つで、
-            狭い画面では出さない作りなので、増やすほど「押せる場所」が散る */}
-        <Section id="changelog">
-          <SectionHead
-            index="08"
-            label="更新情報"
-            title="いま何が新しいか"
-            lead="公開したばかりのサービスなので、これからも変わっていきます。直近の更新はここに出します。"
-          />
-          <div className="mt-10 flex max-w-3xl flex-col gap-6">
-            {/*
-              **最新3件だけ**（`CHANGELOG_ON_LP`）。ここは登録前の人が
-              「動いているサービスか」を確かめる場所なので、全部を並べる場所ではない。
-              古い更新（規約の改定を含む）が押し出されて消えないよう、全件は `/changelog` に残す。
-            */}
-            <ChangelogList entries={latestChangelog()} compact />
-            <Link
-              href="/changelog"
-              className="self-start rounded-md text-[13px] font-extrabold text-brand-deep underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-deep"
-            >
-              更新情報をすべて見る →
-            </Link>
           </div>
         </Section>
 
