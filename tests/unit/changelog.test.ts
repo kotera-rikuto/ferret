@@ -20,6 +20,7 @@ import {
   latestChangelog,
   type ChangelogCategory,
 } from "@/lib/changelog";
+import { DAILY_LIMIT_GLOBAL } from "@/lib/ai/quota";
 import { LEGAL_REVISED_DATE } from "@/lib/legal";
 import { CRAWL_DISALLOW } from "@/lib/seo/site";
 
@@ -104,6 +105,28 @@ describe("§20 更新情報の中身", () => {
       formatChangelogDate(latestLegal!.date),
       `lib/legal.ts の最終改定日（${LEGAL_REVISED_DATE}）に対応する更新情報が無い`,
     ).toBe(LEGAL_REVISED_DATE);
+  });
+
+  /**
+   * **サービス全体の1日あたりの上限は、数値を書かない。**
+   *
+   * 利用規約 第6条は**個人の上限（20問）だけ数値を出し、全体の上限は「達した場合は」**
+   * としか書いていない。伏せてあるのは意図的で、全体の天井は
+   * **アカウントを量産されたときに効く唯一の防御**（CLAUDE.md の料金プランの節）。
+   * 数値が公開されると「何回叩けば全員の採点を止められるか」が分かる ──
+   * 超過は 503 で、その日は誰も採点できなくなる。
+   *
+   * 更新情報は**規約より書きやすい場所**なので（機能の説明のついでに数字を添えたくなる）、
+   * ここで止める。同じ理由で連打の安全網（1分10回など）の回数も書かない。
+   *
+   * この検査に引っかかったら、数値を消して「上限に達した場合は」の書き方に直すこと。
+   */
+  it("U-890 サービス全体の1日あたりの上限を数値で書いていない", () => {
+    const all = CHANGELOG.map(textOf).join("\n");
+    expect(
+      all,
+      `全体の上限（${DAILY_LIMIT_GLOBAL}）は伏せる決め。利用規約 第6条3項も数値を書いていない`,
+    ).not.toContain(String(DAILY_LIMIT_GLOBAL));
   });
 
   it("U-885 行き先はサイト内のパスで書く", () => {

@@ -56,6 +56,10 @@ test.describe("§5 レスポンスヘッダ", () => {
 
     await authedPage.goto("/");
     await authedPage.goto("/login");
+    // 更新情報（E12）。**公開ページを足したらここにも足す** ── CSP に弾かれて
+    // 表示が壊れても画面には何も出ないので、気づける経路がこの巡回しかない。
+    // 気づけないと「動かすために CSP を緩める」方向の改修を誘発する
+    await authedPage.goto("/changelog");
     await authedPage.goto("/stages");
     await authedPage.goto(`/problems/${problems[0].id}`);
 
