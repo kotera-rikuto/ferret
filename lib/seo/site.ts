@@ -48,6 +48,9 @@ export const SITE_DESCRIPTION =
  */
 export const SITEMAP_PATHS = [
   { path: "/", priority: 1, changeFrequency: "weekly" },
+  // 更新情報（E12）。**ログイン不要のページ**なので載せてよい。
+  // ここが更新されていること自体が「動いているサービス」の材料になる（M1 と相性がある）
+  { path: "/changelog", priority: 0.5, changeFrequency: "monthly" },
   { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
   { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
 ] as const satisfies ReadonlyArray<{

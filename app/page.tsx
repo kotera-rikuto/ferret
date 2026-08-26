@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -23,6 +24,8 @@ import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
 import { IconComment, IconHandover, IconSpark } from "@/components/lp/icons";
 import { publicPageMetadata } from "@/lib/seo/site";
+import { ChangelogList } from "@/components/changelog/ChangelogList";
+import { latestChangelog } from "@/lib/changelog";
 
 /**
  * 検索結果に出る唯一の入口。**title は書かない**（`layout.tsx` の既定値をそのまま使う）。
@@ -582,6 +585,34 @@ export default async function Home() {
           />
           <div className="mx-auto mt-10 max-w-3xl">
             <Faq items={FAQ} />
+          </div>
+        </Section>
+
+        {/* ══ 08 更新情報 ═════════════════════════════════════════ */}
+        {/* id を振ってあるのは `/#changelog` で直接ここへ来られるようにするため
+            （記事や告知から「更新情報」だけを指したいときの行き先）。
+            上部バーの並びには足していない ── あちらは節への近道が3つで、
+            狭い画面では出さない作りなので、増やすほど「押せる場所」が散る */}
+        <Section id="changelog">
+          <SectionHead
+            index="08"
+            label="更新情報"
+            title="いま何が新しいか"
+            lead="公開したばかりのサービスなので、これからも変わっていきます。直近の更新はここに出します。"
+          />
+          <div className="mt-10 flex max-w-3xl flex-col gap-6">
+            {/*
+              **最新3件だけ**（`CHANGELOG_ON_LP`）。ここは登録前の人が
+              「動いているサービスか」を確かめる場所なので、全部を並べる場所ではない。
+              古い更新（規約の改定を含む）が押し出されて消えないよう、全件は `/changelog` に残す。
+            */}
+            <ChangelogList entries={latestChangelog()} compact />
+            <Link
+              href="/changelog"
+              className="self-start rounded-md text-[13px] font-extrabold text-brand-deep underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-deep"
+            >
+              更新情報をすべて見る →
+            </Link>
           </div>
         </Section>
 
