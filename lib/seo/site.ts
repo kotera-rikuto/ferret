@@ -100,6 +100,32 @@ export function siteOrigin(): string | null {
 }
 
 /**
+ * 共有カード（`app/opengraph-image.tsx`）に描く文字。**ここが唯一の出どころ。**
+ *
+ * 画像の中の文字は、あとから検索も差し替えもできない ── 貼られた先に残り、
+ * SNS 側にキャッシュされる。だから LP（`app/page.tsx`）の見出しと同じ言葉にしてある。
+ * 違う言葉を出すと、クリックした人が**別のサービスに来たように感じる**（C11 の注意書き）。
+ *
+ * ⚠️ **文字を足したら `python3 design/og/subset-font.py` を回し直すこと。**
+ * カードのフォントは「このファイルに出てくる字」だけを切り出した実体で、
+ * 入っていない字は豆腐（□）で描かれる。忘れると tests/unit/og-image.test.ts の U-845 が落ちる。
+ */
+export const OG_IMAGE_ALT = `${SITE_NAME}（フェレット）── 他人のコードが読める、AI時代のエンジニアに。`;
+
+/**
+ * カードの見出し。**節ごとに配列にしてある** ── 日本語はどこでも改行できるので、
+ * 1本の文字列で渡すと画像の幅しだいで「読め / る、」のように語の途中で折れる
+ * （LP の見出しで同じ手当てをしている）。
+ */
+export const OG_IMAGE_HEADLINE = [
+  "他人のコードが読める、",
+  "AI時代のエンジニアに。",
+] as const;
+
+/** 見出しの下の1行。何のサイトかを名乗る */
+export const OG_IMAGE_TAGLINE = "コードリーディング特化のプログラミング学習サイト";
+
+/**
  * og:（SNS に貼られたときのカード）の共通部分。
  *
  * **ページ側で `openGraph` を書くときは必ずこれを展開すること。**
@@ -107,14 +133,49 @@ export function siteOrigin(): string | null {
  * 展開を忘れるとそのページだけ og:site_name も og:locale も消える
  * （`node_modules/next/dist/docs` の generate-metadata.md「Overwriting fields」）。
  *
- * 画像（og:image）は入れていない。**無くても検索には載る**ので、
- * 見た目を決める M2（LPページ）に回した ── オーナー判断（2026-08-22・C8）。
+ * **画像（og:image）をここに持たせているのは、まさにその上書きのため。**
+ * 絵の実体は `app/opengraph-image.tsx` で、あのファイルを置くだけで Next.js が
+ * og:image を足してくれる ── **ただし `openGraph` を書いていないページに限る。**
+ * 実測（C11・2026-08-26）: 何も書いていない `/login` と `/register` には付き、
+ * `publicPageMetadata` を通している `/terms` `/privacy` `/changelog` には**付かなかった。**
+ * 下の階層で `openGraph` を丸ごと差し替えた時点で、足してもらった画像も一緒に消える。
+ * だからここに URL を書き、全ページが必ず展開する形にしてある。
+ *
+ * `/opengraph-image` は `app/opengraph-image.tsx` が配られる場所。相対パスなので、
+ * 本番では `metadataBase`（`app/layout.tsx`）が絶対URLに直す。基点が無いとき
+ * （ローカル・プレビュー）はビルドが `http://localhost:3000` を仮に当てて警告を出す
+ * ── **貼られるのは本番のURLだけ**なので、そのままにしてある。
  */
+export const OG_IMAGE = {
+  url: "/opengraph-image",
+  width: 1200,
+  height: 630,
+  alt: OG_IMAGE_ALT,
+} as const;
+
 export const OPEN_GRAPH_BASE = {
   type: "website",
   siteName: SITE_NAME,
   locale: "ja_JP",
+  images: [OG_IMAGE],
 } as const satisfies NonNullable<Metadata["openGraph"]>;
+
+/**
+ * X（Twitter）のカードの共通部分。
+ *
+ * **`card: "summary_large_image"` が要点。** 既定は `summary` で、
+ * せっかく 1200×630 の絵を出しても**左端の小さな四角に縮められる。**
+ * 文言は og: と同じものを入れる ── X は twitter: があればそちらを優先するので、
+ * 片方だけ直すと「タイムラインの見出し」と「他のSNSの見出し」が食い違う。
+ *
+ * 画像も og: と同じものを書く。`twitter` を書いたページでは
+ * og: と同様に**足してもらった `twitter:image` が消える**（OPEN_GRAPH_BASE の実測を参照）。
+ */
+export const TWITTER_BASE = {
+  card: "summary_large_image",
+  images: [OG_IMAGE],
+} as const satisfies NonNullable<Metadata["twitter"]>;
+
 
 /**
  * ログイン不要のページ1枚ぶんのメタ情報。
@@ -163,6 +224,10 @@ export function publicPageMetadata({
       description,
       ...(url ? { url } : {}),
     },
+    // twitter: も openGraph: と同じく**まるごと上書き**される。
+    // 書かなければ layout.tsx のもの（トップの文言）を受け継ぐので、
+    // 規約のページを X に貼ると「見出しだけトップのまま」になる
+    twitter: { ...TWITTER_BASE, title: ogTitle, description },
     ...(url ? { alternates: { canonical: url } } : {}),
   };
 }
