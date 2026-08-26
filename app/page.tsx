@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -24,8 +23,6 @@ import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
 import { IconComment, IconHandover, IconSpark } from "@/components/lp/icons";
 import { publicPageMetadata } from "@/lib/seo/site";
-import { ChangelogList } from "@/components/changelog/ChangelogList";
-import { latestChangelog } from "@/lib/changelog";
 
 /**
  * 検索結果に出る唯一の入口。**title は書かない**（`layout.tsx` の既定値をそのまま使う）。
@@ -393,37 +390,6 @@ export default async function Home() {
                 </div>
               </Card>
             </div>
-          </Container>
-        </section>
-
-        {/* ══ 更新情報 ══════════════════════════════════════════════ */}
-        {/*
-          **主役のすぐ下。番号を振らない。**
-
-          最初は末尾（節08）に置いていたが、**そこまで読む人はほとんどいない**
-          （オーナー指摘・2026-08-26）。ここで伝えたいのは「いまも動いているアプリだ」
-          ということで、それは**最初の画面で分からないと意味がない。**
-
-          見出しは「更新情報」だけ。惹句（「いま何が新しいか」「これからも変わっていきます」）は
-          外した ── 更新そのものが動いている証拠なので、説明を足すほど宣伝に見える。
-
-          **細い帯にしてあるのは、主役の惹句とボタンを押し下げないため。**
-          日付・種類・見出しの1行だけを並べ、本文は `/changelog` に置く。
-        */}
-        <section id="changelog" className="border-y-2 border-line bg-bg-deep">
-          <Container className="flex flex-col gap-3.5 py-7 sm:py-8">
-            <div className="flex items-baseline justify-between gap-4">
-              <h2 className="text-[11px] font-extrabold tracking-[0.16em] text-muted">
-                更新情報
-              </h2>
-              <Link
-                href="/changelog"
-                className="rounded-md text-[12px] font-extrabold whitespace-nowrap text-brand-deep hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-deep"
-              >
-                すべて見る →
-              </Link>
-            </div>
-            <ChangelogList entries={latestChangelog()} variant="row" />
           </Container>
         </section>
 
