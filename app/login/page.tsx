@@ -173,6 +173,17 @@ export default function LoginPage() {
               className="rounded-xl border-2 border-line bg-panel px-4 py-3 text-sm font-bold outline-none focus:border-brand placeholder:text-locked-ink placeholder:font-medium"
             />
           </label>
+          {/*
+           * パスワードを忘れた人の入口（C9）。**入力欄のすぐ下に置く。**
+           * 「入らない」と気づくのはパスワードを打った直後なので、
+           * カードの末尾（新規登録の並び）に置くと目に入らない。
+           */}
+          <Link
+            href="/forgot-password"
+            className="self-end text-xs font-extrabold text-muted hover:text-ink"
+          >
+            パスワードをお忘れですか
+          </Link>
           {shownError && <p className="text-danger text-sm">{shownError}</p>}
           <button
             type="submit"

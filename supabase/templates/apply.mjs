@@ -23,8 +23,8 @@
  * **アカウント全体を操作できる強い鍵なので、使い終わったら削除するか、
  * 上のように環境変数で渡して unset すること。** ファイルに書かない。
  *
- * 触るのは確認メールの件名と本文だけ。site_url やパスワード設定など他の項目は
- * 送らないので変わらない（`supabase config push` と違い、ファイル全体で
+ * 触るのは下の TEMPLATES に並べたメールの件名と本文だけ。site_url やパスワード設定など
+ * 他の項目は送らないので変わらない（`supabase config push` と違い、ファイル全体で
  * 上書きしないのが狙い。config push は site_url まで巻き込むため使えない）。
  */
 
@@ -34,7 +34,14 @@ import { dirname, join } from "node:path";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
-/** 管理画面の「Confirm signup」に対応する2項目。API のプロパティ名は公式リファレンス準拠 */
+/**
+ * 反映する文面。**1件ずつ「件名」と「本文」の2項目**を送る。
+ * API のプロパティ名は公式リファレンス準拠（管理画面の各タブに対応する）。
+ *
+ * ここに足すと、次に実行したときから一緒に反映される。
+ * **リポジトリ側の控え（同じフォルダの .html）が唯一の正**なので、
+ * 管理画面で直接編集しないこと（README.md 参照）。
+ */
 const TEMPLATES = [
   {
     label: "Confirm signup",
@@ -42,6 +49,15 @@ const TEMPLATES = [
     subject: "Ferret のメールアドレス確認",
     subjectKey: "mailer_subjects_confirmation",
     contentKey: "mailer_templates_confirmation_content",
+  },
+  {
+    // パスワード再設定（C9）。管理画面の「Reset Password」。
+    // 件名に「再設定」とだけ書き、アカウントの状態を断定しない
+    label: "Reset Password",
+    file: "reset-password.html",
+    subject: "Ferret のパスワード再設定",
+    subjectKey: "mailer_subjects_recovery",
+    contentKey: "mailer_templates_recovery_content",
   },
 ];
 

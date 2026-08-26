@@ -11,6 +11,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { silenceConsole } from "./helpers";
+import {
+  RECOVERY_COOKIE,
+  RECOVERY_WINDOW_SECONDS,
+  RESET_PASSWORD_PATH,
+  verifyRecoveryMark,
+} from "@/lib/auth/recovery";
 
 // ---------------------------------------------------------------------------
 // モック
@@ -74,6 +80,10 @@ vi.mock("@/lib/supabase/server", () => ({
 
 process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
 process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "anon-test-key";
+// パスワード再設定の印は特権キーから鍵を導出して署名する（`lib/auth/recovery.ts`）。
+// `npm test` は .env.local を読まないので、ここで置いておく。
+// `??=` にしてあるのは、実キーが入っている環境の値を踏まないため
+process.env.SUPABASE_SERVICE_ROLE_KEY ??= "service-role-test-key";
 
 const { proxy, config } = await import("@/proxy");
 const { GET: authCallback } = await import("@/app/auth/callback/route");
@@ -156,6 +166,20 @@ describe("§7 proxy", () => {
     expect(joined).not.toContain("/login");
     expect(joined).not.toContain("/register");
     expect(joined).not.toContain("/api");
+  });
+
+  /**
+   * パスワード再設定の2画面（C9）は**ログイン不要のまま**にする。
+   *
+   * matcher に足すと1行で済んでしまうが、足した瞬間に
+   * **パスワードを忘れた人だけが通れない経路**になる（ログインを求められるが、
+   * ログインできないから来ている）。`/reset-password` を守っているのは
+   * ログインの有無ではなく「メールを受け取れた印」（`lib/auth/recovery.ts`）。
+   */
+  it("I-311 matcher がパスワード再設定の画面を含まない", () => {
+    const joined = config.matcher.join(" ");
+    expect(joined).not.toContain("/forgot-password");
+    expect(joined).not.toContain("/reset-password");
   });
 
   /**
@@ -367,10 +391,13 @@ describe("§8 GET /auth/callback", () => {
 
   /**
    * **リンクを開いた人はログイン状態になる。** これは種別によらず同じなので、
-   * 確認後の行き先を決めていない種別（recovery = パスワード再設定、
-   * email_change = メールアドレス変更）は受け取らない。C3 で足すときに一緒に決める。
+   * 確認後の行き先を決めていない種別（email_change = メールアドレス変更）は受け取らない。
+   *
+   * `recovery`（パスワード再設定）は **C9 で行き先を決めたのでこの一覧から外した** ──
+   * 行き先は `/reset-password`、印は Cookie（I-345〜I-348）。
+   * 種別を足すときは行き先も同時に決めること（ルート側のコメント）。
    */
-  it.each(["recovery", "email_change", "magiclink", "invite", "signup "])(
+  it.each(["email_change", "magiclink", "invite", "signup "])(
     "I-340 対象外の type（%s）は確認せずログイン画面へ",
     async (type) => {
       silenceConsole();
@@ -432,6 +459,81 @@ describe("§8 GET /auth/callback", () => {
     expect(exchangeMock).toHaveBeenCalledWith("abc");
     expect(verifyOtpMock).not.toHaveBeenCalled();
     expect(locationOf(res).pathname).toBe("/stages");
+  });
+
+  /**
+   * パスワード再設定のリンク（C9）。**確認メールと行き先が違う唯一の種別。**
+   *
+   * ここが /stages に流れていると、パスワードを決める画面を通らずに
+   * ログイン状態だけが出来上がる ── 忘れた人は結局入れないまま、
+   * 「リンクを踏んだら学習画面に入れた」という分かりにくい状態になる。
+   */
+  it("I-345 token_hash + type=recovery はパスワード再設定の画面へ送る", async () => {
+    const res = await authCallback(
+      get("http://localhost:3000/auth/callback?token_hash=hash-1&type=recovery"),
+    );
+
+    expect(verifyOtpMock).toHaveBeenCalledWith({
+      token_hash: "hash-1",
+      type: "recovery",
+    });
+    expect(locationOf(res).pathname).toBe(RESET_PASSWORD_PATH);
+  });
+
+  /**
+   * 「メールを受け取れた印」を持たせる（`lib/auth/recovery.ts`）。
+   *
+   * **これが無いと `/reset-password` は「ログインしていれば誰でもパスワードを
+   * 差し替えられる画面」になる。** せってい画面（PasswordForm）が
+   * いまのパスワードを尋ねて塞いでいる穴と同じものが、こちらに開く。
+   *
+   * 属性も一緒に見る。`httpOnly` が外れれば画面側の JavaScript から読めるようになり、
+   * `path` が広がれば関係のないリクエストにも付いて回る。
+   */
+  it("I-346 recovery のときだけ、メールを受け取れた印を付ける", async () => {
+    const res = await authCallback(
+      get("http://localhost:3000/auth/callback?token_hash=hash-1&type=recovery"),
+    );
+
+    const cookie = res.cookies.get(RECOVERY_COOKIE);
+    // **中身は署名済み。** 素の値（"1" のような固定文字）だと、
+    // 開発者ツールから1行打つだけで印が手に入る
+    expect(cookie?.value).toBeTruthy();
+    expect(cookie?.value).not.toBe("1");
+    expect(verifyRecoveryMark(cookie?.value)).toBe(true);
+
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.path).toBe(RESET_PASSWORD_PATH);
+    // 寿命は「画面が開いてから打ち終わるまで」の猶予。無期限にしない
+    expect(cookie?.maxAge).toBe(RECOVERY_WINDOW_SECONDS);
+  });
+
+  it.each(["signup", "email"])(
+    "I-347 確認メール（type=%s）では印を付けない",
+    async (type) => {
+      const res = await authCallback(
+        get(`http://localhost:3000/auth/callback?token_hash=hash-1&type=${type}`),
+      );
+
+      expect(res.cookies.get(RECOVERY_COOKIE)).toBeUndefined();
+      expect(locationOf(res).pathname).toBe("/stages");
+    },
+  );
+
+  /**
+   * 期限切れ・使用済みのリンクで印を配らない。
+   * 配ると、**確認に落ちた人がパスワードを差し替えられる画面へ入れてしまう。**
+   */
+  it("I-348 recovery の確認に失敗したら印を付けずログイン画面へ", async () => {
+    silenceConsole();
+    verifyOtpMock.mockResolvedValue({ error: { message: "Token has expired" } });
+
+    const res = await authCallback(
+      get("http://localhost:3000/auth/callback?token_hash=hash-1&type=recovery"),
+    );
+
+    expect(res.cookies.get(RECOVERY_COOKIE)).toBeUndefined();
+    expect(locationOf(res).pathname).toBe("/login");
   });
 });
 

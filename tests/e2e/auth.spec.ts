@@ -10,6 +10,9 @@ import {
   expect,
   login,
   submitLoginForm,
+  createDisposableUser,
+  recoveryTokenFor,
+  removeUser,
   TEST_USER,
 } from "./support/fixtures";
 import { SHOW_OAUTH } from "../../lib/auth/errors";
@@ -248,5 +251,171 @@ test.describe("§1 ログアウト", () => {
       .locator("xpath=ancestor::form[1]");
     await expect(form).toHaveAttribute("action", "/logout");
     await expect(form).toHaveAttribute("method", "post");
+  });
+});
+
+test.describe("§1 パスワードの再設定", () => {
+  /**
+   * 入口（C9）。**ここが無いと、パスワードを忘れた人はそこで終わる。**
+   * 位置は入力欄のすぐ下 ── 「入らない」と気づくのはパスワードを打った直後なので、
+   * カードの末尾に置くと目に入らない。
+   */
+  test("E-140 ログイン画面から再設定の画面へ行ける", async ({ page }) => {
+    await page.goto("/login");
+    await page.getByRole("link", { name: "パスワードをお忘れですか" }).click();
+
+    await expect(page).toHaveURL(/\/forgot-password/);
+    await expect(
+      page.getByRole("heading", { name: "パスワードの再設定" }),
+    ).toBeVisible();
+  });
+
+  /**
+   * **登録の有無を画面で分けない**（オーナー判断 2026-08-26・案A）。
+   *
+   * 分けると、メールアドレスを入れるだけで「そのアドレスが Ferret に登録されて
+   * いるか」を誰でも調べられる。C7（新規登録の案内文・E-112）と同じ判断。
+   *
+   * 使うのは**毎回違う未登録のアドレス。** テストユーザーのアドレスを入れると
+   * 実際に再設定メールが飛ぶ（送信の上限も消費する）。
+   */
+  test("E-141 未登録のアドレスでも「送りました」と出る", async ({ page }) => {
+    const unknown = `e2e-forgot-${Date.now()}@ferret.test`;
+
+    await page.goto("/forgot-password");
+    await page.getByLabel("メールアドレス").fill(unknown);
+    await page.getByRole("button", { name: "リンクを送る" }).click();
+
+    await expect(page.getByRole("heading", { name: "メールを送りました" })).toBeVisible();
+    // 「登録されていません」と分かる文面は出ない
+    await expect(page.getByText(/登録されていません|見つかりません/)).toHaveCount(0);
+  });
+
+  /**
+   * `/reset-password` を守っているのは**ログインの有無ではなく
+   * 「メールを受け取れた印」**（`lib/auth/recovery.ts`）。
+   *
+   * 印が無いのに入力欄を出すと、**いまのパスワードを知らない人が
+   * パスワードを差し替えられる画面**になる。せってい画面（E-450 台）が
+   * いまのパスワードを尋ねて塞いでいる穴と同じもの。
+   */
+  test("E-142 リンクを通らずに開くと入力欄を出さない", async ({ page }) => {
+    await page.goto("/reset-password");
+
+    await expect(
+      page.getByRole("heading", { name: "メールのリンクからお進みください" }),
+    ).toBeVisible();
+    await expect(page.getByLabel("あたらしいパスワード", { exact: true })).toHaveCount(0);
+    // 次の一手（送り直す）への道がある
+    await expect(page.getByRole("link", { name: "メールを送り直す" })).toBeVisible();
+  });
+
+  /**
+   * **どちらもログイン不要。** proxy に足すと1行で済むが、足した瞬間に
+   * 「パスワードを忘れた人だけが通れない経路」になる（I-311 と対になる確認）。
+   */
+  test("E-143 未ログインでも両方の画面が開ける", async ({ page }) => {
+    for (const path of ["/forgot-password", "/reset-password"]) {
+      await page.goto(path);
+      await expect(page).toHaveURL(new RegExp(path));
+    }
+  });
+
+  /**
+   * **印を偽造できないこと（C9）。**
+   *
+   * 想定している相手は「ログイン中の端末を触れる人」で、その人は開発者ツールから
+   * Cookie を自分で書ける。**印が素の値なら1行打つだけで手に入り**、
+   * せってい画面が要求している「いまのパスワード」を回避できてしまう。
+   * だから印は署名してある（`lib/auth/recovery.ts`）。
+   *
+   * Cookie の名前は原本（同ファイル）と1文字ずつ同じにしてある ──
+   * E2E はアプリのコードを import しない約束なので、**原本を変えたらここも変えること**
+   * （変え忘れても、印が通らない側に倒れるのでこのテストは落ちる）。
+   */
+  test("E-146 印を自分で作っても入力欄は出ない", async ({ page, baseURL }) => {
+    for (const value of ["1", `${Math.floor(Date.now() / 1000) + 600}.AAAA`]) {
+      await page.context().clearCookies();
+      await page.context().addCookies([
+        { name: "ferret-password-recovery", value, url: baseURL! },
+      ]);
+
+      await page.goto("/reset-password");
+      await expect(
+        page.getByRole("heading", { name: "メールのリンクからお進みください" }),
+      ).toBeVisible();
+      await expect(
+        page.getByLabel("あたらしいパスワード", { exact: true }),
+      ).toHaveCount(0);
+    }
+  });
+
+  /**
+   * **通し（C9 の本題）。** ここが通らないと、パスワードを忘れた人は戻れない。
+   *
+   * メールの受信だけ管理APIで代わりを立てている（`recoveryTokenFor`。
+   * リンクに埋め込まれる値を送信せずに取り出す）。**リンクの形は
+   * メールの文面と同じ**（`supabase/templates/reset-password.html`）にしてあるので、
+   * 受け取り口（`app/auth/callback/route.ts`）の約束が崩れればここで落ちる。
+   *
+   * 使い捨てアカウントで回すのは、共有のテストユーザーでパスワードを
+   * 変えてしまうと他のテストが入れなくなるため（E-706 と同じ理由）。
+   */
+  test("E-144 メールのリンクからパスワードを設定し直して、それでログインできる", async ({
+    page,
+  }) => {
+    const account = await createDisposableUser("c9");
+    const newPassword = "FerretRecovered2026!";
+
+    try {
+      const token = await recoveryTokenFor(account.email);
+
+      await page.goto(`/auth/callback?token_hash=${token}&type=recovery`);
+      await expect(page).toHaveURL(/\/reset-password/);
+
+      await page.getByLabel("あたらしいパスワード", { exact: true }).fill(newPassword);
+      await page.getByLabel("あたらしいパスワード（確認）").fill(newPassword);
+      await page.getByRole("button", { name: "このパスワードにする" }).click();
+
+      await expect(
+        page.getByRole("heading", { name: "あたらしいパスワードを設定しました" }),
+      ).toBeVisible();
+
+      // 出直して、あたらしいパスワードで入れること。
+      // ここまで通れば「忘れた状態からの復帰」が成立している
+      await page.context().clearCookies();
+      await page.goto("/login");
+      await submitLoginForm(page, {
+        email: account.email,
+        password: newPassword,
+      });
+      await expect(page).toHaveURL(/\/stages/);
+    } finally {
+      await removeUser(account.id);
+    }
+  });
+
+  /**
+   * 一度使ったリンクは通らない（Supabase 側の性質。C9 の注意「1回限りの扱いを
+   * 確認すること」）。**通ってしまうと、メールを覗かれた人が後からいつでも
+   * パスワードを差し替えられる。**
+   */
+  test("E-145 一度使ったリンクは二度目は通らない", async ({ page }) => {
+    const account = await createDisposableUser("c9-reuse");
+
+    try {
+      const token = await recoveryTokenFor(account.email);
+      const link = `/auth/callback?token_hash=${token}&type=recovery`;
+
+      await page.goto(link);
+      await expect(page).toHaveURL(/\/reset-password/);
+
+      // 同じリンクをもう一度。理由は画面に出さずログイン画面へ戻す約束（I-342）
+      await page.context().clearCookies();
+      await page.goto(link);
+      await expect(page).toHaveURL(/\/login\?error=auth_callback/);
+    } finally {
+      await removeUser(account.id);
+    }
   });
 });
