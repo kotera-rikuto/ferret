@@ -194,7 +194,7 @@ Number(値) は数に直します。env.X === "true" のような比べ方は、
 );
 
 -- ステージ79〜80 投入
--- 出典: problems/stage-006-014.data.mjs / 設計: problems/stage-006-014.md
+-- 出典: problems/stage-073-080.data.mjs / 設計: problems/stage-073-080.md
 -- **投入済みの実データから生成したもので、手書きしていない**
 -- id は書かない（GENERATED ALWAYS AS IDENTITY）
 

@@ -1,6 +1,10 @@
 // 投入済みの実データから登録用 SQL を生成する。
 //
-//   node problems/gen-sql.mjs <開始order> <終了order> > problems/stage-XXX-YYY.sql
+//   node problems/gen-sql.mjs <開始order> <終了order> [出典の名前] > problems/stage-XXX-YYY.sql
+//
+// 第3引数を省くと 出典 の行が stage-006-014 のまま出る（初回のバッチの名前が残っている）。
+// **記録の出典が実際のデータファイルと違うと、あとから読んだ人が別のものを直す**ので、
+// 新しいバッチでは自分のファイル名を渡すこと。
 //
 // **手で SQL を書かない。** 手書きだと、投入のときに直した1文字が記録に反映されず、
 // あとから .sql を信じた人が別のものを入れることになる
@@ -12,6 +16,7 @@ import { readFile } from "node:fs/promises";
 
 const from = Number(process.argv[2]);
 const to = Number(process.argv[3]);
+const source = process.argv[4] ?? "stage-006-014";
 
 const env = await readFile(".env.local", "utf8");
 const pick = (k) => env.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1]?.trim();
@@ -38,7 +43,7 @@ const jsonb = (v) => `${lit(JSON.stringify(v))}::jsonb`;
 
 const out = [];
 out.push(`-- ステージ${from}〜${to} 投入`);
-out.push(`-- 出典: problems/stage-006-014.data.mjs / 設計: problems/stage-006-014.md`);
+out.push(`-- 出典: problems/${source}.data.mjs / 設計: problems/${source}.md`);
 out.push(`-- **投入済みの実データから生成したもので、手書きしていない**`);
 out.push(`-- id は書かない（GENERATED ALWAYS AS IDENTITY）`);
 out.push("");
