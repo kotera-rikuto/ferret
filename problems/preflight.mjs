@@ -76,6 +76,11 @@ function warn(p, id, message) {
 const dataPath = process.argv[2] ?? "./problems/stage-006-014.data.mjs";
 const { problems } = await import(pathToFileURL(dataPath).href);
 
+// `--replace` ── 既存の同じ order を「置き換える」ときに付ける（A3 の1〜3問目の書き替え）。
+// 付けないと I-807 が、これから上書きする当の行を重複として落とす。
+// **新規どうしの重複は付けても見る**（データファイル内で order を書き間違えたら落ちる）。
+const REPLACE = process.argv.includes("--replace");
+
 // 既存の問題（order / title の重複を見るために読む。読み取りのみ）
 let existing = [];
 try {
@@ -90,6 +95,15 @@ try {
   notes.push(`既存 ${existing.length} 件と突き合わせた`);
 } catch (e) {
   notes.push(`⚠️ 既存データを読めなかったので order / title の重複は未検査（${e.message}）`);
+}
+
+// 置き換えるときは、置き換え対象の行そのものを重複判定から外す
+const targetOrders = new Set(problems.map((p) => p.order));
+const existingToCompare = REPLACE
+  ? existing.filter((e) => !targetOrders.has(e.order))
+  : existing;
+if (REPLACE) {
+  notes.push(`--replace: order=${[...targetOrders].join(" / ")} の既存行は置き換え対象として重複判定から外した`);
 }
 
 for (const p of problems) {
@@ -187,7 +201,7 @@ for (const p of problems) {
   }
 
   // --- I-807 / I-808 重複（新規どうし + 既存との突き合わせ） ------------------
-  for (const other of [...problems, ...existing]) {
+  for (const other of [...problems, ...existingToCompare]) {
     if (other === p) continue;
     if (other.order === p.order) fail(p, "I-807", `order が「${other.title}」と重複`);
     if (other.title === p.title && other.order !== p.order) {

@@ -1,5 +1,5 @@
 -- ステージ25〜29 投入
--- 出典: problems/stage-006-014.data.mjs / 設計: problems/stage-006-014.md
+-- 出典: problems/stage-025-029.data.mjs / 設計: problems/stage-025-029.md
 -- **投入済みの実データから生成したもので、手書きしていない**
 -- id は書かない（GENERATED ALWAYS AS IDENTITY）
 

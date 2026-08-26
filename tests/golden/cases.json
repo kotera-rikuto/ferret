@@ -2,8 +2,13 @@
   "$comment": [
     "ゴールデンセット（50件）。tests/golden/golden.test.ts が実行時に読む。",
     "",
-    "**このファイルは git 管理外。** 10問ぶんの正答（模範解答相当）と、どう書くと",
-    "不合格になるかの一覧を含むため、/problems/ と同じ理由で公開しない（.gitignore 参照）。",
+    "⚠️ **この記述は事実と違う（2026-08-26 確認）。** 「git 管理外」と書いてあるが、",
+    "このファイルは追跡されており Public リポジトリに入っている（`.gitignore` にあるのは `/tests/golden/results/` だけ）。10問ぶんの正答と不合格例を含むので、**非公開にするなら .gitignore に足して履歴からも消す判断が必要。** A3 では方針を変えていない。",
+    "",
+    "**2026-08-26 追記（tasks/A3）**: order 1〜3 の15件（G01〜G05・G11〜G15・G16〜G20）を作り直した。",
+    "**問題そのものがチュートリアル用に差し替わった**ため、前の回答文はコードと対応しなくなっていた",
+    "（`problems/stage-001-003.md`）。**このため order 1〜3 の数字は 2026-08-19 の測定と比較できない。**",
+    "新しい15件は15件だけに絞って実測した（GOLDEN_ONLY・15回・約¥0.6）。想定との一致は 15/15。",
     "",
     "order は problems.order を指す。id ではなく order で指定しているのは、",
     "id が自動採番で環境によって変わるため（order は問題設計上の固定値）。",
@@ -24,7 +29,7 @@
       "category": "clear",
       "bullet": false,
       "numeric_only": false,
-      "answer": "5行目で const で宣言された rate に 0.8 を再代入しているため、そこで TypeError が発生して実行が止まります。total の計算までは進んで 900 になっていますが、return に到達しないので console.log は何も出力しません。",
+      "answer": "4100 が出力されます。total には最初 unitPrice と count を掛けた 3600 が入り、その次の行で shipping の 500 を足した値を代入し直しているので 4100 になります。",
       "note": "模範解答に近い。core/ground/depth すべて満たす想定"
     },
     {
@@ -33,8 +38,8 @@
       "category": "clear",
       "bullet": false,
       "numeric_only": false,
-      "answer": "const で宣言した rate に対して 5行目で 0.8 を代入しているので、実行時にエラーになって止まります。関数の戻り値は返らないため、最後の console.log の行は動きません。",
-      "note": "エラー名を書かずに depth（console.log 未到達）を満たす回答"
+      "answer": "4100 が出力されます。4行目で total に shipping の 500 を足した値を入れ直しているためです。let で宣言されているので後から入れ直せます。",
+      "note": "途中の値 3600 に触れず ground だけを満たす回答（depth が none でもクリアするか）"
     },
     {
       "id": "G03",
@@ -42,8 +47,8 @@
       "category": "short_correct",
       "bullet": false,
       "numeric_only": false,
-      "answer": "const の rate に再代入しているのでエラーになります。",
-      "note": "残課題 §8 で 63/71/73 と振れた回答。層1は3スロット当たる"
+      "answer": "total に 500 を足すので 4100 が出力されます。",
+      "note": "core を満たす短い正答。層1は3スロット当たる"
     },
     {
       "id": "G04",
@@ -51,8 +56,8 @@
       "category": "inverted",
       "bullet": false,
       "numeric_only": true,
-      "answer": "rate は 0.8 に再代入されますが、エラーにはなりません。console.log で 900 が出力されます。",
-      "note": "残課題 §11 の実測経路そのもの。core_reject 1（900 が出力される）"
+      "answer": "total から shipping の 500 が引かれるので、3100 が出力されます。",
+      "note": "core_reject 2（shipping が引かれて 3100）。誤りの中心が数値だけ（残課題 §11 の経路）"
     },
     {
       "id": "G05",
@@ -60,8 +65,8 @@
       "category": "fail",
       "bullet": false,
       "numeric_only": false,
-      "answer": "このコードはエラーが出ると思います。",
-      "note": "残課題 §8 で 29/53/29 と 24点振れた回答。フリップ観測の主役"
+      "answer": "変数に計算した値を入れて、それを出力しているコードだと思います。",
+      "note": "一般論。出力の値に踏み込んでいない"
     },
     {
       "id": "G06",
@@ -114,7 +119,7 @@
       "category": "clear",
       "bullet": false,
       "numeric_only": false,
-      "answer": "ログには「最後に集計した注文: A-3」と出ます。A-3 は canceled なので合計には入っておらず、返る合計は A-1 と A-2 の 2000 です。原因は order が var で宣言されていることで、ブロックスコープを持たないためループを抜けた後も最後の繰り返しで代入された末尾の要素が残ります。加算を分けているのは if の中だけで、var order への代入は毎回実行されます。",
+      "answer": "鈴木 が出力されます。keep に最初の primaryOwner の値である 田中 を取っておいてから、primaryOwner に backupOwner の値を入れているためです。最後の行で backupOwner には keep の 田中 が入ります。",
       "note": "模範解答に近い"
     },
     {
@@ -123,8 +128,8 @@
       "category": "clear",
       "bullet": false,
       "numeric_only": false,
-      "answer": "ログに出るのは A-3 です。var で宣言された order は関数全体で有効なので、ループが終わった後も最後に代入された値、つまり配列の末尾の注文が残っています。合計に足すかどうかは if で分けていますが、order への代入は毎回行われます。",
-      "note": "合計値 2000 に触れないが depth の後半条件（if は加算だけ）を満たす"
+      "answer": "出力は 鈴木 です。primaryOwner に backupOwner を代入する前に、元の値を keep に退避しているので、上書きしても消えません。",
+      "note": "depth（backupOwner が 田中 になる）に触れない正答"
     },
     {
       "id": "G13",
@@ -132,7 +137,7 @@
       "category": "short_correct",
       "bullet": false,
       "numeric_only": false,
-      "answer": "var の order が関数全体に残るため、集計されていない A-3 がログに出ます。",
+      "answer": "keep に退避してから入れ替えているので、primaryOwner は 鈴木 になります。",
       "note": "core と ground を一文で満たす短い正答"
     },
     {
@@ -141,8 +146,8 @@
       "category": "inverted",
       "bullet": false,
       "numeric_only": true,
-      "answer": "ログには A-2 が出ます。canceled の A-3 は if で弾かれるので、order には集計した最後の注文である A-2 が入っています。",
-      "note": "core_reject 1・2。誤りの中心が A-2 という3文字の識別子（§11 の経路）"
+      "answer": "primaryOwner は 田中 のままなので、田中 が出力されます。",
+      "note": "core_reject 1（付け替える前の値で答えている）。誤りの中心が2文字の名前（§11 の経路）"
     },
     {
       "id": "G15",
@@ -150,8 +155,8 @@
       "category": "fail",
       "bullet": false,
       "numeric_only": false,
-      "answer": "合計は 2000 になります。canceled の注文は加算されないためです。",
-      "note": "合計だけ説明し、設問が問うログの食い違いに触れていない"
+      "answer": "担当者を付け替えるコードで、変数が3つ使われています。keep は一時的に使うためのものです。",
+      "note": "コードの説明だけで、何が出力されるかに答えていない"
     },
     {
       "id": "G16",
@@ -159,7 +164,7 @@
       "category": "clear",
       "bullet": false,
       "numeric_only": false,
-      "answer": "age はキー自体がレスポンスに存在していて、その値として null が入っています。サーバーが値は無いと明示して返した状態です。company はキー自体が存在しないので、存在しないプロパティにアクセスした結果 undefined が返っています。根拠は6つ目と7つ目の出力で、profile.age は null、profile.company は undefined になります。",
+      "answer": "2つ目は undefined を出力します。profile に company という名前が書かれていないためです。1つ目の profile.age は null で、こちらは名前があって値として null が入っている状態なので、意味が違います。",
       "note": "模範解答に近い"
     },
     {
@@ -168,7 +173,7 @@
       "category": "clear",
       "bullet": true,
       "numeric_only": false,
-      "answer": "1. age はキーがあり、その値が null です\n2. company はキー自体が存在しないため undefined が返ります\n3. 根拠は6つ目と7つ目の出力で、それぞれ null と undefined になります",
+      "answer": "1. 2つ目の出力は undefined です\n2. profile に company という名前が存在しないためです\n3. 1つ目の profile.age は null で、名前はあって値が入っていない状態です",
       "note": "箇条書きの正答。§12 の誤爆観測用"
     },
     {
@@ -177,7 +182,7 @@
       "category": "short_correct",
       "bullet": false,
       "numeric_only": false,
-      "answer": "company はキー自体が存在しないので undefined になります。age はキーがあって値が null です。",
+      "answer": "company は profile に存在しないので、2つ目の出力は undefined になります。",
       "note": "core を満たす短い正答"
     },
     {
@@ -186,8 +191,8 @@
       "category": "inverted",
       "bullet": false,
       "numeric_only": false,
-      "answer": "age も company もどちらも値が無いという同じ意味で、出力もどちらも undefined になります。",
-      "note": "core_reject 1（どちらも同じだとまとめている）"
+      "answer": "2つ目も null が出力されます。age も company もどちらも値が無いという同じ状態を表しているためです。",
+      "note": "core_reject 1（2つ目の出力も null だと読んでいる）"
     },
     {
       "id": "G20",
@@ -195,7 +200,7 @@
       "category": "fail",
       "bullet": false,
       "numeric_only": false,
-      "answer": "null と undefined はどちらも値が存在しないことを表しますが、使われる場面が違います。typeof で確認するとその違いが分かります。",
+      "answer": "null と undefined はどちらも値が存在しないことを表しますが、使われる場面が違います。型を調べると違いが分かります。",
       "note": "一般論。コードの出力を根拠にしていない"
     },
     {
