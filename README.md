@@ -278,7 +278,9 @@ npm run dev
 必要な環境変数は [`.env.local.example`](.env.local.example) が正です。
 `SUPABASE_SERVICE_ROLE_KEY` / `STRIPE_SECRET_KEY` / `OPENAI_API_KEY` は `NEXT_PUBLIC_` を付けずに宣言し、
 サーバー（`lib/supabase/admin.ts`・API Routes）からのみ参照します。クライアントバンドルには含めません。
-`RESEND_API_KEY` は**アプリのコードが読みません**（メールを送るのは Supabase なので、同じ値を SMTP 設定に入れます）。
+`RESEND_API_KEY` は2つの経路で使います。認証メールを送るのは Supabase なので同じ値を SMTP 設定に入れ、
+改善要望の通知（E13）はアプリのコード（`lib/mail.ts`）がこの値を読んで送ります。
+届け先の `FEEDBACK_NOTIFY_EMAIL` も同様にサーバーからのみ参照します。
 
 DB を変えるときは `supabase/migrations/` にファイルを足して `supabase db push`。管理画面から手で変えません。
 

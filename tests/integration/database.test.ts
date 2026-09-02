@@ -539,15 +539,15 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
       await admin.from("problem_feedback").delete().in("user_id", [userA, userB]);
     });
 
-    it("I-670 kind が2種以外なら拒否する", async () => {
+    it("I-670 kind が3種以外なら拒否する", async () => {
       const { error } = await admin
         .from("problem_feedback")
         .insert(feedback({ kind: "spam" }));
       expect(error?.code).toBe("23514");
     });
 
-    it("I-671 score_dispute / problem_error は通る", async () => {
-      for (const kind of ["score_dispute", "problem_error"]) {
+    it("I-671 score_dispute / problem_error / improvement は通る", async () => {
+      for (const kind of ["score_dispute", "problem_error", "improvement"]) {
         const { error } = await admin.from("problem_feedback").insert(feedback({ kind }));
         expect(error, `${kind} が拒否された: ${error?.message}`).toBeNull();
       }
@@ -567,8 +567,9 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
       expect(error).toBeNull();
     });
 
-    /** 連打・スパムの安い歯止め。同じ問題への同種の報告は1人1件 */
-    it("I-673 同じ user / problem / kind の2件目は拒否する", async () => {
+    /** 連打・スパムの安い歯止め。既存2種は同じ問題への同種の報告が1人1件
+        （E13 で unique 制約から部分ユニークインデックスに変更） */
+    it("I-673 同じ user / problem / kind の2件目は拒否する（既存2種）", async () => {
       const row = feedback({ kind: "score_dispute", user_id: userA });
       await admin.from("problem_feedback").delete().eq("user_id", userA);
       const first = await admin.from("problem_feedback").insert(row);
@@ -578,11 +579,17 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
       expect(second.error?.code).toBe("23505"); // unique violation
     });
 
-    it("I-673b upsert なら上書きできる（書き直しを捨てない）", async () => {
-      const rewritten = feedback({ comment: "書き直しました。こちらが本当の理由です。" });
+    /**
+     * 部分ユニークインデックスは PostgREST の upsert から推論できないので、
+     * 書き直しは API と同じく update で上書きする（app/api/feedback/route.ts）
+     */
+    it("I-673b 書き直しは update で上書きできる（捨てない）", async () => {
       const { error } = await admin
         .from("problem_feedback")
-        .upsert(rewritten, { onConflict: "user_id,problem_id,kind" });
+        .update({ comment: "書き直しました。こちらが本当の理由です。" })
+        .eq("user_id", userA)
+        .eq("problem_id", problemId)
+        .eq("kind", "score_dispute");
       expect(error).toBeNull();
 
       const { data } = await admin
@@ -592,6 +599,18 @@ describe.skipIf(!RUN)("§13 DB 制約と RLS（実DB）", () => {
         .eq("kind", "score_dispute")
         .single();
       expect(data?.comment).toContain("書き直しました");
+    });
+
+    /** 改善要望（E13）は何度でも送れる ── 部分インデックスの対象外 */
+    it("I-673c improvement は同じ user / problem でも複数入る", async () => {
+      const row = feedback({ kind: "improvement", user_id: userA });
+      const first = await admin.from("problem_feedback").insert(row);
+      expect(first.error).toBeNull();
+
+      const second = await admin
+        .from("problem_feedback")
+        .insert({ ...row, comment: "2通目です。設定画面の場所が分かりにくいと感じました。" });
+      expect(second.error).toBeNull();
     });
 
     it("I-674 存在しない問題への報告は作れない", async () => {

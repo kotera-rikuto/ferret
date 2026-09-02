@@ -8,6 +8,7 @@ import { IconPaw } from "@/components/ui/icons";
 import {
   COMMENT_MAX_CHARS,
   COMMENT_MIN_CHARS,
+  REPEATABLE_KINDS,
   type FeedbackKind,
 } from "@/lib/feedback";
 // 型だけを読み込む。計算は page.tsx（サーバー）側で済ませてあるので、
@@ -45,17 +46,27 @@ type ReportState = "idle" | "sending" | "sent";
  */
 const REPORT_FORMS: Record<
   FeedbackKind,
-  { label: string; title: string; hint: string }
+  { label: string; title: string; hint: string; sentNote: string }
 > = {
+  // 改善要望（作者へのメッセージ・E13）。他の2つより目立たせる（文字を濃くし ▼ を付ける）。
+  // Object.keys の並びがそのまま表示順になるので、先頭に置いてある
+  improvement: {
+    label: "もっとこうしてほしい ▼",
+    title: "作者へのメッセージ",
+    hint: "改善してほしいところ、ほしい問題、気づいたことなど、何でも書いてください。作者に直接届きます。",
+    sentNote: "メッセージを受け取りました。ありがとうございます",
+  },
   score_dispute: {
     label: "採点に納得できない",
     title: "採点への異議",
     hint: "どこを正しく読めていたと考えるか、コードを根拠に書いてください。いただいた内容は採点の改善にそのまま使います。",
+    sentNote: "「採点に納得できない」を受け取りました。ありがとうございます",
   },
   problem_error: {
     label: "問題の誤りを報告",
     title: "問題の誤りを報告",
     hint: "どこが誤っていそうか教えてください（誤字、コードと設問の食い違いなど）。",
+    sentNote: "「問題の誤りを報告」を受け取りました。ありがとうございます",
   },
 };
 
@@ -97,9 +108,10 @@ export function ResultView({
    */
   const softened =
     contradiction && !cleared && Boolean(feedback || praise || nextFocus);
-  // 異議申し立て・誤り報告。2種で状態を分けるのは、片方を送った後も
-  // もう片方を送れるようにするため
+  // 改善要望・異議申し立て・誤り報告。種別ごとに状態を分けるのは、
+  // 1つを送った後も残りを送れるようにするため
   const [reports, setReports] = useState<Record<FeedbackKind, ReportState>>({
+    improvement: "idle",
     score_dispute: "idle",
     problem_error: "idle",
   });
@@ -425,25 +437,38 @@ export function ResultView({
           )}
         </div>
 
-        {/* 異議申し立て・誤り報告。控えめに置くが、書かれた理由は
-            ゴールデンセット（採点精度の検証）の材料になる重要な導線 */}
+        {/* 改善要望・異議申し立て・誤り報告。控えめに置くが、書かれた理由は
+            ゴールデンセット（採点精度の検証）と改善の材料になる重要な導線。
+            改善要望だけ文字を濃くして目立たせる（E13・オーナーの指定）。
+            何度でも送れる種別は、送った後もボタンを残す */}
         {openKind === null ? (
           <div className="mt-3 flex flex-wrap items-center justify-center gap-x-6 gap-y-1.5 text-xs font-bold">
-            {(Object.keys(REPORT_FORMS) as FeedbackKind[]).map((kind) =>
-              reports[kind] === "sent" ? (
-                <span key={kind} className="text-muted">
-                  「{REPORT_FORMS[kind].label}」を受け取りました。ありがとうございます
-                </span>
-              ) : (
-                <button
+            {(Object.keys(REPORT_FORMS) as FeedbackKind[]).map((kind) => {
+              const sent = reports[kind] === "sent";
+              const repeatable = REPEATABLE_KINDS.includes(kind);
+              return (
+                <span
                   key={kind}
-                  onClick={() => openReport(kind)}
-                  className="text-locked-ink underline underline-offset-4 hover:text-muted"
+                  className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1"
                 >
-                  {REPORT_FORMS[kind].label}
-                </button>
-              ),
-            )}
+                  {sent && (
+                    <span className="text-muted">{REPORT_FORMS[kind].sentNote}</span>
+                  )}
+                  {(!sent || repeatable) && (
+                    <button
+                      onClick={() => openReport(kind)}
+                      className={
+                        kind === "improvement"
+                          ? "text-ink underline underline-offset-4 hover:text-brand-deep"
+                          : "text-locked-ink underline underline-offset-4 hover:text-muted"
+                      }
+                    >
+                      {REPORT_FORMS[kind].label}
+                    </button>
+                  )}
+                </span>
+              );
+            })}
           </div>
         ) : (
           <div className="mt-3 flex w-full flex-col gap-3 rounded-2xl border-2 border-line bg-panel p-5">
@@ -455,7 +480,11 @@ export function ResultView({
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               rows={4}
-              placeholder="理由を入力してください..."
+              placeholder={
+                openKind === "improvement"
+                  ? "伝えたいことを入力してください..."
+                  : "理由を入力してください..."
+              }
               className="resize-y rounded-xl border-2 border-line bg-panel px-3.5 py-3 text-sm leading-relaxed outline-none focus:border-brand placeholder:text-locked-ink"
             />
             {reportError && <p className="text-danger text-xs">{reportError}</p>}

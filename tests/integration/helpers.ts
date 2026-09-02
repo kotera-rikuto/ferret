@@ -43,8 +43,10 @@ export type DbState = {
   problemDetail: Record<string, unknown> | null;
   /** リプレイ検索が返す行。null なら新規採点 */
   replay: Record<string, unknown> | null;
-  /** insert が返すエラー。null なら成功 */
-  insertError: { message: string } | null;
+  /** insert が返すエラー。null なら成功。code は unique violation（23505）の再現に使う */
+  insertError: { message: string; code?: string } | null;
+  /** update が返すエラー。null なら成功 */
+  updateError: { message: string } | null;
   /** upsert が返すエラー。null なら成功 */
   upsertError: { message: string } | null;
   /**
@@ -76,6 +78,8 @@ export type DbState = {
 export type DbSpy = {
   /** insert された行 */
   inserted: Record<string, unknown>[];
+  /** update された [テーブル, 行] */
+  updated: Array<[string, Record<string, unknown>]>;
   /** upsert された [行, オプション] */
   upserted: Array<[Record<string, unknown>, unknown]>;
   /** admin 側の [テーブル, 列] */
@@ -105,6 +109,7 @@ export type DbSpy = {
 export function emptySpy(): DbSpy {
   return {
     inserted: [],
+    updated: [],
     upserted: [],
     selects: [],
     filters: [],
@@ -188,6 +193,15 @@ function makeAdmin(state: DbState, spy: DbSpy) {
         insert(row: Record<string, unknown>) {
           spy.inserted.push(row);
           return Promise.resolve({ error: state.insertError });
+        },
+        /** 異議申し立ての書き直し（insert が 23505 のときの2段目）。`.update().eq(...)` の鎖 */
+        update(row: Record<string, unknown>) {
+          spy.updated.push([table, row]);
+          return makeChain(
+            { error: state.updateError },
+            (column, value) => spy.filters.push([table, column, value]),
+            spy,
+          );
         },
         upsert(row: Record<string, unknown>, options?: unknown) {
           spy.upserted.push([row, options]);
@@ -345,6 +359,7 @@ export function defaultState(patch: Partial<DbState> = {}): DbState {
     problemDetail: PROBLEM_DETAIL,
     replay: null,
     insertError: null,
+    updateError: null,
     upsertError: null,
     deleteErrors: {},
     authDeleteError: null,

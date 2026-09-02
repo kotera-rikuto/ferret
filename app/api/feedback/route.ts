@@ -5,12 +5,14 @@ import {
   COMMENT_MAX_CHARS,
   COMMENT_MIN_CHARS,
   FEEDBACK_KINDS,
+  IMPROVEMENT_DAILY_LIMIT,
   type FeedbackKind,
 } from "@/lib/feedback";
+import { notifyOwner } from "@/lib/mail";
 import { NextRequest, NextResponse } from "next/server";
 
 /**
- * 採点への異議申し立て・問題の誤り報告の受け口。
+ * 採点への異議申し立て・問題の誤り報告・改善要望（作者へのメッセージ・E13）の受け口。
  *
  * 保存するだけの単純な API だが、守り（CSRF・Content-Type・本文サイズ・認証）は
  * /api/score と同じ構えにしてある。「書き込みが起きる POST」の入口を
@@ -129,25 +131,86 @@ export async function POST(request: NextRequest) {
     attemptId = attempt?.id ?? null;
   }
 
-  // unique (user_id, problem_id, kind) に当たる再送は「書き直し」として上書きする。
-  // 無視（ignoreDuplicates）にすると、前回より詳しく書き直した理由が黙って捨てられる
   const admin = createAdminClient();
-  const { error } = await admin.from("problem_feedback").upsert(
-    {
-      user_id: user.id,
-      problem_id: problemId,
-      attempt_id: attemptId,
-      kind,
-      comment,
-    },
-    { onConflict: "user_id,problem_id,kind" },
+  const row = {
+    user_id: user.id,
+    problem_id: problemId,
+    attempt_id: attemptId,
+    kind,
+    comment,
+  };
+  const failure = NextResponse.json(
+    { error: "送信できませんでした。時間をおいてもう一度お試しください。" },
+    { status: 500 },
   );
 
-  if (error) {
-    return NextResponse.json(
-      { error: "送信できませんでした。時間をおいてもう一度お試しください。" },
-      { status: 500 },
+  if (kind === "improvement") {
+    // 改善要望は件数の縛りが無い（何度でも送れる）ぶん、1日の上限で連打を止める。
+    // 保存のたびに作者へメールが飛ぶので、無制限だと1人がメール爆撃の装置になれる
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { data: recent, error: countError } = await admin
+      .from("problem_feedback")
+      .select("created_at")
+      .eq("user_id", user.id)
+      .eq("kind", "improvement")
+      .gte("created_at", since);
+    if (countError) {
+      return failure;
+    }
+    if ((recent ?? []).length >= IMPROVEMENT_DAILY_LIMIT) {
+      return NextResponse.json(
+        {
+          error:
+            "たくさんの声をありがとうございます。きょうのぶんは受け取りきったので、つづきはまたあした送ってください。",
+        },
+        { status: 429 },
+      );
+    }
+
+    const { error } = await admin.from("problem_feedback").insert(row);
+    if (error) {
+      return failure;
+    }
+
+    // 保存できていれば意見は失われないので、メールの失敗で応答を失敗にしない。
+    // 本文には返信・調査に要る「どの問題・誰・いつ」を入れる（E13）。
+    // 意見の本文は外部AIに送らない ── 自分あてのメールに載せるだけ
+    const sentAt = new Date().toLocaleString("ja-JP", { timeZone: "Asia/Tokyo" });
+    await notifyOwner(
+      `【Ferret】改善要望（問題 ${problemId}）`,
+      [
+        `問題: ${problemId}`,
+        `ユーザー: ${user.id}${user.email ? `（${user.email}）` : ""}`,
+        `回答: ${attemptId ?? "紐付けなし"}`,
+        `日時: ${sentAt}（JST）`,
+        "",
+        comment,
+      ].join("\n"),
     );
+
+    return NextResponse.json({ ok: true });
+  }
+
+  // 既存2種は「同じ問題への同種の報告は1人1件」（部分ユニークインデックス）。
+  // 再送は「書き直し」として上書きする ── 無視すると、前回より詳しく
+  // 書き直した理由が黙って捨てられる。
+  // 部分インデックスは PostgREST の upsert から推論できないため、
+  // insert して 23505（unique violation）なら update する2段構え。
+  // 並んで走っても、負けた側が update に落ちるだけで結果は収束する
+  const { error } = await admin.from("problem_feedback").insert(row);
+  if (error) {
+    if (error.code !== "23505") {
+      return failure;
+    }
+    const { error: updateError } = await admin
+      .from("problem_feedback")
+      .update({ comment, attempt_id: attemptId })
+      .eq("user_id", user.id)
+      .eq("problem_id", problemId)
+      .eq("kind", kind);
+    if (updateError) {
+      return failure;
+    }
   }
 
   return NextResponse.json({ ok: true });

@@ -20,15 +20,23 @@ import {
   type DbState,
   type DbSpy,
 } from "./helpers";
-import { COMMENT_MIN_CHARS, COMMENT_MAX_CHARS, FEEDBACK_KINDS } from "@/lib/feedback";
+import {
+  COMMENT_MIN_CHARS,
+  COMMENT_MAX_CHARS,
+  FEEDBACK_KINDS,
+  IMPROVEMENT_DAILY_LIMIT,
+} from "@/lib/feedback";
 
-const { getUserMock, holder } = vi.hoisted(() => ({
+const { getUserMock, holder, notifyOwnerMock } = vi.hoisted(() => ({
   getUserMock: vi.fn(),
   holder: { admin: null as unknown, session: null as unknown },
+  notifyOwnerMock: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => holder.session }));
 vi.mock("@/lib/supabase/admin", () => ({ createAdminClient: () => holder.admin }));
+// 改善要望の通知メール（E13）。実物は Resend を叩くのでここでは差し替える
+vi.mock("@/lib/mail", () => ({ notifyOwner: notifyOwnerMock }));
 
 const { POST } = await import("@/app/api/feedback/route");
 
@@ -46,6 +54,8 @@ function setup(patch: Partial<DbState> = {}) {
 beforeEach(() => {
   getUserMock.mockReset();
   getUserMock.mockResolvedValue({ data: { user: { id: USER_ID } } });
+  notifyOwnerMock.mockReset();
+  notifyOwnerMock.mockResolvedValue(true);
   setup();
 });
 
@@ -78,9 +88,9 @@ const VALID = {
   comment: COMMENT,
 };
 
-/** upsert された行 */
+/** insert された行（再送の上書きは spy.updated を直接見る） */
 function saved() {
-  return spy.upserted[0]?.[0];
+  return spy.inserted[0];
 }
 
 // ---------------------------------------------------------------------------
@@ -89,7 +99,7 @@ describe("§14-1 リクエストの入口", () => {
   it("I-700 別サイトからの POST は 403", async () => {
     const { res } = await post(VALID, { headers: { "sec-fetch-site": "cross-site" } });
     expect(res.status).toBe(403);
-    expect(spy.upserted).toHaveLength(0);
+    expect(spy.inserted).toHaveLength(0);
   });
 
   it("I-701 別サブドメインからの POST も 403", async () => {
@@ -122,7 +132,7 @@ describe("§14-1 リクエストの入口", () => {
     await post(VALID, { headers: { "sec-fetch-site": "cross-site" } });
     await post(VALID, { headers: { "content-type": "text/plain" } });
     await post(null, { raw: "{壊れている" });
-    expect(spy.upserted).toHaveLength(0);
+    expect(spy.inserted).toHaveLength(0);
   });
 });
 
@@ -132,7 +142,7 @@ describe("§14-2 認証", () => {
     const { res, json } = await post(VALID);
     expect(res.status).toBe(401);
     expect(json.error).toBe("ログインが必要です。");
-    expect(spy.upserted).toHaveLength(0);
+    expect(spy.inserted).toHaveLength(0);
   });
 
   /**
@@ -174,7 +184,7 @@ describe("§14-3 入力検証", () => {
   ])("I-721 problem_id が不正（%s）なら 400", async (_label, problem_id) => {
     const { res } = await post({ ...VALID, problem_id });
     expect(res.status).toBe(400);
-    expect(spy.upserted).toHaveLength(0);
+    expect(spy.inserted).toHaveLength(0);
   });
 
   it.each([
@@ -208,7 +218,7 @@ describe("§14-3 入力検証", () => {
     const { res, json } = await post({ ...VALID, comment: "あ".repeat(COMMENT_MIN_CHARS - 1) });
     expect(res.status).toBe(400);
     expect(json.error).toContain(String(COMMENT_MIN_CHARS));
-    expect(spy.upserted).toHaveLength(0);
+    expect(spy.inserted).toHaveLength(0);
   });
 
   it("I-726 下限ちょうどは通る（境界）", async () => {
@@ -330,32 +340,148 @@ describe("§14-6 保存", () => {
   });
 
   /**
-   * 同じ問題への同種の報告は1人1件（DB の unique 制約）。
-   * 無視（ignoreDuplicates）ではなく上書きにしているのは、
-   * 前回より詳しく書き直した理由が黙って捨てられるのを防ぐため。
+   * 同じ問題への同種の報告は1人1件（部分ユニークインデックス・E13 で unique 制約から変更）。
+   * 部分インデックスは PostgREST の upsert から推論できないので、
+   * insert が 23505（unique violation）を返したら update で上書きする。
+   * 無視ではなく上書きなのは、前回より詳しく書き直した理由が
+   * 黙って捨てられるのを防ぐため。
    */
-  it("I-762 再送は上書きになる（無視ではない）", async () => {
+  it("I-762 再送（23505）は上書きになる（無視ではない）", async () => {
+    setup({ insertError: { message: "duplicate key", code: "23505" } });
+    const { res } = await post(VALID);
+    expect(res.status).toBe(200);
+    expect(spy.updated).toHaveLength(1);
+    expect(spy.updated[0][0]).toBe("problem_feedback");
+    expect(spy.updated[0][1]).toMatchObject({ comment: COMMENT });
+    // 自分の・その問題の・その種別の行だけを上書きする
+    expect(spy.filters).toContainEqual(["problem_feedback", "user_id", USER_ID]);
+    expect(spy.filters).toContainEqual(["problem_feedback", "problem_id", UNLOCKED_ID]);
+    expect(spy.filters).toContainEqual(["problem_feedback", "kind", "score_dispute"]);
+  });
+
+  it("I-762b 初回の送信では update しない", async () => {
     await post(VALID);
-    expect(spy.upserted[0][1]).toEqual({ onConflict: "user_id,problem_id,kind" });
+    expect(spy.updated).toHaveLength(0);
   });
 
   it("I-763 書き込みは service_role で行う", async () => {
     await post(VALID);
     // session 側では書いていない（RLS でポリシーが無く、そもそも書けない）
-    expect(spy.upserted).toHaveLength(1);
+    expect(spy.inserted).toHaveLength(1);
   });
 
   it("I-764 保存に失敗したら 500 で、成功に見せない", async () => {
-    setup({ upsertError: { message: "duplicate key" } });
+    setup({ insertError: { message: "connection reset" } });
     const { res, json } = await post(VALID);
     expect(res.status).toBe(500);
     expect(json).not.toHaveProperty("ok");
     expect(json.error).toContain("送信できませんでした");
   });
 
+  it("I-764b 上書き（update）に失敗しても 500 で、成功に見せない", async () => {
+    setup({
+      insertError: { message: "duplicate key", code: "23505" },
+      updateError: { message: "connection reset" },
+    });
+    const { res, json } = await post(VALID);
+    expect(res.status).toBe(500);
+    expect(json).not.toHaveProperty("ok");
+  });
+
   it("I-765 エラー本文に DB の生メッセージを出さない", async () => {
-    setup({ upsertError: { message: "duplicate key value violates unique constraint" } });
+    setup({ insertError: { message: "duplicate key value violates unique constraint" } });
     const { json } = await post(VALID);
     expect(JSON.stringify(json)).not.toContain("constraint");
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+/**
+ * 改善要望（作者へのメッセージ・E13）。
+ * 既存2種と違い「何度でも送れる」ので、代わりに1日の上限で連打を止める。
+ * 保存に成功したら作者へメールを送るが、メールの失敗で応答は失敗にしない
+ * （意見そのものは DB に残っていて失われないため）。
+ */
+describe("§14-7 改善要望（improvement）", () => {
+  const IMPROVE = {
+    problem_id: UNLOCKED_ID,
+    kind: "improvement",
+    comment: "もっと長いコードを読む問題がほしいです。実務に近づくので。",
+  };
+
+  it("I-770 保存されて作者へメールが飛ぶ", async () => {
+    const { res, json } = await post(IMPROVE);
+    expect(res.status).toBe(200);
+    expect(json).toEqual({ ok: true });
+    expect(saved()).toMatchObject({
+      user_id: USER_ID,
+      problem_id: UNLOCKED_ID,
+      kind: "improvement",
+      comment: IMPROVE.comment,
+    });
+    expect(notifyOwnerMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("I-771 メール本文から「どの問題・誰・何を」が分かる", async () => {
+    await post(IMPROVE);
+    const [subject, text] = notifyOwnerMock.mock.calls[0] as [string, string];
+    expect(subject).toContain(String(UNLOCKED_ID));
+    expect(text).toContain(USER_ID);
+    expect(text).toContain(IMPROVE.comment);
+  });
+
+  it("I-772 メールが失敗しても応答は成功（意見は DB に残っている）", async () => {
+    notifyOwnerMock.mockResolvedValue(false);
+    const { res, json } = await post(IMPROVE);
+    expect(res.status).toBe(200);
+    expect(json).toEqual({ ok: true });
+  });
+
+  it("I-773 保存に失敗したらメールを送らない（500）", async () => {
+    setup({ insertError: { message: "connection reset" } });
+    const { res } = await post(IMPROVE);
+    expect(res.status).toBe(500);
+    expect(notifyOwnerMock).not.toHaveBeenCalled();
+  });
+
+  it("I-774 何度でも送れる（上書きではなく毎回新しい行）", async () => {
+    const first = await post(IMPROVE);
+    const second = await post({ ...IMPROVE, comment: "設定画面の場所が分かりにくかったです。上にあると助かります。" });
+    expect(first.res.status).toBe(200);
+    expect(second.res.status).toBe(200);
+    expect(spy.inserted).toHaveLength(2);
+    expect(spy.updated).toHaveLength(0);
+  });
+
+  it("I-775 1日の上限に達したら 429 で、保存もメールもしない", async () => {
+    setup({
+      rateRows: Array.from({ length: IMPROVEMENT_DAILY_LIMIT }, () => ({
+        created_at: new Date().toISOString(),
+      })),
+    });
+    const { res } = await post(IMPROVE);
+    expect(res.status).toBe(429);
+    expect(spy.inserted).toHaveLength(0);
+    expect(notifyOwnerMock).not.toHaveBeenCalled();
+  });
+
+  it("I-776 上限の確認に失敗したら 500（数えられないまま通さない）", async () => {
+    setup({ rateError: { message: "connection reset" } });
+    const { res } = await post(IMPROVE);
+    expect(res.status).toBe(500);
+    expect(spy.inserted).toHaveLength(0);
+  });
+
+  it("I-777 上限を数えるのは自分の improvement の行だけ", async () => {
+    await post(IMPROVE);
+    expect(spy.filters).toContainEqual(["problem_feedback", "user_id", USER_ID]);
+    expect(spy.filters).toContainEqual(["problem_feedback", "kind", "improvement"]);
+  });
+
+  it("I-778 既存2種（異議・誤り報告）ではメールを送らない", async () => {
+    await post(VALID);
+    await post({ ...VALID, kind: "problem_error" });
+    expect(notifyOwnerMock).not.toHaveBeenCalled();
   });
 });
