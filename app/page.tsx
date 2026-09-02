@@ -6,6 +6,7 @@ import { LegalFooter } from "@/components/legal/LegalFooter";
 import { Mascot } from "@/components/ui/Mascot";
 import { IconCheck } from "@/components/ui/icons";
 import { CHAPTERS } from "@/lib/stages/chapters";
+import { READING_TYPES } from "@/lib/stages/reading-types";
 import { ANSWER_MAX_CHARS, CLEAR_THRESHOLD } from "@/lib/ai/compose";
 import {
   Card,
@@ -23,6 +24,7 @@ import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
 import { IconComment, IconHandover, IconSpark } from "@/components/lp/icons";
 import { publicPageMetadata } from "@/lib/seo/site";
+import { structuredDataJson } from "@/lib/seo/structured-data";
 
 /**
  * 検索結果に出る唯一の入口。**title は書かない**（`layout.tsx` の既定値をそのまま使う）。
@@ -138,25 +140,6 @@ const SCENES = [
     title: "引き継いだコードの修正",
     body: "書いた人はもういない。100行を読むところから仕事が始まります。",
   },
-];
-
-/**
- * 読解型6種。**定義は `ideas/問題構成案.md` v3 の凡例をそのまま噛み砕いたもの。**
- * ここを勝手に言い換えると、問題の作り方（`rubric_items` の `depth`）と食い違う。
- */
-const READING_TYPES = [
-  {
-    name: "トレース",
-    body: "実行したら何が起きるか。出力・戻り値・順番を追う",
-  },
-  { name: "意図", body: "なぜこの書き方なのか。書いた人の狙いを言葉にする" },
-  {
-    name: "ズレ",
-    body: "やりたかったことと実際の動きが、噛み合っていない場所",
-  },
-  { name: "影響", body: "ここを変えると、どこまで波が届くか" },
-  { name: "命名", body: "名前とコメントだけで、その関数の役目を当てる" },
-  { name: "仕様", body: "テストと型定義から、守るべき約束を読み取る" },
 ];
 
 /** 採点のしくみ。**すべて実装済みのものだけ**を書く */
@@ -280,8 +263,28 @@ async function isSignedIn(): Promise<boolean> {
 export default async function Home() {
   if (await isSignedIn()) redirect("/stages");
 
+  const jsonLd = structuredDataJson();
+
   return (
     <div className="flex min-h-screen flex-col">
+      {/*
+        構造化データ（JSON-LD）── 人には見えない、機械向けの自己紹介（C12）。
+        **`layout.tsx` ではなくここに置いてある。** 全ページに出すと
+        規約やポリシーの画面まで「これは学習アプリです」と名乗ることになり、
+        機械から見た「このURLは何のページか」がぼやける。
+        名乗る中身は `lib/seo/structured-data.ts`。本番URLが分からない配信では null になり、
+        その場合は何も描かない（プレビューが本番を名乗らないため）。
+
+        `next/script` は使わない ── あれは JavaScript を読み込んで実行するための部品で、
+        JSON-LD は実行されないデータ（Next.js の json-ld.md にそう書いてある）。
+      */}
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: jsonLd }}
+        />
+      )}
+
       <LpHeader />
 
       <main className="flex-1">

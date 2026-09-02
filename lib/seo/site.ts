@@ -1,5 +1,8 @@
 import type { Metadata, MetadataRoute } from "next";
 import { configuredAppOrigin } from "@/lib/http/origin";
+import { ANSWER_MIN_CHARS, CLEAR_THRESHOLD } from "@/lib/ai/compose";
+import { CHAPTERS } from "@/lib/stages/chapters";
+import { READING_TYPES } from "@/lib/stages/reading-types";
 
 /**
  * 検索エンジンと SNS に渡す「このサイトは何か」の一次情報。
@@ -8,6 +11,11 @@ import { configuredAppOrigin } from "@/lib/http/origin";
  * `app/layout.tsx`（<head> のメタ情報）・`app/sitemap.ts`・`app/robots.ts`・
  * 各ページの canonical の4か所に散るため。散らすと、直したつもりの1か所だけが
  * 新しくなり、**検索結果には古い文言が出続ける**（画面を見ても気づけない）。
+ *
+ * **機械向けの2つ（C12・2026-09-02）も同じ出どころから組み立てる** ──
+ * JSON-LD（`lib/seo/structured-data.ts`）と `/llms.txt`（`app/llms.txt/route.ts`）。
+ * こちらは読み手が AI なので、食い違いの症状がさらに遠い
+ * （**AI が矛盾した説明のどちらかを事実として答える**が、こちらからは見えない）。
  *
  * 文言は `app/page.tsx` の本文から取っている。タイトル画面には
  * 「他人のコードが読める、AI時代のエンジニアに。」「コードリーディング特化
@@ -36,6 +44,74 @@ export const SITE_DESCRIPTION =
   "他人のコードが読める、AI時代のエンジニアに。コードを読んで日本語で説明し、AI がフィードバックを返す、コードリーディング特化のプログラミング学習サイトです。";
 
 /**
+ * カタカナ表記。「フェレット」で検索されたときの手掛かりで、`SITE_TITLE` にも入っている。
+ * JSON-LD の `alternateName` に渡す（機械には「同じものの別名」だと明示しないと伝わらない）。
+ */
+export const SITE_ALTERNATE_NAME = "フェレット";
+
+/**
+ * 技術記事を出している場所（Zenn）。**JSON-LD の `sameAs` と `/llms.txt` に載せる。**
+ *
+ * C12 の中でここだけが「外」に効く。AI が答えるときに参照するのは
+ * **他人が書いたもの**で、自分のサイトに何を書いても
+ * 「本人がそう言っている」以上の重みは持たない（票 C12 の期待値の節）。
+ * このリンクは、サイトと記事を**同じ主体のものとして結び付ける**ためだけにある。
+ *
+ * ⚠️ **記事ごとのURLを列挙しないこと（意図）。** 1本増えるたびに直す形にすると、
+ * 追記を忘れた分だけ古い一覧を配り続けることになる。プロフィールのURLは記事が増えても正しい。
+ */
+export const ARTICLES_URL = "https://zenn.dev/ferretcode";
+
+/**
+ * いま全機能を無料で使えるか。**機械向けの申告の出どころ**
+ * （JSON-LD の `isAccessibleForFree` / `offers` と `/llms.txt` の1行）。
+ *
+ * ⚠️ **課金を始める日（`tasks/D2`）にここを `false` にすること。**
+ * JSON-LD に書いた値は AI がそのまま事実として答えるので、放置すると
+ * **有料化した後も「無料で使える」と言われ続ける。** しかも自分の画面は正しい価格を
+ * 出しているので、**サイトを見ても気づけない**（気づくのは AI に聞いた人だけ）。
+ * LP の FAQ「お金はかかりますか？」（`app/page.tsx`）も対で直す。
+ */
+export const SITE_IS_FREE = true;
+
+/**
+ * 機械（AI・クローラー）に渡す事実の箇条書き。
+ * **`/llms.txt` の本文と JSON-LD の `featureList` は、どちらもここから来る。**
+ *
+ * 分けて書かない理由は SITE_DESCRIPTION と同じ ── 2か所に書くと、
+ * **AI が矛盾した説明を拾う**（票 C12 の手順4）。しかも食い違っても画面は何も変わらない。
+ *
+ * ⚠️ **実装済みのことだけ書くこと。** 段位・認定証・共有機能・振り返り画面はまだ無い。
+ * ⚠️ **実績・利用者数・満足度を書かないこと。** AI は書いてあることをそのまま事実として
+ * 答えるので、盛った数字はそのまま広まって取り消せない（票 C12 の注意）。
+ *
+ * **数字は定数から導く**（章の定義と採点の閾値）。ここに焼くと、
+ * 章が増えた日にサイトの説明だけが古い数字を名乗る。
+ */
+export const SITE_FACTS: readonly string[] = [
+  `全${CHAPTERS[CHAPTERS.length - 1].to}問・${CHAPTERS.length}章。コードは10行前後で、扱うのは JavaScript と TypeScript（フレームワークは扱わない）`,
+  "コードを書く課題は無い。読む側だけに絞っている",
+  `回答は日本語の自由記述（${ANSWER_MIN_CHARS}文字から）。選択肢は無く、自分の言葉で説明する`,
+  "採点は AI（OpenAI）が自動で行い、点数と「よかったところ」「つぎの一歩」を返す",
+  `100点満点で${CLEAR_THRESHOLD}点以上がクリア`,
+  "AI が挙げたコードの引用は、サーバー側で実物と突き合わせてから点にする（合わなければ数えない）",
+  "同じ回答なら同じ点数が返る（採点済みの回答を取り置いてある）",
+  "採点に納得できないときは、リザルト画面から異議を送れる",
+  ...(SITE_IS_FREE
+    ? ["いまは全機能を無料で使える。クレジットカードの登録は要らない"]
+    : []),
+  "問題を解くにはログインが必要。ログインが要る画面はクローラーに公開していない",
+];
+
+/**
+ * 読み方6種の1行説明。`/llms.txt` と JSON-LD の `teaches` に渡す。
+ * 語そのものは `lib/stages/reading-types.ts`（DB の CHECK 制約が正）。
+ */
+export const READING_TYPE_LINES: readonly string[] = READING_TYPES.map(
+  (t) => `${t.name} ── ${t.body}`,
+);
+
+/**
  * `sitemap.xml` に載せるページ ── **ログインが要らないページだけ。**
  *
  * ⚠️ **認証が要るページを足さないこと。** sitemap は「このURLを見に来てください」と
@@ -47,16 +123,44 @@ export const SITE_DESCRIPTION =
  * 登録フォームだけが単独で検索結果に出ても、何のサービスか分からないまま終わる。
  */
 export const SITEMAP_PATHS = [
-  { path: "/", priority: 1, changeFrequency: "weekly" },
+  {
+    path: "/",
+    priority: 1,
+    changeFrequency: "weekly",
+    label: "トップ",
+    summary: "何のサービスか・実際の画面と同じ部品で組んだデモ・よくある質問",
+  },
   // 更新情報（E12）。**ログイン不要のページ**なので載せてよい。
   // ここが更新されていること自体が「動いているサービス」の材料になる（M1 と相性がある）
-  { path: "/changelog", priority: 0.5, changeFrequency: "monthly" },
-  { path: "/terms", priority: 0.3, changeFrequency: "yearly" },
-  { path: "/privacy", priority: 0.3, changeFrequency: "yearly" },
+  {
+    path: "/changelog",
+    priority: 0.5,
+    changeFrequency: "monthly",
+    label: "更新情報",
+    summary: "直したところと足した機能の記録",
+  },
+  {
+    path: "/terms",
+    priority: 0.3,
+    changeFrequency: "yearly",
+    label: "利用規約",
+    summary: "禁止事項・免責・準拠法",
+  },
+  {
+    path: "/privacy",
+    priority: 0.3,
+    changeFrequency: "yearly",
+    label: "プライバシーポリシー",
+    summary: "採点のため回答と問題文を OpenAI に送ることを含む、取り扱いの説明",
+  },
 ] as const satisfies ReadonlyArray<{
   path: string;
   priority: number;
   changeFrequency: NonNullable<MetadataRoute.Sitemap[number]["changeFrequency"]>;
+  /** `/llms.txt` の一覧に出す見出し。`sitemap.xml` は使わない */
+  label: string;
+  /** 同じ一覧の1行説明。**ページに実際に書いてあることだけ** */
+  summary: string;
 }>;
 
 /**
