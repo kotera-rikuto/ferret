@@ -52,5 +52,7 @@ export const PROCESSORS = [
   { name: "OpenAI, L.L.C.", country: "米国", role: "回答の採点" },
   { name: "Supabase, Inc.", country: "米国", role: "アカウント管理・データの保存" },
   { name: "Vercel, Inc.", country: "米国", role: "本サービスの配信（ホスティング）" },
-  { name: "Resend, Inc.", country: "米国", role: "確認メールなどの送信" },
+  // E13 で用途が広がった: 確認メールに加えて、改善要望の本文（ユーザーの記入内容と
+  // メールアドレス）を作者あての通知として Resend 経由で送るようになった
+  { name: "Resend, Inc.", country: "米国", role: "確認メールや通知メールの送信" },
 ] as const;
