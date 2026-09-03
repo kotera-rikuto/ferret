@@ -215,6 +215,22 @@ AI が参照するのは、**Qiita・Zenn・GitHub・個人ブログのような
   （プレビューが本番を名乗らない。sitemap・canonical と同じ方針）
 - `npm test` **816 passed / 72 skipped / 1 todo**（33ファイル）・`npm run build` 通過・`npx eslint` 指摘なし
 
+### 2026-09-03 ── 本番へ反映・実測
+
+`main` へ反映（`805e2fc`。E13 が先に入っていたので rebase してから）。**本番で実測:**
+
+| 見たもの | 結果 |
+|---|---|
+| `https://ferretcode.com/llms.txt` | **200 / `text/plain; charset=utf-8`**。本文も定数どおり |
+| LP の JSON-LD | **`JSON.parse` が通る。** ノードは `WebSite` / `WebApplication` |
+| `url` / `sameAs` | `https://ferretcode.com` / `https://zenn.dev/ferretcode` |
+| 価格の申告 | `isAccessibleForFree: true` ＋ `offers` 0円（**D2 で落とす**） |
+| `featureList` / `teaches` | 10件 / 6件（`SITE_FACTS` と読解型6種がそのまま出ている） |
+
+> ⚠️ **反映の前日（2026-09-02）にドメインが停止していた**（`clientHold`。詳細は `tasked/C6` の追記）。
+> **Bing への登録を止めたのはこのため** ── 停止中に申告すると、クローラーが
+> 「存在しないサイト」を受け取る。**復旧を確認してから進めること。**
+
 ### 効果の記録
 
 | 日付 | 聞き方 | 答え |
