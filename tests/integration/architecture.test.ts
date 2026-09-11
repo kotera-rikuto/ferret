@@ -154,10 +154,19 @@ describe("§11 静的検査", () => {
    * 保護画面を新しく作ったとき、proxy の matcher に足し忘れると
    * ページ側のガードだけが残る。動くので気づけないが、
    * DB へのクエリが走ってから弾かれることになる。
+   *
+   * **例外を1つだけ認めている**（C13・2026-09-11）── ログイン前に一部だけ見せる画面。
+   * `matcher` は Next.js の制約でリテラルのパスしか書けず、
+   * 「この問題は開けてよいか」を `problems.order` で決めている以上、
+   * proxy の側では判断できない（URL に出るのは id）。
+   *
+   * ⚠️ **素通しを認めているのではない。** 外すなら、判定の出どころ
+   * （`lib/progress/preview.ts`）を通していることまで確かめる。
+   * これが無いと「matcher から外して、ページ側のガードも書かない」が通ってしまう。
    */
-  it("I-395 ログインを要求するページがすべて matcher に含まれている", () => {
+  it("I-395 ログインを要求するページが matcher か preview の判定を通っている", () => {
     const guarded = SOURCES.filter(
-      (f) => f.path.endsWith("/page.tsx") && f.code.includes('redirect("/login")'),
+      (f) => f.path.endsWith("/page.tsx") && /redirect\(`?"?\/login/.test(f.code),
     );
     expect(guarded.length).toBeGreaterThan(0);
 
@@ -165,7 +174,38 @@ describe("§11 静的検査", () => {
       // app/stages/page.tsx → stages / app/problems/[id]/page.tsx → problems
       const segment = f.path.split("/")[1];
       const covered = config.matcher.some((m) => m.startsWith(`/${segment}`));
-      expect(covered, `${f.path} が proxy の matcher に無い`).toBe(true);
+      if (covered) continue;
+
+      expect(
+        f.code,
+        `${f.path} が proxy の matcher にも lib/progress/preview.ts にも繋がっていない`,
+      ).toContain("@/lib/progress/preview");
+    }
+  });
+
+  /**
+   * ログイン前に見せる画面が、**開放の判定を自前で書いていない**こと（C13）。
+   *
+   * 票 C13 の注意書き「開放の判定を2か所に書かないこと」の機械的な受け皿。
+   * `order <= 3` のような式を画面に直接書くと、`lib/progress/preview.ts` を
+   * 直しても画面だけ古い範囲を開け続ける ── しかも**開けすぎた側には何の症状も出ない。**
+   */
+  it("I-404 開放の範囲を画面に直接書いていない", () => {
+    const screens = SOURCES.filter(
+      (f) =>
+        f.path.startsWith("app/") &&
+        (f.path.endsWith("/page.tsx") || f.path.endsWith(".tsx")) &&
+        f.code.includes("@/lib/progress/preview"),
+    );
+    expect(screens.length).toBeGreaterThan(0);
+
+    for (const f of screens) {
+      // 上限そのもの（数値）を画面に書いていないこと。
+      // 定数を import して使うぶんには、この名前しか出てこない
+      expect(
+        /(?:order|stage)\s*(?:<=|<|===)\s*\d/.test(f.code),
+        `${f.path} が開放の範囲を自前で計算している`,
+      ).toBe(false);
     }
   });
 

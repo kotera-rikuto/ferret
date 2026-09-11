@@ -1,4 +1,5 @@
 import { llmsTxt } from "@/lib/seo/llms";
+import { previewPages } from "@/lib/seo/preview-pages";
 
 /**
  * `https://ferretcode.com/llms.txt` を配る（C12）。
@@ -13,12 +14,15 @@ import { llmsTxt } from "@/lib/seo/llms";
  * **文字化けを避けられない**ため（`charset` が無いと相手の既定の文字コードで読まれる）。
  */
 
-// 中身はビルド時に決まる定数だけ（リクエストごとに変わるものが無い）。
-// robots.txt・sitemap.xml と同じ扱いにして、配信のたびに組み立て直さない
+// 中身はビルド時に決まる（リクエストごとに変わるものが無い）。
+// robots.txt・sitemap.xml と同じ扱いにして、配信のたびに組み立て直さない。
+//
+// **ログイン前に読める問題の一覧だけ DB から引く**（C13）。URL に `problems.id` が
+// 入るので定数に書けないため。問題を入れ替えたら再デプロイで追随する
 export const dynamic = "force-static";
 
-export function GET(): Response {
-  return new Response(llmsTxt(), {
+export async function GET(): Promise<Response> {
+  return new Response(llmsTxt(await previewPages()), {
     headers: { "content-type": "text/plain; charset=utf-8" },
   });
 }

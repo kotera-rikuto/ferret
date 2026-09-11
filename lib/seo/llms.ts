@@ -1,3 +1,4 @@
+import type { PublicPage } from "@/lib/seo/preview-pages";
 import {
   ARTICLES_URL,
   READING_TYPE_LINES,
@@ -25,8 +26,12 @@ import {
  * 権利の許諾にあたり、**利用規約 第8条・第9条（問題文・解説・コード例の複製と
  * 再配布を禁じている）と正面から食い違う。** ここに書いてよいのは「拒否していない」という事実だけで、
  * 許諾は法務文書の側で決めること。
+ *
+ * @param extraPages `SITEMAP_PATHS` に**定数として書けない**公開ページ
+ *                   （ログイン前に読める問題。URL に `problems.id` が入るため。
+ *                   `lib/seo/preview-pages.ts`）。渡さなければ定数ぶんだけを並べる
  */
-export function llmsTxt(): string {
+export function llmsTxt(extraPages: readonly PublicPage[] = []): string {
   const origin = siteOrigin();
 
   // 本番URLが分かるなら絶対URL、分からない（プレビュー・ローカル）なら相対パス。
@@ -50,7 +55,7 @@ export function llmsTxt(): string {
     "",
     "## 公開しているページ",
     "",
-    ...SITEMAP_PATHS.map(
+    ...[...SITEMAP_PATHS, ...extraPages].map(
       ({ path, label, summary }) => `- [${label}](${link(path)}): ${summary}`,
     ),
     "",
@@ -61,7 +66,7 @@ export function llmsTxt(): string {
     "## この文書について",
     "",
     "- サイト本文・検索エンジン向けのメタ情報・構造化データ（JSON-LD）と、同じ出どころから作っている",
-    "- AI のクローラーを拒否していない。`robots.txt` で巡回対象から外しているのは、ログインが要る画面と、人が読む画面ではないもの（API・ログアウト）だけ",
+    "- AI のクローラーを拒否していない。`robots.txt` で巡回対象から外しているのは、ログインしないと中身が出ない画面と、人が読む画面ではないもの（API・ログアウト）だけ",
     "- 実績や利用者数は書いていない。書いていないことは、まだ無いか、公表していない",
     "",
   ];

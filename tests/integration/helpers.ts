@@ -331,6 +331,9 @@ export const LOCKED_ID = 6;
 
 export const PROBLEM_DETAIL = {
   id: 5,
+  // **`order` を持たせてある。** 画面の select は order を含んでおり、
+  // ログイン前に読めるかの判定（C13・`lib/progress/preview.ts`）がこの値を見る
+  order: 1,
   code: "const rate = 0.9;\nrate = 0.8;",
   question: "このコードを実行すると何が起きますか。",
   model_answer: "const の rate に再代入しているため TypeError で止まります。",

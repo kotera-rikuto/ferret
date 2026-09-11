@@ -3,6 +3,7 @@ import { configuredAppOrigin } from "@/lib/http/origin";
 import { ANSWER_MIN_CHARS, CLEAR_THRESHOLD } from "@/lib/ai/compose";
 import { CHAPTERS } from "@/lib/stages/chapters";
 import { READING_TYPES } from "@/lib/stages/reading-types";
+import { PREVIEW_MAX_ORDER } from "@/lib/progress/preview";
 
 /**
  * 検索エンジンと SNS に渡す「このサイトは何か」の一次情報。
@@ -87,6 +88,19 @@ export const SITE_IS_FREE = true;
 export const CTA_PRIMARY_LABEL = SITE_IS_FREE ? "無料ではじめる" : "はじめる";
 
 /**
+ * お試しの入口の文言（C13・2026-09-11）。**LP の主役で主ボタンの隣に並ぶ。**
+ *
+ * `CTA_PRIMARY_LABEL` と違って価格を名乗っていないので `SITE_IS_FREE` には連動しない。
+ * ここに置いてあるのは、主ボタンと**対で読まれる1組**だからで、
+ * 片方だけ別の場所にあると言い回しが割れる（「はじめる／1問目をみてみる」の対）。
+ *
+ * ⚠️ **押した先が読めない状態でこのボタンを出さないこと**（票 C13）。
+ * 行き先は `lib/progress/preview.ts` の `firstPreviewPath` が返す問題で、
+ * 返らなければ（問題が1件も入っていない環境）ボタンごと出さない。
+ */
+export const CTA_PREVIEW_LABEL = "1問目をみてみる";
+
+/**
  * 機械（AI・クローラー）に渡す事実の箇条書き。
  * **`/llms.txt` の本文と JSON-LD の `featureList` は、どちらもここから来る。**
  *
@@ -112,7 +126,9 @@ export const SITE_FACTS: readonly string[] = [
   ...(SITE_IS_FREE
     ? ["いまは全機能を無料で使える。クレジットカードの登録は要らない"]
     : []),
-  "問題を解くにはログインが必要。ログインが要る画面はクローラーに公開していない",
+  // C13（2026-09-11）でステージ1を開けた。**ここを直さないと
+  // AI が「全問ログインが必要」と答え続ける**（画面を見ても気づけない）
+  `最初の${PREVIEW_MAX_ORDER}問（ステージ1${PREVIEW_MAX_ORDER > 1 ? `〜${PREVIEW_MAX_ORDER}` : ""}）は登録もログインもせずに読める。採点を受けるにはログインが必要`,
 ];
 
 /**
@@ -129,6 +145,10 @@ export const READING_TYPE_LINES: readonly string[] = READING_TYPES.map(
  * ⚠️ **認証が要るページを足さないこと。** sitemap は「このURLを見に来てください」と
  * 自分から配る一覧なので、守っているURLを載せるのは構造の外部公開にあたる。
  * 機械的な歯止めは tests/unit/seo.test.ts の U-830（`proxy.ts` の matcher と突き合わせる）。
+ *
+ * **ここに載らない公開ページがもう1種類ある**（C13・2026-09-11）── ログイン前に
+ * 読める問題（`lib/seo/preview-pages.ts`）。あちらは URL に `problems.id` が入るので
+ * 定数にできず、`sitemap.ts` と `/llms.txt` が実行時に足す。
  *
  * `/login` と `/register` を**入れていないのはオーナー判断**（2026-08-22・C8）。
  * 検索から来た人の入口はトップ（`/`）に寄せる ── そこには説明と「はじめる」があり、
@@ -178,7 +198,7 @@ export const SITEMAP_PATHS = [
 /**
  * クローラーに巡回させないパス。
  *
- * 1行目〜5行目は `proxy.ts` の `matcher` と同じ範囲（＝ログインが要る画面）。
+ * `proxy.ts` の `matcher`（＝ログインが要る画面）は**すべてここに入っている。**
  * どうせログイン画面へ飛ばされるが、**列挙しないと巡回の予算をそこで使われる**うえ、
  * 「ログイン画面へのリダイレクト」自体が索引に載ることがある。
  *
@@ -186,13 +206,26 @@ export const SITEMAP_PATHS = [
  * `/auth/callback` は確認メールのリンクの着地点で、いずれも人が読む画面ではない。
  *
  * ⚠️ **`proxy.ts` の matcher に画面を足したら、ここにも足すこと。**
- * 忘れると tests/unit/seo.test.ts の U-831 が落ちる（そのための検査）。
+ * 忘れると tests/unit/seo.test.ts の U-836 が落ちる（そのための検査）。
+ *
+ * **`/stages` は matcher から外れた後もここに残してある**（C13・2026-09-11）。
+ * ログインしていない人にも見せる画面になったが、**あそこには鍵付き100問への
+ * リンクが並んでいる。** 巡回させると、クローラーはそこから100本の
+ * 「ログイン画面へのリダイレクト」へ歩いていくことになる。
+ * 逆に言えば、**ここを開けるとその100本が外から見つかる**ので、開けないこと。
+ *
+ * ⚠️ **`/problems` は外した**（C13）。最初の数問をログイン前に読めるようにしたので、
+ * まとめて塞ぐと**開けた問題まで読まれなくなる**（`robots.txt` で塞いだページは
+ * 中身を読んでもらえず、`index: false` の宣言すら届かない）。
+ * 残り100問を索引から守っているのは、
+ * **問題画面の `generateMetadata` が返す `index: false`** のほう
+ * （`app/problems/[id]/page.tsx`）。上の `/stages` と合わせて、
+ * 「外から辿れない」＋「載せないでくれと伝える」の2枚でできている。
  *
  * 書き方は前方一致。`/stages` と書けば `/stages/3` も含む。
  */
 export const CRAWL_DISALLOW = [
   "/stages",
-  "/problems",
   "/result",
   "/review",
   "/settings",

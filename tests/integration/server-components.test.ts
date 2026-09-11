@@ -17,6 +17,7 @@ import {
   EVIDENCE_REAL,
   UNLOCKED_ID,
   LOCKED_ID,
+  PROBLEM_DETAIL,
   USER_ID,
   silenceConsole,
   type AttemptRow,
@@ -101,9 +102,23 @@ const params = (id: string) => ({ params: Promise.resolve({ id }) });
 // ---------------------------------------------------------------------------
 
 describe("§10-1 /stages", () => {
-  it("I-373 未ログインならログイン画面へ送る", async () => {
+  /**
+   * ログインしていない人にもマップを見せる（C13・オーナー判断 2026-09-11）。
+   * 全体像（全部でこれだけある）が伝わるほうがよいという判断で、
+   * **開くのは `lib/progress/preview.ts` が許した範囲だけ**・残りは鍵のまま。
+   */
+  it("I-373 未ログインでもマップは開く（鍵は preview の範囲）", async () => {
     getUserMock.mockResolvedValue({ data: { user: null } });
-    expect(await outcome(() => StagesPage())).toBe("REDIRECT:/login");
+    expect(await outcome(() => StagesPage())).toBe("RENDERED");
+  });
+
+  it("I-420 未ログインでは回答ログを読みにいかない", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    await StagesPage();
+    // 進行・XP・連続日数・残数はすべて user_id に紐づくもの。
+    // ログインしていない人には該当する行が無いので、問い合わせごと出さない
+    expect(spy.selects.filter(([t]) => t === "user_attempts")).toHaveLength(0);
+    expect(spy.selects.filter(([t]) => t === "ai_usage_daily")).toHaveLength(0);
   });
 
   it("I-370 problems は admin、回答履歴は session クライアントで読む", async () => {
@@ -179,11 +194,40 @@ describe("§10-1 /stages", () => {
 // ---------------------------------------------------------------------------
 
 describe("§10-2 /problems/[id]", () => {
-  it("I-373b 未ログインならログイン画面へ送る", async () => {
+  /**
+   * ログイン前に読める範囲（C13・2026-09-11）。**ここが2つで1組。**
+   *
+   * 片方だけ見ていると、
+   *   - 前だけ  … 開けすぎても気づけない（全問が読めてもテストは通る）
+   *   - 後ろだけ… 開放そのものが消えても気づけない
+   * のどちらかになる。範囲は `lib/progress/preview.ts` の1か所で決まる。
+   */
+  it("I-421 未ログインでも、開けた問題は読める", async () => {
     getUserMock.mockResolvedValue({ data: { user: null } });
+    // PROBLEM_DETAIL は order:1（＝開けてある範囲）
     expect(await outcome(() => ProblemPage(params(String(UNLOCKED_ID))))).toBe(
-      "REDIRECT:/login",
+      "RENDERED",
     );
+  });
+
+  it("I-422 未ログインで範囲外の問題はログイン画面へ（戻り先つき）", async () => {
+    setup({ problemDetail: { ...PROBLEM_DETAIL, id: LOCKED_ID, order: 2 } });
+    getUserMock.mockResolvedValue({ data: { user: null } });
+
+    // 戻り先を持たせる。以前は proxy.ts が付けていた（この画面は matcher から外した）
+    expect(await outcome(() => ProblemPage(params(String(LOCKED_ID))))).toBe(
+      `REDIRECT:/login?next=${encodeURIComponent(`/problems/${LOCKED_ID}`)}`,
+    );
+  });
+
+  it("I-423 未ログインでも模範解答とルーブリックは引かない", async () => {
+    getUserMock.mockResolvedValue({ data: { user: null } });
+    await outcome(() => ProblemPage(params(String(UNLOCKED_ID))));
+    for (const [, columns] of spy.selects.filter(([t]) => t === "problems")) {
+      expect(columns).not.toContain("model_answer");
+      expect(columns).not.toContain("rubric_items");
+      expect(columns).not.toContain("keywords");
+    }
   });
 
   it.each(["abc", "0", "-1", "5.5", "", "1e3"])(

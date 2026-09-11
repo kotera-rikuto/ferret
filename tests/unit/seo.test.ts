@@ -9,7 +9,7 @@
  * どれも本番で気づくまでに時間がかかるので、機械で止められるものはここで止める。
  */
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import robots from "@/app/robots";
@@ -28,8 +28,29 @@ import {
 import { structuredData, structuredDataJson } from "@/lib/seo/structured-data";
 import { llmsTxt } from "@/lib/seo/llms";
 import { READING_TYPES } from "@/lib/stages/reading-types";
+import type { PublicPage } from "@/lib/seo/preview-pages";
+import { PREVIEW_MAX_ORDER } from "@/lib/progress/preview";
 
 const ORIGIN = "https://ferret.example";
+
+/**
+ * ログイン前に読める問題（C13）。**DB を読む部分は差し替える。**
+ *
+ * URL に入るのは `problems.id` で、`order` との対応は DB にしか無い
+ * （実データのステージ1は id 8）。ここで固定の1件に差し替えておけば、
+ * 「定数のページ ＋ 実行時に足すページ」の合流のしかただけを見られる。
+ */
+const PREVIEW_PAGE: PublicPage = {
+  path: "/problems/8",
+  priority: 0.6,
+  changeFrequency: "monthly",
+  label: "ステージ1: 注文金額の計算を1行ずつ追う",
+  summary: "登録しなくても読めるコードリーディングの問題",
+};
+
+vi.mock("@/lib/seo/preview-pages", () => ({
+  previewPages: async () => [PREVIEW_PAGE],
+}));
 
 /** 基点あり／なしを切り替えて確かめる。設定は Production にしか無い（C5） */
 function withOrigin<T>(origin: string | null, run: () => T): T {
@@ -67,11 +88,11 @@ function protectedPrefixes(): string[] {
 }
 
 describe("§18 sitemap に載せるURL", () => {
-  it("U-830 認証が要るページを1つも載せない", () => {
+  it("U-830 認証が要るページを1つも載せない", async () => {
     const prefixes = protectedPrefixes();
     expect(prefixes.length).toBeGreaterThan(0); // 読み取り自体が失敗していないこと
 
-    const urls = withOrigin(ORIGIN, () => sitemap().map((entry) => entry.url));
+    const urls = (await withOrigin(ORIGIN, () => sitemap())).map((e) => e.url);
     for (const url of urls) {
       const path = new URL(url).pathname;
       for (const prefix of prefixes) {
@@ -89,20 +110,21 @@ describe("§18 sitemap に載せるURL", () => {
     expect(paths).not.toContain("/register");
   });
 
-  it("U-832 URL は絶対URLで、すべて同じ基点から始まる", () => {
-    const urls = withOrigin(ORIGIN, () => sitemap().map((entry) => entry.url));
-    expect(urls.length).toBe(SITEMAP_PATHS.length);
+  it("U-832 URL は絶対URLで、すべて同じ基点から始まる", async () => {
+    const urls = (await withOrigin(ORIGIN, () => sitemap())).map((e) => e.url);
+    // 定数ぶん ＋ ログイン前に読める問題（C13）
+    expect(urls.length).toBe(SITEMAP_PATHS.length + 1);
     for (const url of urls) expect(url.startsWith(`${ORIGIN}`)).toBe(true);
     // トップは基点そのもの。`https://.../` とスラッシュを重ねない
     expect(urls).toContain(ORIGIN);
   });
 
-  it("U-833 基点が未設定なら空で返す（プレビューが本番の一覧を配らない）", () => {
-    expect(withOrigin(null, () => sitemap())).toEqual([]);
+  it("U-833 基点が未設定なら空で返す（プレビューが本番の一覧を配らない）", async () => {
+    expect(await withOrigin(null, () => sitemap())).toEqual([]);
   });
 
-  it("U-834 設定が壊れていても本番URLを名乗らない", () => {
-    expect(withOrigin("壊れた値", () => sitemap())).toEqual([]);
+  it("U-834 設定が壊れていても本番URLを名乗らない", async () => {
+    expect(await withOrigin("壊れた値", () => sitemap())).toEqual([]);
   });
 });
 
@@ -176,7 +198,11 @@ describe("§18 canonical（このURLが正、の宣言）", () => {
     // 一覧に載せながら巡回を禁じる、という自己矛盾を止める。
     // どちらも `as const` なので TypeScript の側でも重ならないと分かっているが、
     // **どちらかを普通の string[] に緩めた瞬間に型の保証は消える**ので実行時にも見る
-    const listed: string[] = SITEMAP_PATHS.map((entry) => entry.path);
+    // 実行時に足すぶん（ログイン前に読める問題・C13）も同じ検査にかける
+    const listed: string[] = [
+      ...SITEMAP_PATHS.map((entry) => entry.path),
+      PREVIEW_PAGE.path,
+    ];
     const blockedPrefixes: string[] = [...CRAWL_DISALLOW];
 
     for (const path of listed) {
@@ -364,5 +390,54 @@ describe("§23 AI のクローラーへの態度（2026-09-02 オーナー判断
     ]) {
       expect(serialized, `${bot} を名指しで塞いでいる`).not.toContain(bot);
     }
+  });
+});
+
+/**
+ * ログイン前に読める範囲の申告（C13・2026-09-11）。
+ *
+ * ここが壊れると症状は2方向に出て、**どちらも画面には出ない。**
+ *   - 開けた問題まで塞ぐ → 開放した意味が消える（検索から誰も来ない）
+ *   - 塞ぐべき側を開ける → 鍵付き100問のURLを自分から配ることになる
+ */
+describe("§24 ログイン前に読める範囲（C13）", () => {
+  it("U-920 開けた問題は塞がず、その入口（/stages）は塞ぐ", () => {
+    const blocked: string[] = [...CRAWL_DISALLOW];
+
+    // `/problems` をまとめて塞ぐと、robots.txt で中身を読んでもらえなくなり、
+    // 開けた1問も検索に出ない（`index: false` の宣言すら届かない）
+    expect(blocked).not.toContain("/problems");
+
+    // 一方 `/stages` は人には見せるが塞いだままにする。
+    // **あの画面には鍵付き100問へのリンクが並んでいる**ので、
+    // ここを開けると100本の「ログイン画面へのリダイレクト」を辿らせることになる
+    expect(blocked).toContain("/stages");
+  });
+
+  it("U-921 /llms.txt に足したページが並び、塞いだ画面のURLは混ざらない", () => {
+    const text = withOrigin(ORIGIN, () => llmsTxt([PREVIEW_PAGE]));
+    expect(text).toContain(`(${ORIGIN}${PREVIEW_PAGE.path})`);
+    expect(text).toContain(PREVIEW_PAGE.label);
+
+    // U-897 と同じ検査を、足したぶんを渡した状態でもう一度かける
+    const links = [...text.matchAll(/\]\(([^)]+)\)/g)].map((m) => m[1]);
+    for (const link of links) {
+      if (link.startsWith(ARTICLES_URL)) continue;
+      const path = link.startsWith(ORIGIN) ? link.slice(ORIGIN.length) || "/" : link;
+      for (const b of CRAWL_DISALLOW) {
+        expect(
+          path === b || path.startsWith(`${b}/`),
+          `${path} は巡回対象から外している画面`,
+        ).toBe(false);
+      }
+    }
+  });
+
+  it("U-922 事実の箇条書きが開放した問数と連動する（AI に古い説明をさせない）", () => {
+    // 「問題を解くにはログインが必要」と言い切ったままにすると、
+    // **AI はそれをそのまま事実として答え続ける**（画面を見ても気づけない）
+    const facts = SITE_FACTS.join("\n");
+    expect(facts).toContain(`最初の${PREVIEW_MAX_ORDER}問`);
+    expect(facts).toContain("採点を受けるにはログインが必要");
   });
 });

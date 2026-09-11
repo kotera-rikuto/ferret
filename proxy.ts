@@ -84,11 +84,20 @@ export const config = {
   // 各ページにも自前のガード（redirect("/login")）があるが、
   // ここで止めれば DB へのクエリが走る前に弾ける。
   // 追加でページを作ったらここにも足すこと
-  matcher: [
-    "/stages/:path*",
-    "/problems/:path*",
-    "/result/:path*",
-    "/review/:path*",
-    "/settings/:path*",
-  ],
+  //
+  // ⚠️ **`/stages` と `/problems` は意図的に外してある**（C13・2026-09-11）。
+  // ログインしていない人にも「ステージ選択」と最初の数問を見せる判断をしたため、
+  // **この2つは「開けてよいものか」を1件ずつ見ないと決められない。**
+  // ここに書ける matcher は Next.js の制約でリテラルのパスだけで、
+  // 問題の `order` を見て分岐する余地が無い（`/problems/8` の 8 は id であって
+  // ステージ番号ではないので、パスの形からも判断できない）。
+  //
+  // 代わりに**ページ側で `lib/progress/preview.ts` を通す。**
+  // 判定の出どころはあの1ファイルだけで、画面・検索エンジンへの申告・
+  // ログイン後の解放判定がすべてそこから来る。
+  // この取り決めは `tests/integration/architecture.test.ts` の I-395 が見張っている。
+  //
+  // **採点API（`/api/score`）はここに関係なく 401 のまま。**
+  // このタスクで開けたのは「読む」だけで、費用の出る経路は開けていない
+  matcher: ["/result/:path*", "/review/:path*", "/settings/:path*"],
 };
