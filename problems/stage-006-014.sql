@@ -7,7 +7,7 @@ begin;
 
 -- ステージ6: 文字列の組み立て ─ テンプレートリテラルと + の二つの顔（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   6,
   '文字列の組み立て ─ テンプレートリテラルと + の二つの顔',
@@ -38,12 +38,14 @@ shippingFee が "500" という文字列で渡っているため、3行目の + 
 
 + は両側が数どうしなら足し算になりますが、片側がテキストのときは左右を並べて1つのテキストを作る働きに変わります。* はこの切り替えを持ちません。
 
-JSON で届いたデータは、見た目が数字でも数の形で入っているとは限りません。'
+JSON で届いたデータは、見た目が数字でも数の形で入っているとは限りません。',
+  '注文明細の1行を組み立てる関数を引き継いだ。
+画面に出す前に、どんな文が出てくるかを確かめておきたい。'
 );
 
 -- ステージ7: == と === ─ 暗黙の型変換のワナ（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   7,
   '== と === ─ 暗黙の型変換のワナ',
@@ -75,12 +77,14 @@ console.log(shouldSendReminder({ remindDays: 3 }));',
 
 そろえ方には決まった規則があり、数と数以外を比べるときは数のほうにそろえます。
 
-HTML のフォームから受け取った値は、数字を入れたつもりでも文字として届きます。'
+HTML のフォームから受け取った値は、数字を入れたつもりでも文字として届きます。',
+  'リマインドを送る条件を見直すことになった。
+まずは、いまの条件がどう効いているかを読んでおく。'
 );
 
 -- ステージ8: if / else if / else ─ どの枝を通るか追う（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   8,
   'if / else if / else ─ どの枝を通るか追う',
@@ -110,12 +114,14 @@ console.log(decidePriority({ waitingHours: 2, isPaidPlan: true }));',
   '{"core":"waitingHours >= 72 の枝には決して到達しないという結論を指していれば満たす","depth":"3回の戻り値が 至急 / 至急 / 優先 になる点に触れていれば満たす","ground":"1つ手前の waitingHours >= 24 が 72 以上の場合も含んでしまう点に触れていれば満たす","core_reject":["1つ目の呼び出しで最優先が返ると読んでいる","waitingHours が 100 のとき最後の else に落ちると読んでいる","isPaidPlan が true なら優先が返ると読んでいる"]}'::jsonb,
   'if / else if / else は、上から順に条件を試して、最初に成立したところだけを実行します。成立した時点で残りの条件は試されません。
 
->= は「以上」を意味します。ticket.waitingHours のようにドットでつなぐ書き方は、オブジェクトの中にある値を取り出しています。'
+>= は「以上」を意味します。ticket.waitingHours のようにドットでつなぐ書き方は、オブジェクトの中にある値を取り出しています。',
+  '問い合わせの優先度を決める処理を引き継いだ。
+どの条件でどこに振り分けられるか、チームに説明することになった。'
 );
 
 -- ステージ9: truthy と falsy ─ 空文字と 0 が分岐を変える（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   9,
   'truthy と falsy ─ 空文字と 0 が分岐を変える',
@@ -147,12 +153,14 @@ console.log(buildProfileSummary({
 
 何が「あり」で何が「なし」かは値ごとに決まっており、null や undefined のほかに、空の文字や一部の数もここでは「なし」の側に入ります。
 
-${ } を含むバッククォートの書き方は、値を差し込んで1つのテキストを組み立てます。'
+${ } を含むバッククォートの書き方は、値を差し込んで1つのテキストを組み立てます。',
+  'プロフィールの表示を作り直すことになり、いまの関数を渡された。
+コメントに書いてある想定と、中身がそろっているかを見てほしいとのこと。'
 );
 
 -- ステージ10: && || ?? ─ 短絡評価が「返す値」（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   10,
   '&& || ?? ─ 短絡評価が「返す値」',
@@ -177,7 +185,9 @@ console.log(resolveSettings({ perPage: 5, theme: "dark", isPro: false, exportLim
   '{"core":"canExport に真偽値ではなく exportLimit の値が入るという結論を指していれば満たす","depth":"1つ目で perPage が 0 のまま残る一方で theme だけ light に置き換わる点に触れていれば満たす","ground":"&& が左を満たすときに右の値をそのまま返す点に触れていれば満たす","core_reject":["canExport に true が入ると読んでいる","1つ目の perPage が 20 になると読んでいる","1つ目の theme が空のまま残ると読んでいる"]}'::jsonb,
   '?? は左が null か undefined のときだけ右を使います。|| はそれに加えて、空の文字や 0 のように「なし」とみなされる値でも右を使います。&& は左が「なし」ならその左を、そうでなければ右を使います。
 
-これらは条件式のなかだけでなく、代入の右側にもよく書かれます。'
+これらは条件式のなかだけでなく、代入の右側にもよく書かれます。',
+  '設定の初期値を決めている関数に、新しい項目を足すことになった。
+先に、いまの決まり方を読んでおきたい。'
 );
 
 -- ステージ11: 三項演算子と switch ─ 分岐の省略形を展開して読む（トレース）

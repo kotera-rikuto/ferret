@@ -16,7 +16,14 @@ import { readFile } from "node:fs/promises";
 
 const from = Number(process.argv[2]);
 const to = Number(process.argv[3]);
-const source = process.argv[4] ?? "stage-006-014";
+// `--scenario` を付けると、場面（A4）だけを入れ直す UPDATE 文を出す。
+//
+// 既に入っている問題に場面を足したときの記録用。insert 文を作り直すと
+// 「この .sql を流せば再現できる」はずが**既存行と衝突して流せない**ので、
+// 場面だけを足した回は場面だけの記録にする。
+// 4・5問目のように data.mjs を持たない問題でも、これで記録が残せる。
+const SCENARIO_ONLY = process.argv.includes("--scenario");
+const source = process.argv.slice(4).find((a) => !a.startsWith("--")) ?? "stage-006-014";
 
 const env = await readFile(".env.local", "utf8");
 const pick = (k) => env.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1]?.trim();
@@ -42,6 +49,26 @@ const lit = (s) => (s === null || s === undefined ? "null" : `'${String(s).repla
 const jsonb = (v) => `${lit(JSON.stringify(v))}::jsonb`;
 
 const out = [];
+
+if (SCENARIO_ONLY) {
+  out.push(`-- ステージ${from}〜${to} の場面（scenario）を投入`);
+  out.push(`-- 出典: problems/${source}.data.mjs / 票: tasks/A4-問題に実務の文脈を足す.md`);
+  out.push(`-- **投入済みの実データから生成したもので、手書きしていない**`);
+  out.push(`-- 入れ直すときは node problems/scenario-update.mjs <データファイル>`);
+  out.push("");
+  out.push("begin;");
+  for (const p of rows) {
+    if (p.scenario === null) continue;
+    out.push("");
+    out.push(`-- ステージ${p.order}: ${p.title}`);
+    out.push(`update public.problems set scenario = ${lit(p.scenario)} where "order" = ${p.order};`);
+  }
+  out.push("");
+  out.push("commit;");
+  console.log(out.join("\n"));
+  process.exit(0);
+}
+
 out.push(`-- ステージ${from}〜${to} 投入`);
 out.push(`-- 出典: problems/${source}.data.mjs / 設計: problems/${source}.md`);
 out.push(`-- **投入済みの実データから生成したもので、手書きしていない**`);
@@ -71,6 +98,10 @@ for (const p of rows) {
   if (p.prerequisite !== null) {
     cols.push("prerequisite");
     vals.push(lit(p.prerequisite));
+  }
+  if (p.scenario !== null) {
+    cols.push("scenario");
+    vals.push(lit(p.scenario));
   }
 
   out.push("");

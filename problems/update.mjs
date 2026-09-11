@@ -36,6 +36,20 @@ const pick = (k) => env.match(new RegExp(`^${k}=(.*)$`, "m"))?.[1]?.trim();
 const url = pick("NEXT_PUBLIC_SUPABASE_URL");
 const key = pick("SUPABASE_SERVICE_ROLE_KEY");
 
+// 1問まるごとのファイルであることを確かめてから走る。
+//
+// `scenario-*.data.mjs`（場面だけのファイル）を間違ってここへ渡すと、
+// `context ?? null` / `prerequisite ?? null` が効いて**実行結果と前提知識が null で潰れる。**
+// しかも PATCH は成功して「✅ 更新した」と出るので、画面を開くまで気づけない。
+// 場面だけを入れるときは problems/scenario-update.mjs を使う。
+const incomplete = problems.filter((p) => !p.title || !p.code || !p.question);
+if (incomplete.length > 0) {
+  console.error("❌ 1問まるごとのデータになっていない（title / code / question が無い）");
+  console.error(`  order=${incomplete.map((p) => p.order).join(" / ")}`);
+  console.error("  場面だけを入れるなら node problems/scenario-update.mjs <ファイル>");
+  process.exit(1);
+}
+
 const col = encodeURIComponent('"order"');
 
 for (const p of problems) {
@@ -47,6 +61,9 @@ for (const p of problems) {
     code: p.code,
     context: p.context ?? null,
     prerequisite: p.prerequisite ?? null,
+    // 場面（A4）。**null も必ず送る。** 省くと PATCH は触らないので、
+    // データファイルから場面を消したのに DB には残り続ける
+    scenario: p.scenario ?? null,
     question: p.question,
     model_answer: p.model_answer,
     keywords: p.keywords,

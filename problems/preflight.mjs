@@ -27,6 +27,16 @@ import { chapterOf } from "../lib/stages/chapters.ts";
 
 const READING_TYPES = ["トレース", "意図", "ズレ", "影響", "命名", "仕様"];
 const PREREQUISITE_MAX = 400;
+// 場面（A4）。DB の CHECK と同じ値。カードは閉じる前に必ず目に入るので、
+// 前提知識より短く抑える（長いとコードに辿り着く前に読むのをやめる）
+const SCENARIO_MAX = 120;
+// 場面に入れてはいけない語。lib/ai/scorer.ts の NG_WORDS の写し。
+// **画面に出る文章なので、採点の講評と同じ制限がかかる**（E-452 が全文を走査する）
+const NG_WORDS = [
+  "弱点", "間違い", "間違っ", "誤り", "誤っ", "初心者", "勉強", "学習",
+  "失敗", "正しい読み方", "不正解", "ダメ", "レベル", "理解不足",
+  "できていません", "苦手", "不足", "足りて", "不十分", "浅い", "誤解",
+];
 
 /** app/api/score/route.ts の PII_PATTERNS と同じ並び */
 const PII_PATTERNS = [
@@ -122,6 +132,9 @@ for (const p of problems) {
   }
   if (p.prerequisite && p.prerequisite.length > PREREQUISITE_MAX) {
     fail(p, "I-815", `前提知識が ${p.prerequisite.length}字（${PREREQUISITE_MAX}字以内）`);
+  }
+  if (p.scenario && p.scenario.length > SCENARIO_MAX) {
+    fail(p, "I-818", `場面が ${p.scenario.length}字（${SCENARIO_MAX}字以内）`);
   }
 
   // --- I-801 模範解答が層1で満点を取る（ガイドが最重要としている検査） -------
@@ -222,6 +235,7 @@ for (const p of problems) {
   for (const [field, value] of [
     ["context", p.context],
     ["prerequisite", p.prerequisite],
+    ["scenario", p.scenario],
   ]) {
     if (value !== undefined && value !== null && value.trim().length === 0) {
       fail(p, "I-814", `${field} が空文字列（使わないなら省略か null）`);
@@ -252,11 +266,46 @@ for (const p of problems) {
     });
   }
 
+  // --- I-819 / I-820 / I-821 場面（A4） --------------------------------------
+  //
+  // 前提知識（I-816 / I-817）とまったく同じ理屈。場面も**全員が読める場所**なので、
+  // 答えを写した文や採点キーワードを置くと、読まずに書き写すだけで点が動く。
+  // 加えて場面は開いた直後に必ず目に入るカードなので、NG語の検査もここでかける。
+  if (p.scenario) {
+    const WINDOW = 14;
+    const sc = normalizeForMatch(p.scenario);
+
+    for (let i = 0; i + WINDOW <= answer.length; i++) {
+      const chunk = answer.slice(i, i + WINDOW);
+      if (sc.includes(chunk)) {
+        fail(p, "I-819", `場面が模範解答と一致「${chunk}」`);
+        break;
+      }
+    }
+
+    const code = normalizeForMatch(p.code);
+    p.keywords.forEach((slot, i) => {
+      for (const kw of slot.match) {
+        const k = normalizeForMatch(kw);
+        if (k.length >= 2 && sc.includes(k) && !code.includes(k)) {
+          fail(p, "I-820", `スロット#${i + 1}の「${kw}」が場面にある（コードには無い）`);
+        }
+      }
+    });
+
+    for (const ng of NG_WORDS) {
+      if (p.scenario.includes(ng)) {
+        fail(p, "I-821", `場面に NG語「${ng}」がある`);
+      }
+    }
+  }
+
   // --- 個人情報検査（投入しても分からない。公開後に学習者の回答が 400 になる） -
   for (const [field, value] of [
     ["code", p.code],
     ["question", p.question],
     ["context", p.context ?? ""],
+    ["scenario", p.scenario ?? ""],
   ]) {
     for (const [re, name] of PII_PATTERNS) {
       if (re.test(value)) {

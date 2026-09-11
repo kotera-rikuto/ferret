@@ -360,6 +360,13 @@ describe("§2 認証・解放判定・問題の取得", () => {
     expect(detail?.[1]).toBe(
       "id, code, question, model_answer, reading_type, rubric_items, keywords",
     );
+
+    // 表示専用の欄は採点に渡さない。**ここが「渡っていない」ことの担保そのもの。**
+    // 混ざると、場面や前提知識の文章に引っ張られて同じ回答の点が動く。
+    // 症状が出るのは採点結果なので、原因がこの1行にあるとは気づけない
+    expect(detail?.[1]).not.toContain("scenario");
+    expect(detail?.[1]).not.toContain("prerequisite");
+    expect(detail?.[1]).not.toContain("context");
   });
 
   it("I-134 解放判定の一覧は model_answer を引かない", async () => {

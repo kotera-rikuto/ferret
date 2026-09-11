@@ -8,6 +8,7 @@ import { IconBook, IconChevronDown, IconClose } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
 import { MemoPad } from "./MemoPad";
 import { ProblemForm } from "./ProblemForm";
+import { ScenarioIntro } from "./ScenarioIntro";
 
 /**
  * ダークなコードパネル。画面が明色でもコードは常にダーク（UXルール）。
@@ -83,7 +84,7 @@ export default async function ProblemPage({
   const { data: problem } = await admin
     .from("problems")
     .select(
-      "id, order, title, code, question, language, reading_type, context, prerequisite",
+      "id, order, title, code, question, language, reading_type, scenario, context, prerequisite",
     )
     .eq("id", problemId)
     .single();
@@ -96,6 +97,13 @@ export default async function ProblemPage({
 
   return (
     <div className="min-h-screen flex flex-col">
+      {/* 場面（どういう状況でこのコードを読むことになったか）。
+          入っている問題だけ、開いた直後に暗い背景の上のカードで1回出す。
+          **閉じたあとの画面は場面が無い問題と同じ**なので、
+          空の問題（大多数）は今までとまったく変わらない。
+          採点には渡していない（ScenarioIntro.tsx の冒頭コメント） */}
+      {problem.scenario && <ScenarioIntro scenario={problem.scenario} />}
+
       {/* 上部バー: × は「中断してマップへ」。クイズ系の定石に合わせて戻る矢印ではなく × */}
       <header className="sticky top-0 z-20 grid grid-cols-[56px_1fr_56px] items-center border-b-2 border-line bg-bg px-5 py-3.5">
         <Link
