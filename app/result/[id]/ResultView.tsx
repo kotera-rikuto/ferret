@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
 import { MascotMotion } from "@/components/ui/MascotMotion";
 import { IconPaw } from "@/components/ui/icons";
+import { shareIntentUrl } from "@/lib/seo/site";
 import {
   COMMENT_MAX_CHARS,
   COMMENT_MIN_CHARS,
@@ -336,6 +337,61 @@ export function ResultView({
     </div>
   );
 
+  /*
+   * 結果を画像で共有する（G1）。**クリアした回にだけ出す。**
+   *
+   * 畳んである理由は2つ。共有はリザルトの主役ではない（主ボタンは1本のまま）のと、
+   * **開くまで絵を作らせない**ため ── 絵は1枚ごとにサーバーで描いており、
+   * 開かない人のぶんまで毎回描く必要がない（`loading="lazy"` も同じ狙い）。
+   * `<details>` なので JavaScript を足していない。
+   *
+   * **並びは「保存 → 投稿」。** X に画像を自動で添付する方法は存在せず、
+   * 投稿画面に入るのは本文だけなので、**先に保存しないと絵の無い投稿になる。**
+   * 順番がそのまま手順の説明を兼ねている（だから説明文を置いていない）。
+   */
+  const shareUrl = `/api/share/${attemptId}`;
+  const shareBlock = (
+    <details className="w-full rounded-2xl border-2 border-line bg-panel px-5 py-3">
+      <summary className="cursor-pointer list-none text-center text-[13px] font-extrabold text-muted hover:text-ink">
+        結果を画像で共有する
+      </summary>
+      <div className="mt-4 flex flex-col items-center gap-3.5">
+        {/* alt に点数を入れない。読み上げの主役は「何の絵か」で、
+            点数は同じ画面の上にもっと大きく出ている。
+
+            **next/image を使わないこと。** あちらは画像を Next.js の最適化を
+            通して配り、結果を**キャッシュする。** この絵は本人の点数なので、
+            サーバー側で `Cache-Control: private, no-store` を付けて
+            「途中に残さない」と言っている ── 最適化を挟むと、その指示の外で
+            絵が保存されることになる（しかも URL はユーザーごとに違うだけで
+            誰でも同じ形をしている）。 */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={shareUrl}
+          loading="lazy"
+          alt="クリアした結果のカード"
+          className="w-full rounded-xl border-2 border-line"
+        />
+        <div className="flex items-center justify-center gap-7 text-[13px] font-extrabold">
+          {/* 同一オリジンなので download が効く（別オリジンだと無視されて開くだけになる） */}
+          <a href={shareUrl} download="ferret.png" className="text-muted hover:text-ink">
+            画像を保存
+          </a>
+          {/* noreferrer は遷移元（/result/12）を X に渡さないため。
+              Referrer-Policy でパスは落ちるが、明示しておく */}
+          <a
+            href={shareIntentUrl(totalScore)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-ink underline underline-offset-4 hover:text-brand-deep"
+          >
+            X に投稿する
+          </a>
+        </div>
+      </div>
+    </details>
+  );
+
   return (
     <div className="relative min-h-screen overflow-x-hidden">
       {/* 紙吹雪はクリア時だけ。位置と遅れは添字から決める（乱数だと SSR とズレる） */}
@@ -413,6 +469,7 @@ export function ResultView({
                   ふりかえる
                 </Link>
               </div>
+              {shareBlock}
             </>
           ) : (
             <>

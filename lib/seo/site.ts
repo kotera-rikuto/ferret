@@ -29,6 +29,19 @@ import { PREVIEW_MAX_ORDER } from "@/lib/progress/preview";
 export const SITE_NAME = "Ferret";
 
 /**
+ * 人に見せるための住所の表記（`ferretcode.com`）。
+ *
+ * ⚠️ **これを canonical や `metadataBase` に使わないこと。** あちらは `siteOrigin()`
+ * （`NEXT_PUBLIC_APP_URL`）を使う ── **本番にしか値が入っていない**のは意図で、
+ * 固定値を書くとプレビュー配信のページまで本番URLを名乗る（下の `siteOrigin` の注釈）。
+ *
+ * こちらは用途が逆で、**絵に焼き込む文字**と**SNS の投稿文**に使う（G1）。
+ * どちらも「見た人が Ferret に辿り着くための案内」なので、
+ * どこで作られた絵であっても指す先は本物のサイト1つでなければ意味がない。
+ */
+export const SITE_HOST = "ferretcode.com";
+
+/**
  * トップページのタイトル（検索結果の見出しになる1行）。
  *
  * 「フェレット」を併記してあるのは、カタカナで検索されたときの手掛かりにするため。
@@ -107,7 +120,9 @@ export const CTA_PREVIEW_LABEL = "1問目をみてみる";
  * 分けて書かない理由は SITE_DESCRIPTION と同じ ── 2か所に書くと、
  * **AI が矛盾した説明を拾う**（票 C12 の手順4）。しかも食い違っても画面は何も変わらない。
  *
- * ⚠️ **実装済みのことだけ書くこと。** 段位・認定証・共有機能・振り返り画面はまだ無い。
+ * ⚠️ **実装済みのことだけ書くこと。** 段位・認定証はまだ無い
+ *    （結果の共有は G1 で入ったが、**ここには足していない** ── 出てくるのは
+ *     クリアした本人の画面の中だけで、「このサイトは何か」の説明には要らない）。
  * ⚠️ **実績・利用者数・満足度を書かないこと。** AI は書いてあることをそのまま事実として
  * 答えるので、盛った数字はそのまま広まって取り消せない（票 C12 の注意）。
  *
@@ -258,6 +273,10 @@ export function siteOrigin(): string | null {
  * ⚠️ **文字を足したら `python3 design/og/subset-font.py` を回し直すこと。**
  * カードのフォントは「このファイルに出てくる字」だけを切り出した実体で、
  * 入っていない字は豆腐（□）で描かれる。忘れると tests/unit/og-image.test.ts の U-845 が落ちる。
+ *
+ * **これが要るのは LP のカードだけ**（`app/opengraph-image.tsx`）。
+ * 結果のカード（G1・`SHARE_CARD`）は問題名を描くので原本を丸ごと読んでいて、
+ * 回し直しは要らない（`assets/fonts/README.md`）。
  */
 export const OG_IMAGE_ALT = `${SITE_NAME}（フェレット）── 他人のコードが読める、AI時代のエンジニアに。`;
 
@@ -324,6 +343,51 @@ export const TWITTER_BASE = {
   card: "summary_large_image",
   images: [OG_IMAGE],
 } as const satisfies NonNullable<Metadata["twitter"]>;
+
+/**
+ * 結果を共有する絵に描く文字（G1・`app/api/share/[attemptId]/route.tsx`）。
+ *
+ * **LP のカード（`OG_IMAGE_*`）とは別物。** あちらはサービスの名乗りで全ページ共通、
+ * こちらは1回ぶんの結果で、**本人がSNSへ貼る**もの。
+ *
+ * ⚠️ **ネガティブワードを入れないこと**（CLAUDE.md）。画面の中だけなら直せるが、
+ * 貼られた先に残り、SNS 側にキャッシュもされる。
+ */
+export const SHARE_CARD = {
+  /** クリアした回。リザルト画面の見出しと同じ言葉にしてある */
+  headline: "クリア！",
+  /** パーフェクト帯。同上 */
+  headlinePerfect: "パーフェクト！",
+  /**
+   * 絵に出す問題名の上限。
+   *
+   * satori は溢れた文字を省略してくれない（枠から出たまま描かれる）ので、
+   * **描く側で切る。** 46 は、いちばん長いタイトル（全角44文字）が
+   * 25px・幅624px の2行に収まる実測値。
+   */
+  titleMaxChars: 46,
+} as const;
+
+/**
+ * X に投稿するときの本文（G1）。
+ *
+ * **本文にリンクを入れることが、この機能の宣伝としての効き目そのもの。**
+ * 画像だけでは見た人が辿り着けない ── **X に画像を自動添付する方法は無く**、
+ * 絵は本人が保存して手で付けるので、リンクは本文が運ぶしかない。
+ *
+ * 問題名を入れていないのは、**タイトルに NG 語が入っている問題が1件ある**ため
+ * （`失敗`。`problems/stage-060-072.data.mjs`・直すのは A2 側）。
+ * 絵のほうは出典が Ferret だと分かる文脈があるが、本文に出すと
+ * こちらが書いた言葉として流れる。点数だけなら問題データに左右されない。
+ */
+export function shareText(score: number): string {
+  return `${SITE_NAME} で1問クリアしました（${score}点）\nhttps://${SITE_HOST}`;
+}
+
+/** X の投稿画面を開くURL。本文だけを渡す（画像は本人が添付する） */
+export function shareIntentUrl(score: number): string {
+  return `https://x.com/intent/post?text=${encodeURIComponent(shareText(score))}`;
+}
 
 
 /**

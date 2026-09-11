@@ -17,8 +17,11 @@
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { config as loadEnv } from "dotenv";
+import { codepointsInFont } from "../support/font";
 import {
   scoreKeywords,
   normalizeForMatch,
@@ -434,6 +437,39 @@ describe.skipIf(!RUN)("§15 問題コンテンツの健全性（実DB・読み�
       }
     }
     expect(hits, `\n${hits.join("\n")}\n`).toEqual([]);
+  });
+
+  /**
+   * 共有カード（G1）は**問題名をそのまま絵に描く。**
+   *
+   * satori はフォントに無い字をエラーにせず**豆腐（□）で描く**ので、
+   * 壊れていても画像は今までどおり返ってくる。気づけるのは
+   * **他人のタイムラインに流れたあと**で、SNS 側にキャッシュもされる。
+   *
+   * **問題を足したときにそれを捕まえられる場所はここしかない。**
+   * タイトルは DB にあるので、コードを読む検査（U-907）では届かない。
+   * 読み方は tests/unit/og-image.test.ts の codepointsInFont と同じ。
+   */
+  it("I-894 全タイトルの字が共有カードのフォントに入っている", () => {
+    const ttf = readFileSync(
+      fileURLToPath(new URL("../../assets/fonts/MPLUSRounded1c-Bold.ttf", import.meta.url)),
+    );
+    const covered = codepointsInFont(ttf);
+
+    const broken: string[] = [];
+    for (const p of problems) {
+      const missing = [...new Set(p.title)].filter(
+        (ch) => !covered.has(ch.codePointAt(0)!),
+      );
+      if (missing.length) broken.push(`${label(p)} → ${missing.join(" ")}`);
+    }
+
+    expect(
+      broken,
+      `\n共有カードで豆腐になるタイトル:\n${broken.join("\n")}\n` +
+        "assets/fonts/MPLUSRounded1c-Bold.ttf は全部入りのはず。" +
+        "切り出したものに差し替わっていないか確かめること\n",
+    ).toEqual([]);
   });
 
   /**

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""共有カード（app/opengraph-image.tsx）に埋め込むフォントを作る（C11・2026-08-26）。
+"""LP の共有カード（app/opengraph-image.tsx）に埋め込むフォントを作る（C11・2026-08-26）。
+
+**結果のカード（app/api/share/[attemptId]）はこれを使わない**（G1・2026-09-11）。
+あちらは問題名を描き、問題名は DB にあって切り出せないので、原本を丸ごと読んでいる
+（assets/fonts/MPLUSRounded1c-Bold.ttf・理由は assets/fonts/README.md）。
+**このスクリプトの出力を結果のカードへ回さないこと** ── 106件中85件が豆腐になる。
 
   python3 design/og/subset-font.py            # 元フォントを取得して切り出す
   python3 design/og/subset-font.py --src <path/to/MPLUSRounded1c-Bold.ttf>

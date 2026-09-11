@@ -13,6 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
+import { codepointsInFont } from "../support/font";
 import { fileURLToPath } from "node:url";
 import {
   OG_IMAGE,
@@ -24,62 +25,6 @@ import {
 
 function repoFile(path: string): Buffer {
   return readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)));
-}
-
-/**
- * TTF の cmap（文字 → 字形の対応表）を読んで、収録されている符号位置を集める。
- *
- * フォントを読む道具（fontkit・opentype.js）は入れていない。**この検査のためだけに
- * 依存を1つ増やす価値は無い**ので、必要な形式だけ自前で読む。
- * `design/og/subset-font.py` の出力は format 4 の subtable だけを持つ
- * （確認: `fontTools` で platformID 0/3 とも format 4）。
- */
-function codepointsInFont(ttf: Buffer): Set<number> {
-  const numTables = ttf.readUInt16BE(4);
-  let cmapOffset = -1;
-  for (let i = 0; i < numTables; i++) {
-    const rec = 12 + i * 16;
-    if (ttf.subarray(rec, rec + 4).toString("latin1") === "cmap") {
-      cmapOffset = ttf.readUInt32BE(rec + 8);
-      break;
-    }
-  }
-  if (cmapOffset < 0) throw new Error("cmap テーブルが無い");
-
-  const found = new Set<number>();
-  const numSubtables = ttf.readUInt16BE(cmapOffset + 2);
-  for (let i = 0; i < numSubtables; i++) {
-    const rec = cmapOffset + 4 + i * 8;
-    const sub = cmapOffset + ttf.readUInt32BE(rec + 4);
-    if (ttf.readUInt16BE(sub) !== 4) continue; // format 4 以外は読まない
-
-    const segCount = ttf.readUInt16BE(sub + 6) / 2;
-    const endCodes = sub + 14;
-    const startCodes = endCodes + segCount * 2 + 2; // reservedPad を1つ挟む
-    const idDeltas = startCodes + segCount * 2;
-    const idRangeOffsets = idDeltas + segCount * 2;
-
-    for (let s = 0; s < segCount; s++) {
-      const end = ttf.readUInt16BE(endCodes + s * 2);
-      const start = ttf.readUInt16BE(startCodes + s * 2);
-      const delta = ttf.readInt16BE(idDeltas + s * 2);
-      const rangeOffset = ttf.readUInt16BE(idRangeOffsets + s * 2);
-      if (start === 0xffff) continue;
-      for (let cp = start; cp <= end; cp++) {
-        let glyph: number;
-        if (rangeOffset === 0) {
-          glyph = (cp + delta) & 0xffff;
-        } else {
-          const at = idRangeOffsets + s * 2 + rangeOffset + (cp - start) * 2;
-          glyph = ttf.readUInt16BE(at);
-          if (glyph !== 0) glyph = (glyph + delta) & 0xffff;
-        }
-        // 字形 0 は「無い」を表す（豆腐で描かれる）
-        if (glyph !== 0) found.add(cp);
-      }
-    }
-  }
-  return found;
 }
 
 /** PNG の IHDR から縦横を読む（8バイトの署名 + 長さ4 + "IHDR"4 の直後） */
@@ -103,6 +48,34 @@ describe("共有カードのフォント", () => {
       missing,
       `フォントに無い字: ${missing.join(" ")}\n` +
         "python3 design/og/subset-font.py を回して assets/fonts/ を作り直すこと",
+    ).toEqual([]);
+  });
+
+  /**
+   * 結果の共有カード（G1）は**問題名を描く**ので、切り出したフォントでは足りない。
+   *
+   * 実測（2026-09-11）で 106件中85件が豆腐になることを確認したうえで、
+   * **丸ごと同梱に切り替えた。** ここはその判断が生きているかだけを見る
+   * ── 誰かが「重いから」と切り出したものに戻すと、
+   * **絵は出るが問題名だけが □ になる**（しかも SNS に流れてから分かる）。
+   *
+   * 投入済みの全タイトルを突き合わせる検査は `npm run test:db` の I-894（§15）。
+   * あちらは DB を読むので既定では走らない。**両方揃って初めて網になる。**
+   */
+  it("U-907 結果カードのフォントは切り出しではなく全部入りである", () => {
+    const full = repoFile("assets/fonts/MPLUSRounded1c-Bold.ttf");
+    const covered = codepointsInFont(full);
+
+    // 常用漢字の一部を抜き出した見本。問題タイトルに実際に出てくる字で、
+    // **切り出したほうには入っていない**ものを選んである
+    const sample = "担当者暗黙型変換短絡罠掘浮動小数点再帰";
+    const missing = [...sample].filter((ch) => !covered.has(ch.codePointAt(0)!));
+
+    expect(
+      missing,
+      `フォントに無い字: ${missing.join(" ")}\n` +
+        "assets/fonts/MPLUSRounded1c-Bold.ttf（全部入り）が要る。" +
+        "切り出したものに戻すと問題名が豆腐で焼かれる",
     ).toEqual([]);
   });
 });

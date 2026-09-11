@@ -80,6 +80,12 @@ export type ChangelogEntry = {
  */
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
+    date: "2026-09-11",
+    category: "feature",
+    title: "クリアした結果を画像で共有できるようにしました",
+    body: "クリアすると、リザルト画面に「結果を画像で共有する」が出ます。点数と問題名の入ったカードを保存して、X などに貼れます。カードに出るのは点数と問題名だけで、書いた答えは入りません。",
+  },
+  {
     date: "2026-08-26",
     category: "problem",
     title: "ステージ1から3の問題を新しくしました",

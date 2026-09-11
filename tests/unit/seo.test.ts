@@ -20,9 +20,13 @@ import {
   SITEMAP_PATHS,
   SITE_DESCRIPTION,
   SITE_FACTS,
+  SITE_HOST,
   SITE_IS_FREE,
   SITE_NAME,
+  SHARE_CARD,
   publicPageMetadata,
+  shareIntentUrl,
+  shareText,
   unlistedPageMetadata,
 } from "@/lib/seo/site";
 import { structuredData, structuredDataJson } from "@/lib/seo/structured-data";
@@ -439,5 +443,52 @@ describe("§24 ログイン前に読める範囲（C13）", () => {
     const facts = SITE_FACTS.join("\n");
     expect(facts).toContain(`最初の${PREVIEW_MAX_ORDER}問`);
     expect(facts).toContain("採点を受けるにはログインが必要");
+  });
+});
+
+describe("§25 結果の共有（G1・2026-09-11）", () => {
+  /**
+   * 共有の本文は**貼られた先に残る。** 画面の文言なら直せば済むが、
+   * こちらは他人のタイムラインに残り、消してもらう手立てが無い。
+   */
+  it("U-908 投稿の本文にネガティブワードが入らない", () => {
+    // 採点の講評と同じ辞書で見る（lib/ai/scorer.ts）。
+    // 画面と AI の本文だけ整えても、ここが素通しなら方針が崩れる
+    const banned = ["弱点", "間違い", "失敗", "初心者", "不正解", "苦手", "不足"];
+    for (const score of [55, 80, 100]) {
+      const text = shareText(score);
+      for (const word of banned) {
+        expect(text, `「${word}」が本文に入っている`).not.toContain(word);
+      }
+    }
+  });
+
+  it("U-909 投稿の本文にサイトへのリンクが入る", () => {
+    // **これが共有機能の宣伝としての効き目そのもの。**
+    // 絵は本人が手で添付するので（X に自動添付する方法が無い）、
+    // リンクを運べるのは本文だけ。落とすと「出どころの分からない絵」になる
+    expect(shareText(85)).toContain(`https://${SITE_HOST}`);
+  });
+
+  it("U-918 点数がそのまま本文に出る", () => {
+    expect(shareText(85)).toContain("85");
+    expect(shareText(100)).toContain("100");
+  });
+
+  it("U-919 投稿画面のURLは本文をエスケープして渡す", () => {
+    const url = shareIntentUrl(85);
+    expect(url.startsWith("https://x.com/intent/post?text=")).toBe(true);
+
+    // 生のままだと本文中の `#` 以降が捨てられ、`&` で別の引数に化ける。
+    // 組み立て直して同じ本文に戻るかで見る
+    const text = new URL(url).searchParams.get("text");
+    expect(text).toBe(shareText(85));
+  });
+
+  it("U-923 共有カードの文言にネガティブワードが入らない", () => {
+    const drawn = [SHARE_CARD.headline, SHARE_CARD.headlinePerfect].join("");
+    for (const word of ["弱点", "間違い", "失敗", "初心者", "不正解"]) {
+      expect(drawn, `「${word}」が絵に入っている`).not.toContain(word);
+    }
   });
 });

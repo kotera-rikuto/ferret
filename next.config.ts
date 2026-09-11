@@ -104,6 +104,28 @@ const nextConfig: NextConfig = {
   // `X-Powered-By: Next.js` を消す。使っている技術と世代を無料で教える必要はない
   poweredByHeader: false,
 
+  /**
+   * 共有カード（G1・`app/api/share/[attemptId]`）が実行時に読むファイルを、
+   * 配信するひとまとまりに必ず入れる。
+   *
+   * **これが無いと本番だけ 500 になる。** Next.js は「どのファイルを一緒に運ぶか」を
+   * import を辿って決めるが、`readFile(join(process.cwd(), ...))` は
+   * **文字列を組み立てて読んでいるだけなので辿れない。**
+   * 手元では実ファイルがそこにあるため最後まで動いてしまい、**配信して初めて分かる。**
+   *
+   * LP のカード（`app/opengraph-image.tsx`）が同じ書き方でも平気なのは、
+   * あちらが**ビルド時に1回描いて絵を焼き込む**ためで、実行時には読まないから。
+   *
+   * 鍵はルートのパス、値はプロジェクト直下からの相対
+   * （`node_modules/next/dist/docs` の output.md「outputFileTracingIncludes」）。
+   */
+  outputFileTracingIncludes: {
+    "/api/share/[attemptId]": [
+      "./assets/fonts/MPLUSRounded1c-Bold.ttf",
+      "./public/character_nobg.png",
+    ],
+  },
+
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
