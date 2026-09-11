@@ -46,7 +46,9 @@ export function ProblemForm({
    *
    * **書いた内容は消さない。** 下書きは下の `handleChange` が
    * その都度 localStorage に入れているので、登録を済ませて同じステージを開けば
-   * 「前回の下書きを復元しました」でそのまま出てくる（持ち回りの仕組みを別に作っていない）
+   * 「前回の下書きを復元しました」でそのまま出てくる（持ち回りの仕組みを別に作っていない）。
+   * **そのことを案内文には書かない**（オーナー判断 2026-09-12）── 説明を重ねるより
+   * 「何が要るのか」の1行だけを残すほうが伝わる。復元は開き直した画面のほうが示す
    */
   const [signupPrompt, setSignupPrompt] = useState(false);
 
@@ -203,7 +205,8 @@ export function ProblemForm({
        * 採点は登録した人向け、という案内（C13）。
        *
        * **「できません」とは書かない**（ネガティブワード禁止・CLAUDE.md）。
-       * 書いたものが残っていることを先に伝えてから、登録への導線を出す。
+       * **1行だけにする**（オーナー判断 2026-09-12）── 何が要るのかを言えば足りる。
+       * 下書きが残ることや採点の中身まで説明すると、押した手を止めるだけの文章量になる。
        * 文言に「無料」を直書きしないのは、課金を始めた日に嘘が残らないようにするため
        * （`CTA_PRIMARY_LABEL` は `SITE_IS_FREE` から来る）
        */}
@@ -214,10 +217,7 @@ export function ProblemForm({
           className="flex flex-col gap-3 rounded-2xl border-2 border-line bg-panel px-4.5 py-4"
         >
           <p className="text-sm font-extrabold leading-relaxed">
-            ここから先は採点です。登録すると、フェレットが回答を読んで点数とコメントを返します。
-          </p>
-          <p className="text-xs font-bold leading-relaxed text-muted">
-            いま書いた回答はこの端末に残してあります。登録したあと、このステージをもう一度開くとそのまま出てきます。
+            採点をするにはフェレットへの登録が必要です。
           </p>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <Link
