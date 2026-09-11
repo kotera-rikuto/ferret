@@ -240,7 +240,7 @@ async function deleteSeeded(db: SupabaseClient) {
 export async function dismissScenario(page: Page) {
   const card = page.locator("[data-scenario-intro]");
   if ((await card.count()) === 0) return;
-  await page.getByRole("button", { name: "コードを読む" }).click();
+  await page.getByRole("button", { name: "問題をとく" }).click();
   await expect(card).toHaveCount(0);
 }
 
