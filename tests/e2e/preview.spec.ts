@@ -28,27 +28,53 @@ function answerBox(page: Page) {
   return page.getByRole("textbox", { name: "回答を入力してください" });
 }
 
+/**
+ * LP のお試しボタン → ステージ選択 → ステージ1 の問題画面、までを辿る。
+ *
+ * **LP から問題へ直行しない**（2026-09-12・オーナー判断）。先に全体像を見せる形にしたので、
+ * 「登録しないで問題まで着けるか」は**この3画面を通しでしか確かめられない。**
+ * 途中のどこが切れても、外から来た人は問題に辿り着けなくなる。
+ */
+async function openStageOneAsGuest(page: Page) {
+  await page.goto("/");
+
+  // **ボタンの文言ではなく行き先で引く**（文言は lib/seo/site.ts の定数で、
+  // 直したときにここが落ちる意味は無い）
+  const preview = page.locator('a[href="/stages"]').first();
+  await expect(preview).toBeVisible();
+  await preview.click();
+  await expect(page).toHaveURL(/\/stages$/);
+
+  // マップのステージ1を押すと確認が出て、そこから問題画面へ入る
+  await stageNode(page, 1).locator("button").first().click();
+  await page.getByRole("button", { name: "挑む" }).click();
+  await expect(page).toHaveURL(/\/problems\/\d+$/);
+
+  // **ログインしていない人が最初に見るのは場面のカード**（A4 との統合でこうなった）。
+  // 閉じるまで本文のどこにも触れないので、先に閉じる
+  await dismissScenario(page);
+}
+
 test.describe("§14 ログイン前に読める範囲", () => {
-  test("E-720 LP の「1問目をみてみる」から、ログインせずに問題が開く", async ({
+  test("E-720 LP のお試しボタンから、ログインせずにステージ1まで着く", async ({
     page,
   }) => {
-    await page.goto("/");
-
-    // 行き先は問題ページ。**ボタンの文言ではなく href の形で引く**
-    // （文言は lib/seo/site.ts の定数で、直したときにここが落ちる意味は無い）
-    const preview = page.locator('a[href^="/problems/"]').first();
-    await expect(preview).toBeVisible();
-
-    await preview.click();
-    await expect(page).toHaveURL(/\/problems\/\d+$/);
-
-    // **ログインしていない人が最初に見るのは場面のカード**（A4 との統合で こうなった）。
-    // 閉じるまで本文のどこにも触れないので、先に閉じる
-    await dismissScenario(page);
+    await openStageOneAsGuest(page);
 
     // ログイン画面へ跳ね返されていないこと。コードと設問が出ている
     await expect(page.locator("[data-code-panel]").first()).toBeVisible();
     await expect(answerBox(page)).toBeVisible();
+  });
+
+  test("E-725 LP のお試しボタンは問題へ直行せず、ステージ選択へ送る", async ({
+    page,
+  }) => {
+    await page.goto("/");
+
+    // **問題への直リンクを LP に置かない**（2026-09-12・オーナー判断）。
+    // 全体像を先に見せる判断なので、ここが戻ると判断ごと消える
+    await expect(page.locator('a[href^="/problems/"]')).toHaveCount(0);
+    await expect(page.locator('a[href="/stages"]').first()).toBeVisible();
   });
 
   test("E-721 範囲外の問題は URL を直打ちしてもログイン画面へ（戻り先つき）", async ({
@@ -111,10 +137,7 @@ test.describe("§14 ログイン前に読める範囲", () => {
       if (r.url().includes("/api/score")) scored.push(r.url());
     });
 
-    await page.goto("/");
-    await page.locator('a[href^="/problems/"]').first().click();
-    await expect(page).toHaveURL(/\/problems\/\d+$/);
-    await dismissScenario(page);
+    await openStageOneAsGuest(page);
 
     const answer = "ログインしないで書いた下書きです。".repeat(6);
     await answerBox(page).fill(answer);

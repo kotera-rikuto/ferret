@@ -24,8 +24,6 @@ import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
 import { IconComment, IconHandover, IconSpark } from "@/components/lp/icons";
 import { publicPageMetadata, CTA_PRIMARY_LABEL, CTA_PREVIEW_LABEL } from "@/lib/seo/site";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { firstPreviewPath } from "@/lib/progress/preview";
 import { structuredDataJson } from "@/lib/seo/structured-data";
 
 /**
@@ -267,11 +265,6 @@ export default async function Home() {
 
   const jsonLd = structuredDataJson();
 
-  // お試しの入口の行き先（C13・2026-09-11）。
-  // **問題が入っていない環境では null が返り、ボタンごと出さない** ──
-  // 押した先がログイン画面だと、登録の障害を下げるつもりで一段増やすことになる
-  const previewPath = await firstPreviewPath(createAdminClient());
-
   return (
     <div className="flex min-h-screen flex-col">
       {/*
@@ -365,14 +358,16 @@ export default async function Home() {
                 並べると、どちらが本線なのか分からなくなる。
                 「アカウントをお持ちの方」はそのまま残す（票 C13）。
 
+                **行き先はステージ選択**（2026-09-12・オーナー判断）。問題へ直行させない ──
+                先に全体像を見せてから中に入ってもらう。ここが `/stages` になったことで、
+                **LP は DB を1回も引かなくなった**（以前は問題の id を引いていた）。
+
                 `sm:flex-wrap` は3本になったことへの手当て。
                 640〜700px の幅では横1列に収まらず、最後の1本が右へはみ出す
               */}
               <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap">
                 <PrimaryCta href="/register">{CTA_PRIMARY_LABEL}</PrimaryCta>
-                {previewPath && (
-                  <SecondaryCta href={previewPath}>{CTA_PREVIEW_LABEL}</SecondaryCta>
-                )}
+                <SecondaryCta href="/stages">{CTA_PREVIEW_LABEL}</SecondaryCta>
                 <SecondaryCta href="/login">
                   アカウントをお持ちの方
                 </SecondaryCta>
