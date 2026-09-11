@@ -1,3 +1,4 @@
+import { CTA_PRIMARY_LABEL } from "@/lib/seo/site";
 import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
 import { Container, PrimaryCta } from "@/components/lp/parts";
@@ -8,7 +9,7 @@ import { ChangelogMenu } from "@/components/changelog/ChangelogMenu";
  *
  * 折りたたみメニューを付けると、この節のためだけに LP 全体がクライアント部品になる
  * （開いているかどうかを覚える必要が出るため）。節への近道は本文を上から読めば
- * 全部通るので、狭い画面ではロゴと「無料で始める」だけを残す作りにした。
+ * 全部通るので、狭い画面ではロゴと登録の主ボタンだけを残す作りにした。
  *
  * **「更新情報」だけは開閉する**（`ChangelogMenu`・E12）。ただし状態を持つのは
  * ブラウザ（`<details>`）で、こちらはサーバー部品のまま ── 上の決めには当たらない。
@@ -62,7 +63,7 @@ export function LpHeader({ anchorBase = "" }: { anchorBase?: "" | "/" } = {}) {
             ログイン
           </Link>
           <PrimaryCta href="/register" size="sm">
-            無料で始める
+            {CTA_PRIMARY_LABEL}
           </PrimaryCta>
         </div>
       </Container>

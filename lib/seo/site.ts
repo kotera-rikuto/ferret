@@ -75,6 +75,18 @@ export const ARTICLES_URL = "https://zenn.dev/ferretcode";
 export const SITE_IS_FREE = true;
 
 /**
+ * 登録への主ボタンの文言。**上部バー・主役・末尾の3か所が同じ文字を出す。**
+ *
+ * ここに置くのは「無料」が価格の主張だから。直書きすると、
+ * **課金を始めた日に3か所を別々に直すことになり、1つ残れば嘘が残る。**
+ * `SITE_IS_FREE` を false にすれば全部が同時に変わる（`CLAUDE.md` の決まり）。
+ *
+ * 表記は**ひらがな**で統一する（2026-09-11・オーナー判断）。
+ * それまで上部バーと末尾が「無料で始める」、主役だけ「はじめる」で割れていた。
+ */
+export const CTA_PRIMARY_LABEL = SITE_IS_FREE ? "無料ではじめる" : "はじめる";
+
+/**
  * 機械（AI・クローラー）に渡す事実の箇条書き。
  * **`/llms.txt` の本文と JSON-LD の `featureList` は、どちらもここから来る。**
  *

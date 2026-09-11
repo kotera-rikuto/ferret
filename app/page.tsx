@@ -23,7 +23,7 @@ import { CodePanel } from "@/components/lp/CodePanel";
 import { Demo } from "@/components/lp/Demo";
 import { Faq } from "@/components/lp/Faq";
 import { IconComment, IconHandover, IconSpark } from "@/components/lp/icons";
-import { publicPageMetadata } from "@/lib/seo/site";
+import { publicPageMetadata, CTA_PRIMARY_LABEL} from "@/lib/seo/site";
 import { structuredDataJson } from "@/lib/seo/structured-data";
 
 /**
@@ -350,7 +350,7 @@ export default async function Home() {
               </p>
 
               <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-                <PrimaryCta href="/register">はじめる</PrimaryCta>
+                <PrimaryCta href="/register">{CTA_PRIMARY_LABEL}</PrimaryCta>
                 <SecondaryCta href="/login">
                   アカウントをお持ちの方
                 </SecondaryCta>
@@ -605,7 +605,7 @@ export default async function Home() {
               </p>
             </Reveal>
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
-              <PrimaryCta href="/register">無料で始める</PrimaryCta>
+              <PrimaryCta href="/register">{CTA_PRIMARY_LABEL}</PrimaryCta>
               <SecondaryCta href="/login">ログイン</SecondaryCta>
             </div>
           </div>
