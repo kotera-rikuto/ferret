@@ -130,7 +130,7 @@ test.describe("§6 表示", () => {
     await expect(card).toContainText("レビューを頼まれた");
 
     // 閉じると消え、残りの画面は場面が無い問題と同じ
-    await page.getByRole("button", { name: "コードを読む" }).click();
+    await page.getByRole("button", { name: "問題をとく" }).click();
     await expect(card).toHaveCount(0);
     await expect(page.locator("[data-code-panel]").first()).toBeVisible();
     await expect(page.getByPlaceholder("回答を入力してください...")).toBeVisible();

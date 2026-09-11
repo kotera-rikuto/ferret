@@ -25,6 +25,15 @@ import { IconPaw } from "@/components/ui/icons";
  *
  * この2つを合わせると**保存先が要らない**ので、この部品は状態を外に持たない。
  *
+ * ### 文言（2026-09-12・オーナー指定）
+ *
+ * 見出しは「しちゅえーしょん」、ボタンは「問題をとく」。**どちらもひらがな。**
+ * 画面の他の言葉（`せってい` / `ふりかえり` / `はじめる`）と同じ寄せ方で、
+ * `f4fc12e` が主ボタンをひらがなに統一したのと同じ方針。
+ *
+ * ボタンが「コードを読む」から「問題をとく」に変わったのは、
+ * **押した先でやることが「読む」で終わらない**ため（読んで、書いて、出す）。
+ *
  * ### 採点には渡らない
  *
  * `scenario` は表示専用（`prerequisite` と同じ扱い）。
@@ -95,7 +104,7 @@ export function ScenarioIntro({ scenario }: { scenario: string }) {
           className="flex items-center gap-2 text-xs font-extrabold tracking-widest text-brand-deep"
         >
           <IconPaw size={16} />
-          こんな場面です
+          しちゅえーしょん
         </p>
 
         <p className="mt-4 text-base font-bold leading-loose whitespace-pre-line">
@@ -106,7 +115,7 @@ export function ScenarioIntro({ scenario }: { scenario: string }) {
           type="button"
           className="mt-7 w-full rounded-2xl border-b-5 border-brand-deep bg-brand px-8 py-3.5 text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2"
         >
-          コードを読む
+          問題をとく
         </button>
       </div>
     </div>
