@@ -1,8 +1,12 @@
+import { cache } from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
+import { isPreviewOrder } from "@/lib/progress/preview";
+import { SITE_NAME, publicPageMetadata, unlistedPageMetadata } from "@/lib/seo/site";
 import { highlightCode, PRE_CLASS } from "@/lib/code/highlight";
 import { IconBook, IconChevronDown, IconClose } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
@@ -53,6 +57,103 @@ function CodePanel({
   );
 }
 
+/**
+ * URL の数字から問題を1件読む。**`generateMetadata` と本体の両方から呼ぶので包んである。**
+ *
+ * `cache`（React）は同じ引数の呼び出しを1リクエストのあいだ1回にまとめる。
+ * 包まずに2か所から呼ぶと、**1画面ぶんの表示で同じ行を2回取りに行く**ことになる
+ * （`fetch` なら Next.js が勝手にまとめるが、Supabase のクライアントは対象外。
+ * `node_modules/next/dist/docs/.../generate-metadata.md` が
+ * 「fetch が使えないときは React の cache を使う」と書いている場所）。
+ *
+ * ⚠️ **`select` の欄を増やさないこと。** `model_answer` と `rubric_items` を
+ * 足すと、この画面の props としてブラウザへ渡る道ができる。
+ */
+const loadProblem = cache(async (problemId: number) => {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("problems")
+    .select(
+      "id, order, title, code, question, language, reading_type, scenario, context, prerequisite",
+    )
+    .eq("id", problemId)
+    .single();
+  return data;
+});
+
+/**
+ * ステージ番号だけを引く。**本文は1文字も取らない。**
+ *
+ * `generateMetadata` が「この問題はログイン前に見せてよいか」を決めるためだけのもの。
+ * そこで `loadProblem` を呼ぶと、**鍵のかかった問題の設問やコードまで
+ * 毎回取りに行くことになる** ── 「未解放なら問題の詳細を引きにすらいかない」という
+ * 取り決め（`tests/integration/server-components.test.ts` の I-376b）が
+ * 画面側だけの話に痩せてしまう。
+ *
+ * 見せてよいと分かった後は `loadProblem` を呼ぶ。同じ引数なので `cache` がまとめ、
+ * **本体の描画と合わせても問い合わせは1回**で済む。
+ */
+const loadProblemOrder = cache(async (problemId: number) => {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("problems")
+    .select("id, order")
+    .eq("id", problemId)
+    .single();
+  return data;
+});
+
+/** URL の数字。ユーザーが自由に書き換えられるので、整数以外はここで落とす */
+function parseProblemId(id: string): number | null {
+  const problemId = Number(id);
+  return Number.isInteger(problemId) && problemId > 0 ? problemId : null;
+}
+
+/**
+ * 検索エンジンへの申告（C13・2026-09-11）。
+ *
+ * **ログイン前に読める問題だけを索引に載せる。** C8 が「事業判断」として保留していた
+ * 「検索に出るページが5枚しかない」はここで解ける ── 開けた問題は
+ * 「JavaScript const 再代入」のような具体的な検索の対象になる。
+ *
+ * ⚠️ **それ以外の問題は `index: false` を返す。** `robots.txt` でまとめて
+ * 塞いでいないので（`lib/seo/site.ts` の `CRAWL_DISALLOW` の注）、
+ * ここが最後の歯止めになる。ログインしていない相手には結局ログイン画面へ
+ * 飛ばすが、**飛ばす前のURLが索引に載ることがある**ので宣言しておく。
+ *
+ * 説明文に**設問だけ**を使い、`model_answer` には触れない。
+ */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  // ログイン前に見せない問題はこれを返す。中身を名乗らない
+  const unlisted = unlistedPageMetadata({
+    title: "問題",
+    description: "ログインすると問題を読めます。",
+  });
+
+  const { id } = await params;
+  const problemId = parseProblemId(id);
+  if (problemId === null) return unlisted;
+
+  const head = await loadProblemOrder(problemId);
+  if (!head || !isPreviewOrder(head.order)) return unlisted;
+
+  // ここから先は「見せてよい」と決まった問題だけ。本文を引くのはこの後
+  const problem = await loadProblem(problemId);
+  if (!problem) return unlisted;
+
+  const title = problem.title ?? `ステージ${problem.order}`;
+  return publicPageMetadata({
+    path: `/problems/${problem.id}`,
+    title: `ステージ${problem.order}: ${title}`,
+    // 設問は改行を含むので1行に均す。長い問題でも検索結果に収まる長さで切る
+    description: `${problem.question.replace(/\s+/g, " ").slice(0, 90)} ── ${SITE_NAME} のコードリーディング練習問題（ステージ${problem.order}）。登録しなくても読めます。`,
+  });
+}
+
 export default async function ProblemPage({
   params,
 }: {
@@ -60,36 +161,43 @@ export default async function ProblemPage({
 }) {
   const { id } = await params;
 
+  const problemId = parseProblemId(id);
+  if (problemId === null) notFound();
+
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
-  // URL の数字はユーザーが自由に書き換えられる。整数以外はここで落とす
-  const problemId = Number(id);
-  if (!Number.isInteger(problemId) || problemId <= 0) notFound();
-
-  const admin = createAdminClient();
-
-  // まだ開いていないステージは、URL を直接打っても開かせない。
-  // マップ上の鍵アイコンはブラウザ側の見た目でしかなく、
-  // アドレスバーに /problems/42 と打てば素通りできてしまうため。
-  // 判定は採点API と同じ関数を使う（片方だけ直してズレるのを防ぐ）
-  const progress = await loadProgress(admin, supabase, user.id);
-  if (!progress.unlockedIds.has(problemId)) notFound();
+  if (user) {
+    // まだ開いていないステージは、URL を直接打っても開かせない。
+    // マップ上の鍵アイコンはブラウザ側の見た目でしかなく、
+    // アドレスバーに /problems/42 と打てば素通りできてしまうため。
+    // 判定は採点API と同じ関数を使う（片方だけ直してズレるのを防ぐ）。
+    //
+    // **詳細を引く前に弾く**（I-376b）。鍵のかかった問題の本文は取りに行かない
+    const admin = createAdminClient();
+    const progress = await loadProgress(admin, supabase, user.id);
+    if (!progress.unlockedIds.has(problemId)) notFound();
+  }
 
   // 表示に必要なカラムだけ取得する。
   // model_answer / rubric_items を select しないことでクライアントへの流出を防ぐ
-  const { data: problem } = await admin
-    .from("problems")
-    .select(
-      "id, order, title, code, question, language, reading_type, scenario, context, prerequisite",
-    )
-    .eq("id", problemId)
-    .single();
-
+  const problem = await loadProblem(problemId);
   if (!problem) notFound();
+
+  // ログインしていない人に開けてあるのは最初の数問だけ（`lib/progress/preview.ts`）。
+  //
+  // **ここでしか止められない**（C13）── 開けてよい問題かどうかは `order` で決めていて、
+  // URL に出るのは id なので、`proxy.ts` の matcher（リテラルのパスしか書けない）でも
+  // 本文を読む前でも判断できない。だから「読んでから、画面に渡す前に」弾く。
+  //
+  // **戻り先を持たせる。** 以前は proxy.ts が付けていたが、この画面が matcher から
+  // 外れたのでここで同じことをする（付けないと、鍵付きのステージを踏んだ人が
+  // ログイン後にステージ選択の先頭へ戻される）
+  if (!user && !isPreviewOrder(problem.order)) {
+    redirect(`/login?next=${encodeURIComponent(`/problems/${problem.id}`)}`);
+  }
 
   // 色付けはここ（サーバー）で終わらせる。ブラウザには色の付いた HTML だけが届く。
   // 対応していない言語や、万一の失敗のときは null が返り、素のテキストで出る
@@ -198,8 +306,11 @@ export default async function ProblemPage({
             </details>
           )}
 
-          {/* 回答入力（送信ボタンは画面下の固定フッター側にある） */}
+          {/* 回答入力（送信ボタンは画面下の固定フッター側にある）。
+              **ログインしていない人にも入力欄は出す**（C13・オーナー判断 2026-09-11）。
+              採点だけが登録の向こう側にある */}
           <ProblemForm
+            signedIn={Boolean(user)}
             problem={{
               id: problem.id,
               title: problem.title ?? `Stage ${problem.order}`,

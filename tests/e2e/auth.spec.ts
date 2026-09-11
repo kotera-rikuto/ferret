@@ -32,10 +32,17 @@ test.describe("§1 認証ガードと next 復帰", () => {
     void userId; // テストユーザーの用意と履歴の初期化
   });
 
+  /**
+   * **`/stages` と `/problems` はここに戻さないこと**（C13・2026-09-11）。
+   * ログインしていない人にも見せる判断になり、`proxy.ts` の matcher から外してある。
+   * 「範囲外の問題を直打ちするとログイン画面へ」は `tests/e2e/preview.spec.ts` の
+   * E-721 が見ている（あちらは `order` が範囲外のシード問題を使うので、
+   * 問題が何問に増えても範囲外のままでいられる）。
+   */
   const guarded = [
-    ["/stages", "/stages"],
-    ["/problems/5", "/problems/5"],
     ["/result/5", "/result/5"],
+    ["/review", "/review"],
+    ["/settings", "/settings"],
   ] as const;
 
   for (const [path, expected] of guarded) {
@@ -49,16 +56,16 @@ test.describe("§1 認証ガードと next 復帰", () => {
   }
 
   test("E-103 ログイン後に元の場所へ戻る", async ({ page, problems }) => {
-    await page.goto("/stages");
+    // 行き先は**ログインが要るまま**の画面から選ぶ（C13 で `/stages` は開いた）
+    await page.goto("/review");
     await expect(page).toHaveURL(/\/login/);
 
     // ここで goto し直すと `next` が消えるので、開いている画面のまま送る
     await submitLoginForm(page);
 
-    await expect(page).toHaveURL(/\/stages/);
-    // ステージ選択画面には見出し（h1）が無い。右レールのウィジェットが
-    // この画面まで到達した印になる（マップだけ見ると、問題0件でも通ってしまう）
-    await expect(page.getByRole("heading", { name: "すすみぐあい" })).toBeVisible();
+    // 既定の行き先（/stages）ではなく、**弾かれた場所**に戻っていること
+    await expect(page).toHaveURL(/\/review/);
+    await expect(page.getByRole("heading", { name: "といた問題" })).toBeVisible();
     expect(problems.length).toBeGreaterThan(0);
   });
 
@@ -236,8 +243,10 @@ test.describe("§1 ログアウト", () => {
     await authedPage.getByRole("button", { name: "ログアウト" }).click();
     await expect(authedPage).toHaveURL(/\/login/);
 
-    // 戻ろうとしても再びログイン画面へ
-    await authedPage.goto("/stages");
+    // 戻ろうとしても再びログイン画面へ。
+    // **見るのはログインが要るまま残した画面**（C13 で `/stages` は開いたので、
+    // あそこを開いても「セッションが消えたか」の答えにならない）
+    await authedPage.goto("/settings");
     await expect(authedPage).toHaveURL(/\/login/);
   });
 

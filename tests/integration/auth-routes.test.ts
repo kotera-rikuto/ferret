@@ -151,14 +151,26 @@ describe("§7 proxy", () => {
 
   it("I-305 matcher が認証の要る画面をすべて含む", () => {
     expect(config.matcher).toEqual([
-      "/stages/:path*",
-      "/problems/:path*",
       "/result/:path*",
       "/review/:path*",
       // せってい（2026-08-19・C3）。退会とパスワード変更を置いた画面なので、
       // ログインしていない人を DB へのクエリが走る前に弾く
       "/settings/:path*",
     ]);
+  });
+
+  /**
+   * `/stages` と `/problems` を matcher から外したこと自体が意図だと固定する（C13）。
+   *
+   * **消さないこと。** ここが無いと「便利だから」で戻され、
+   * ログイン前に読ませる判断（オーナー・2026-09-11）が静かに取り消される。
+   * 代わりの守りはページ側にあり、`tests/integration/architecture.test.ts` の
+   * I-395 が「preview の判定を通っていること」まで見ている。
+   */
+  it("I-405 ログイン前に見せる2画面は matcher に入れない（C13）", () => {
+    const joined = config.matcher.join(" ");
+    expect(joined).not.toContain("/stages");
+    expect(joined).not.toContain("/problems");
   });
 
   it("I-306 matcher が公開画面と API を含まない", () => {

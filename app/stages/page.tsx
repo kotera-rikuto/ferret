@@ -1,7 +1,8 @@
-import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
+import { loadPreviewProgress } from "@/lib/progress/preview";
 import { PERFECT_THRESHOLD } from "@/lib/ai/compose";
 import { calcStreak, toJstDate } from "@/lib/progress/streak";
 import { levelFromXp, totalXp } from "@/lib/progress/level";
@@ -11,23 +12,33 @@ import { IconCheck, IconFlame } from "@/components/ui/icons";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileHeader } from "@/components/layout/MobileHeader";
 import { Mascot } from "@/components/ui/Mascot";
+import { CTA_PRIMARY_LABEL } from "@/lib/seo/site";
 
 
+/**
+ * ステージ選択。**ログインしていなくても開く**（C13・オーナー判断 2026-09-11）。
+ *
+ * 未ログインのときに見せるのは「全部でこれだけある」という全体像で、
+ * 開くのは `lib/progress/preview.ts` が許した最初の数問だけ。残りは鍵のまま。
+ * 鍵の判定は `loadPreviewProgress` が `loadProgress` と**同じ形**で返すので、
+ * この下の描画はログインの有無で分岐しない（分けると片方だけ鍵が外れる）。
+ *
+ * ⚠️ **この画面は `robots.txt` で巡回対象から外したままにしてある**
+ * （`lib/seo/site.ts` の `CRAWL_DISALLOW`）。人には見せるが、
+ * ここには鍵付き100問へのリンクが並んでいるので、クローラーに辿らせる意味が無い。
+ */
 export default async function StagesPage() {
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
 
   // 解放状態の計算は問題画面・採点APIと共通の関数に寄せてある。
   // 表示（ここ）と実際のガードが同じ答えを出すことを保証するため
   const admin = createAdminClient();
-  const { problems, bestScores, clearedFlags, currentIndex } = await loadProgress(
-    admin,
-    supabase,
-    user.id,
-  );
+  const { problems, bestScores, clearedFlags, currentIndex } = user
+    ? await loadProgress(admin, supabase, user.id)
+    : await loadPreviewProgress(admin);
 
   const stages: Stage[] = problems.map((p, i) => ({
     id: p.id,
@@ -53,12 +64,17 @@ export default async function StagesPage() {
 
   // ストリークは回答ログから毎回導出する（カウンタを別に持たない。lib/progress/streak.ts）。
   // session クライアント経由なので RLS で自分の行に絞られる
-  const { data: attemptDates } = await supabase
-    .from("user_attempts")
-    .select("created_at")
-    .eq("user_id", user.id)
-    .order("created_at", { ascending: false })
-    .limit(366);
+  // **未ログインでは問い合わせごと出さない。** 回答ログは user_id で絞るもので、
+  // ログインしていない人には該当する行が存在しない（空で0日になるが、
+  // 無駄な往復を1回増やすことになる）
+  const { data: attemptDates } = user
+    ? await supabase
+        .from("user_attempts")
+        .select("created_at")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false })
+        .limit(366)
+    : { data: null };
   const streak = calcStreak(
     (attemptDates ?? []).map((a) => toJstDate(a.created_at)),
     toJstDate(new Date()),
@@ -69,15 +85,37 @@ export default async function StagesPage() {
   // 矛盾表示になる。だから残数の表示だけを先に作らないことになっていた
   // （design/移植残タスク.md §3）。日付の境目も SQL 側の JST で揃う。
   // 読めなかったときは null が返るので、枠そのものを出さない
-  const quota = await peekAiQuota(admin, user.id);
+  // 未ログインでは採点そのものが登録の向こう側なので、残数の枠を出さない
+  const quota = user ? await peekAiQuota(admin, user.id) : null;
 
   return (
     <div className="mx-auto grid min-h-screen w-full max-w-[1280px] grid-cols-1 gap-8 px-6 lg:grid-cols-[280px_minmax(0,1fr)_280px]">
-      <AppSidebar email={user.email ?? null} />
+      <AppSidebar email={user?.email ?? null} signedIn={Boolean(user)} />
 
       <main className="flex flex-col gap-5 py-5 pb-28">
         {/* lg 未満はサイドバーが消えるので、簡易ヘッダーで代用する */}
-        <MobileHeader current="stages" />
+        {user ? (
+          <MobileHeader current="stages" signedIn />
+        ) : (
+          /*
+           * ログインしていない人には、**この帯が画面に残る唯一の登録の入口**（C13）。
+           * 下の数字の帯（レベル・つづけた日数・すすみぐあい）は出さないので、
+           * ここを貼り付けないと入口が1つも見えなくなる。
+           *
+           * **貼り付ける理由は下の帯と同じ。** マップは開いた瞬間に現在地まで
+           * スクロールするので、貼らずに置くと**開いた時点で画面の外**にある
+           * （375px の実測で、ログイン前の現在地＝ステージ1 はページの約 24,000px の位置）。
+           *
+           * ⚠️ **高さ（`h-15` = 60px）は下の数字の帯と揃えてある。**
+           * `StageMap.tsx` の章バナーがこの高さ（`top-16`）の下に貼り付く前提なので、
+           * 変えると重なる（`tests/e2e/display.spec.ts` の E-466）。
+           * `grid` にしてあるのは、中の `<header>` を横幅いっぱいのまま縦に中央へ置くため
+           * （`flex` だと中身の幅に縮む）。
+           */
+          <div className="sticky top-0 z-30 grid h-15 items-center bg-bg lg:hidden">
+            <MobileHeader current="stages" signedIn={false} />
+          </div>
+        )}
 
         {/*
          * 狭い画面ぶんの数字（レベル / つづけた日数 / すすみぐあい）。
@@ -92,6 +130,7 @@ export default async function StagesPage() {
          * バナーはこの帯の下に貼り付くので、高さを変えるならあちらも動かすこと
          * （重なりは `tests/e2e/display.spec.ts` の E-466 が見ている）。
          */}
+        {user && (
         <div className="sticky top-0 z-30 flex h-15 items-center gap-2 bg-bg lg:hidden">
           {/* 「あなたは○○レベル」とは言わない（UXルール）。数字は装備と同じ扱い */}
           <div className="flex-1 rounded-xl border-2 border-line bg-panel px-2 py-1.5">
@@ -146,6 +185,7 @@ export default async function StagesPage() {
             </div>
           </div>
         </div>
+        )}
 
         {stages.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-16">
@@ -160,6 +200,27 @@ export default async function StagesPage() {
       </main>
 
       <aside className="hidden lg:flex sticky top-0 h-dvh flex-col gap-4 border-l-2 border-line py-9 pl-5">
+        {!user && (
+          /* ログインしていない人向けはこの1枚だけ（C13）。
+             レベル・つづけた日数・すすみぐあいは回答ログから導出するものなので、
+             ログインしていない人にはどれも 0 しか出ない ── 並べると
+             「まだ何も持っていない」という見え方になり、装備獲得型の方針と合わない */
+          <div className="rounded-2xl border-b-5 border-brand-deep bg-gradient-to-br from-brand to-brand-soft p-5 text-white">
+            <h3 className="mb-1.5 text-sm font-extrabold">記録がのこる</h3>
+            <p className="mb-3.5 text-xs font-bold leading-relaxed opacity-95">
+              登録すると、回答をフェレットが採点します。レベルとつづけた日数も、その日から数え始めます。
+            </p>
+            <Link
+              href="/register"
+              className="block rounded-2xl border-b-4 border-black/20 bg-white py-3 text-center text-sm font-extrabold text-brand-deep"
+            >
+              {CTA_PRIMARY_LABEL}
+            </Link>
+          </div>
+        )}
+
+        {user && (
+        <>
         {/* レベル。上で導出した XP をそのまま出す。
             「あなたは○○レベル」という言い方はしない（UXルール）。
             数字は装備と同じ扱いで、下がることはない */}
@@ -257,6 +318,8 @@ export default async function StagesPage() {
             準備中
           </button>
         </div>
+        </>
+        )}
       </aside>
     </div>
   );

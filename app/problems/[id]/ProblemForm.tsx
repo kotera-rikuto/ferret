@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useState, useSyncExternalStore } from "react";
+import { useCallback, useId, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ANSWER_MIN_CHARS, ANSWER_MAX_CHARS } from "@/lib/ai/compose";
+import { CTA_PRIMARY_LABEL } from "@/lib/seo/site";
 import { IconInfo } from "@/components/ui/icons";
 import { MascotMotion } from "@/components/ui/MascotMotion";
 
@@ -19,10 +20,53 @@ export type ProblemForDisplay = {
 /** localStorage の下書きを初回描画で読むための購読なしストア。サーバー描画時は null */
 const subscribeNothing = () => () => {};
 
-export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
+/**
+ * @param signedIn ログイン済みか。**false のとき採点APIを一度も呼ばない**（C13）。
+ *                 採点は1回ごとに実費が出て、上限はすべて `user_id` に紐づいている。
+ *                 未ログインで呼んでもサーバーは 401 を返すが、
+ *                 ここで止めておけば「登録してください」という案内が
+ *                 通信の失敗としてではなく、そのままの意味で出せる
+ */
+export function ProblemForm({
+  problem,
+  signedIn,
+}: {
+  problem: ProblemForDisplay;
+  signedIn: boolean;
+}) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  /**
+   * 「採点は登録した人向け」の案内を出しているか（C13・オーナー判断 2026-09-11）。
+   *
+   * **入力欄は出したうえで、押した時点で案内する。**
+   * 書く前に伝えると、読んだだけで離れる人に「ここから先は有料です」の形で届く。
+   * 書き終えた人には、その回答がそのまま登録したくなる理由になる。
+   *
+   * **書いた内容は消さない。** 下書きは下の `handleChange` が
+   * その都度 localStorage に入れているので、登録を済ませて同じステージを開けば
+   * 「前回の下書きを復元しました」でそのまま出てくる（持ち回りの仕組みを別に作っていない）
+   */
+  const [signupPrompt, setSignupPrompt] = useState(false);
+
+  /**
+   * 案内が出たら、その位置まで画面を送る。
+   *
+   * **これが無いと「押しても何も起きない」ように見える。** 実測（1280×900・C13）で
+   * 案内は y=990 に出る ── 送信ボタンは画面下に貼り付いている（`lg:fixed`）ので、
+   * 押した指の位置から 90px 下、つまり**画面の外**に案内が現れることになる。
+   * 375×780 でも y=778 で、下端ぎりぎりに隠れる。
+   *
+   * 動きは `prefers-reduced-motion` を見て切り替える（`app/globals.css` と同じ方針）。
+   * 関数の中身を `useCallback` で固定してあるのは、**この ref を毎回作り直すと
+   * 1文字打つたびに画面が飛ぶ**ため（React は ref の関数が変わるたびに呼び直す）
+   */
+  const scrollPromptIntoView = useCallback((el: HTMLDivElement | null) => {
+    if (!el) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "center" });
+  }, []);
   /**
    * 1日の上限に達したときの案内（判定保留）。**error と分けてある。**
    *
@@ -60,6 +104,13 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
 
   async function handleSubmit() {
     if (tooShort || tooLong) return;
+
+    // 未ログインはここで折り返す。**`/api/score` を呼ばない**（上の signupPrompt の注）
+    if (!signedIn) {
+      setSignupPrompt(true);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setQuotaNotice("");
@@ -146,6 +197,43 @@ export function ProblemForm({ problem }: { problem: ProblemForDisplay }) {
           <IconInfo size={16} className="mt-0.5 shrink-0" />
           <span>{quotaNotice}</span>
         </p>
+      )}
+
+      {/*
+       * 採点は登録した人向け、という案内（C13）。
+       *
+       * **「できません」とは書かない**（ネガティブワード禁止・CLAUDE.md）。
+       * 書いたものが残っていることを先に伝えてから、登録への導線を出す。
+       * 文言に「無料」を直書きしないのは、課金を始めた日に嘘が残らないようにするため
+       * （`CTA_PRIMARY_LABEL` は `SITE_IS_FREE` から来る）
+       */}
+      {signupPrompt && (
+        <div
+          ref={scrollPromptIntoView}
+          role="status"
+          className="flex flex-col gap-3 rounded-2xl border-2 border-line bg-panel px-4.5 py-4"
+        >
+          <p className="text-sm font-extrabold leading-relaxed">
+            ここから先は採点です。登録すると、フェレットが回答を読んで点数とコメントを返します。
+          </p>
+          <p className="text-xs font-bold leading-relaxed text-muted">
+            いま書いた回答はこの端末に残してあります。登録したあと、このステージをもう一度開くとそのまま出てきます。
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <Link
+              href="/register"
+              className="rounded-2xl border-b-5 border-brand-deep bg-brand px-7 py-3 text-center text-[15px] font-extrabold tracking-wide text-white active:translate-y-[3px] active:border-b-2"
+            >
+              {CTA_PRIMARY_LABEL}
+            </Link>
+            <Link
+              href={`/login?next=${encodeURIComponent(`/problems/${problem.id}`)}`}
+              className="rounded-2xl px-4 py-3 text-center text-[13px] font-extrabold text-brand-deep underline"
+            >
+              アカウントをお持ちの方
+            </Link>
+          </div>
+        </div>
       )}
 
       {/*
