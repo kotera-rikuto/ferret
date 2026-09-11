@@ -12,6 +12,7 @@ import {
   stub,
   deepOutput,
   markCleared,
+  dismissScenario,
   statChip,
   ANSWER,
 } from "./support/fixtures";
@@ -85,6 +86,9 @@ test.describe("§6 表示", () => {
     await markCleared(userId, problems[0].id, 100);
     await authedPage.goto(`/problems/${problems[1].id}`);
 
+    // 2問目には場面も入っているので、先にカードを閉じないと本文に触れない（A4）
+    await dismissScenario(authedPage);
+
     // 実行結果はコードと混ざらず、別のパネルとして出る
     await expect(authedPage.locator("pre")).toHaveCount(2);
     await expect(authedPage.getByText("実行結果")).toBeVisible();
@@ -95,6 +99,63 @@ test.describe("§6 表示", () => {
     await expect(body).toBeHidden();
     await authedPage.getByText("ヒント").click();
     await expect(body).toBeVisible();
+  });
+
+  /**
+   * 場面のカード（A4）。
+   *
+   * 見るべきは**閉じたあとの画面が、場面が無い問題とまったく同じであること。**
+   * この形（重ねて、閉じたら消す）を選んだ理由が
+   * 「コードに辿り着くまでのスクロールを伸ばさない」ことなので、
+   * 閉じたのに何かが残っていたら、選んだ意味そのものが無くなる。
+   */
+  test("E-472 場面は開いた直後に出て、閉じると跡形もなく消える", async ({
+    authedPage,
+    problems,
+    userId,
+  }) => {
+    const page = authedPage;
+
+    // 1問目: 場面が無い。カードは出ず、いきなりコードが読める
+    await page.goto(`/problems/${problems[0].id}`);
+    await expect(page.locator("[data-scenario-intro]")).toHaveCount(0);
+    await expect(page.locator("[data-code-panel]").first()).toBeVisible();
+
+    // 2問目: 場面が入っている。1問目をクリアして解放する
+    await markCleared(userId, problems[0].id, 100);
+    await page.goto(`/problems/${problems[1].id}`);
+
+    const card = page.locator("[data-scenario-intro]");
+    await expect(card).toBeVisible();
+    await expect(card).toContainText("レビューを頼まれた");
+
+    // 閉じると消え、残りの画面は場面が無い問題と同じ
+    await page.getByRole("button", { name: "コードを読む" }).click();
+    await expect(card).toHaveCount(0);
+    await expect(page.locator("[data-code-panel]").first()).toBeVisible();
+    await expect(page.getByPlaceholder("回答を入力してください...")).toBeVisible();
+  });
+
+  /**
+   * 閉じる手が button だけだと、ポインタを使わない人が閉じられない。
+   * **閉じられない = その問題に入れない**ので、ここは見た目の話ではない。
+   */
+  test("E-472b 場面のカードは Esc でも、背景を押しても閉じられる", async ({
+    authedPage,
+    problems,
+    userId,
+  }) => {
+    const page = authedPage;
+    await markCleared(userId, problems[0].id, 100);
+
+    await page.goto(`/problems/${problems[1].id}`);
+    await page.keyboard.press("Escape");
+    await expect(page.locator("[data-scenario-intro]")).toHaveCount(0);
+
+    // 背景（カードの外側）を押しても閉じる
+    await page.goto(`/problems/${problems[1].id}`);
+    await page.locator("[data-scenario-intro]").click({ position: { x: 5, y: 5 } });
+    await expect(page.locator("[data-scenario-intro]")).toHaveCount(0);
   });
 
   /**

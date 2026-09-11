@@ -1,9 +1,11 @@
--- ステージ1〜3 投入（2026-08-26・tasks/A3 でチュートリアル用に差し替えた後の実データ）
+-- ステージ1〜3 投入（2026-08-26・tasks/A3 でチュートリアル用に差し替えた後の実データ。
+-- 2026-09-11・tasks/A4 の場面を足したあとに再生成した）
 --
 -- ⚠️ **この insert は空の DB に入れるとき用。** 既存の 1〜3 を持つ DB では
 -- order が重複する（I-807）。差し替えとして反映するなら
 --   node problems/update.mjs problems/stage-001-003.data.mjs
 -- を使う（id を据え置き、中身だけ替える）。
+-- 場面だけを入れ直すなら node problems/scenario-update.mjs problems/stage-001-003.data.mjs
 -- 差し替える前の1〜3問目は problems/stage-001-005.sql / .md に残してある。
 -- 出典: problems/stage-001-003.data.mjs / 設計: problems/stage-001-003.md
 -- **投入済みの実データから生成したもので、手書きしていない**
@@ -13,7 +15,7 @@ begin;
 
 -- ステージ1: 注文金額の計算を1行ずつ追う（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   1,
   '注文金額の計算を1行ずつ追う',
@@ -36,12 +38,14 @@ console.log(subtotal(1200, 3));',
   '{"core":"4100 が出力されるという結論を指していれば満たす","depth":"unitPrice と count を掛けた 3600 という途中の値に触れていれば満たす","ground":"total に shipping の 500 を足した値を入れ直している行を根拠として挙げていれば満たす","core_reject":["count を掛けずに 1700 が出力されると読んでいる","shipping が引かれて 3100 が出力されると読んでいる"]}'::jsonb,
   'let で宣言した変数には、後から別の値を入れ直せます。const で宣言した変数はそれができません。
 
-コードは上から1行ずつ実行されるので、同じ変数でも行によって入っている値が変わります。'
+コードは上から1行ずつ実行されるので、同じ変数でも行によって入っている値が変わります。',
+  '先輩が書いた注文金額の計算を引き継ぐことになった。
+手を入れる前に、いまどう動くのかを読んでおきたい。'
 );
 
 -- ステージ2: 代入の順番を追う ─ 担当者の付け替え（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   2,
   '代入の順番を追う ─ 担当者の付け替え',
@@ -65,12 +69,14 @@ keep には最初の primaryOwner の値、つまり 田中 が退避されて�
   '{"core":"鈴木 が出力されるという結論を指していれば満たす","depth":"backupOwner が 田中 になる点に触れていれば満たす","ground":"keep に元の primaryOwner の値を取っておいてから上書きしている点に触れていれば満たす","core_reject":["出力が 田中 になると読んでいる","primaryOwner と backupOwner が両方とも 鈴木 になると読んでいる"]}'::jsonb,
   '= は、右側の値を左側の変数に入れる書き方です。左右が等しいという意味ではありません。
 
-すでに値が入っている変数に入れると、前の値は残りません。'
+すでに値が入っている変数に入れると、前の値は残りません。',
+  '案件の担当者を入れ替える処理を、チームの朝会で説明することになった。
+短い処理なので、順番どおりに追ってみる。'
 );
 
 -- ステージ3: レスポンスに無い項目を読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   3,
   'レスポンスに無い項目を読む',
@@ -96,7 +102,9 @@ profile には company という名前が書かれていないので、存在し
   '{"core":"company はプロパティが存在しないため undefined になるという結論を指していれば満たす","depth":"1つ目の profile.age が null を出力する点に触れていれば満たす","ground":"profile に company という名前が書かれていない点に触れていれば満たす","core_reject":["2つ目の出力も null になると読んでいる","存在しないプロパティを読み取るとエラーになって止まると読んでいる"]}'::jsonb,
   'オブジェクトは「名前: 値」の組を { } の中に並べたものです。
 
-obj.名前 と書くと、その名前に入っている値を取り出せます。'
+obj.名前 と書くと、その名前に入っている値を取り出せます。',
+  '他のチームが作った API の応答を、画面に出す担当になった。
+どんな値が届くのか、先に確かめておきたい。'
 );
 
 commit;

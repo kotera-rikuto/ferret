@@ -31,6 +31,8 @@ export const problems = [
     language: "js",
     difficulty: 1,
     reading_type: "トレース",
+    scenario: `先輩が書いた注文金額の計算を引き継ぐことになった。
+手を入れる前に、いまどう動くのかを読んでおきたい。`,
     code: `function subtotal(unitPrice, count) {
   let total = unitPrice * count;
   const shipping = 500;
@@ -72,6 +74,8 @@ console.log(subtotal(1200, 3));`,
     language: "js",
     difficulty: 2,
     reading_type: "トレース",
+    scenario: `案件の担当者を入れ替える処理を、チームの朝会で説明することになった。
+短い処理なので、順番どおりに追ってみる。`,
     code: `// 案件の主担当と副担当を付け替える
 let primaryOwner = "田中";
 let backupOwner = "鈴木";
@@ -113,6 +117,8 @@ keep には最初の primaryOwner の値、つまり 田中 が退避されて�
     language: "js",
     difficulty: 2,
     reading_type: "トレース",
+    scenario: `他のチームが作った API の応答を、画面に出す担当になった。
+どんな値が届くのか、先に確かめておきたい。`,
     code: `// GET /api/profile の応答をそのまま受け取ったもの
 const profile = {
   id: 1024,

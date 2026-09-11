@@ -18,6 +18,8 @@ export const problems = [
     language: "js",
     difficulty: 2,
     reading_type: "トレース",
+    scenario: `注文明細の1行を組み立てる関数を引き継いだ。
+画面に出す前に、どんな文が出てくるかを確かめておきたい。`,
     code: `function buildOrderLine(item) {
   const goods = item.unitPrice * item.quantity;
   const subtotal = item.shippingFee + goods;
@@ -68,6 +70,8 @@ JSON で届いたデータは、見た目が数字でも数の形で入ってい
     language: "js",
     difficulty: 2,
     reading_type: "トレース",
+    scenario: `リマインドを送る条件を見直すことになった。
+まずは、いまの条件がどう効いているかを読んでおく。`,
     code: `function shouldSendReminder(form) {
   if (form.remindDays == 0) {
     return false;
@@ -125,6 +129,8 @@ HTML のフォームから受け取った値は、数字を入れたつもりで
     language: "js",
     difficulty: 2,
     reading_type: "トレース",
+    scenario: `問い合わせの優先度を決める処理を引き継いだ。
+どの条件でどこに振り分けられるか、チームに説明することになった。`,
     code: `function decidePriority(ticket) {
   if (ticket.waitingHours >= 24) {
     return "至急";
@@ -173,6 +179,8 @@ console.log(decidePriority({ waitingHours: 2, isPaidPlan: true }));`,
     language: "js",
     difficulty: 3,
     reading_type: "ズレ",
+    scenario: `プロフィールの表示を作り直すことになり、いまの関数を渡された。
+コメントに書いてある想定と、中身がそろっているかを見てほしいとのこと。`,
     code: `function buildProfileSummary(profile) {
   // 表示名が設定されていなければユーザーIDを代わりに出す
   const displayName = profile.displayName || profile.userId;
@@ -224,6 +232,8 @@ console.log(buildProfileSummary({
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `設定の初期値を決めている関数に、新しい項目を足すことになった。
+先に、いまの決まり方を読んでおきたい。`,
     code: `function resolveSettings(config) {
   const perPage = config.perPage ?? 20;
   const theme = config.theme || "light";

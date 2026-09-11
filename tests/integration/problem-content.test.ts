@@ -50,6 +50,8 @@ type Problem = {
   context: string | null;
   /** 前提知識。入っている問題だけ折りたたみで出る */
   prerequisite: string | null;
+  /** 場面。入っている問題だけ、開いた直後にカードで1回出る（A4） */
+  scenario: string | null;
   keywords: KeywordSlot[];
   rubric_items: {
     core: string;
@@ -74,7 +76,7 @@ describe.skipIf(!RUN)("§15 問題コンテンツの健全性（実DB・読み�
     const { data, error } = await db
       .from("problems")
       .select(
-        "id, order, title, language, code, question, model_answer, reading_type, context, prerequisite, keywords, rubric_items",
+        "id, order, title, language, code, question, model_answer, reading_type, scenario, context, prerequisite, keywords, rubric_items",
       )
       .order("order");
     if (error) throw new Error(`問題を読み込めません: ${error.message}`);
@@ -255,12 +257,13 @@ describe.skipIf(!RUN)("§15 問題コンテンツの健全性（実DB・読み�
    * 空文字列を入れると、入れたつもりなのに画面には出ない。
    * **エラーにならず、画面も壊れないので気づけない。** 未使用なら NULL のままにする。
    */
-  it("I-814 実行結果・前提知識に空文字列が入っていない", () => {
+  it("I-814 実行結果・前提知識・場面に空文字列が入っていない", () => {
     const blank: string[] = [];
     for (const p of problems) {
       for (const [field, value] of [
         ["context", p.context],
         ["prerequisite", p.prerequisite],
+        ["scenario", p.scenario],
       ] as const) {
         if (value !== null && value.trim().length === 0) {
           blank.push(`${label(p)} の ${field}（NULL にすること）`);
@@ -339,6 +342,98 @@ describe.skipIf(!RUN)("§15 問題コンテンツの健全性（実DB・読み�
       });
     }
     expect(leaked, `\n${leaked.join("\n")}\n`).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  // 場面（A4・2026-09-11）
+  //
+  // 場面は「どういう状況でこのコードを読むことになったか」を、問題を開いた直後に
+  // カードで1回だけ見せる欄。**閉じる前に必ず目に入る**ぶん、前提知識より
+  // 崩れたときの影響が大きい（前提知識は開かない人がいるが、こちらは全員が読む）。
+  //
+  // 検査の理屈は前提知識（I-815〜I-817）とまったく同じ。
+  // そこに NG語（I-821）が1件加わる ── 場面は画面に出る文章なので、
+  // 採点の講評と同じ「ネガティブワード禁止」がかかる。
+  // -------------------------------------------------------------------------
+
+  it("I-818 場面が120字以内（DB制約の再確認）", () => {
+    const tooLong: string[] = [];
+    for (const p of problems) {
+      if (p.scenario && p.scenario.length > 120) {
+        tooLong.push(`${label(p)} → ${p.scenario.length}字`);
+      }
+    }
+    expect(tooLong, `\n${tooLong.join("\n")}\n`).toEqual([]);
+  });
+
+  /**
+   * 場面に答えを書くと、コードを読む前に結論を渡すことになる
+   * （tasks/A4-問題に実務の文脈を足す.md の注意）。
+   * 「この関数はバグっているらしい」と書いた時点で、読む理由が消える。
+   *
+   * I-816 と同じ**目安の検査**。言い換えた場合は捕まえられないが、
+   * 模範解答から文を持ってくるという一番ありがちな崩れ方は止まる。
+   */
+  it("I-819 場面が模範解答の文をそのまま写していない", () => {
+    const WINDOW = 14;
+    const leaked: string[] = [];
+    for (const p of problems) {
+      if (!p.scenario) continue;
+      const sc = normalizeForMatch(p.scenario);
+      const ans = normalizeForMatch(p.model_answer);
+      for (let i = 0; i + WINDOW <= ans.length; i++) {
+        const chunk = ans.slice(i, i + WINDOW);
+        if (sc.includes(chunk)) {
+          leaked.push(`${label(p)} 模範解答と一致「${chunk}」`);
+          break;
+        }
+      }
+    }
+    expect(leaked, `\n${leaked.join("\n")}\n`).toEqual([]);
+  });
+
+  /** I-817 と同じ理屈。場面も全員が読める場所なので、写すだけで層1が取れてはいけない */
+  it("I-820 場面に、コードに無い採点キーワードが入っていない", () => {
+    const leaked: string[] = [];
+    for (const p of problems) {
+      if (!p.scenario) continue;
+      const sc = normalizeForMatch(p.scenario);
+      const code = normalizeForMatch(p.code);
+      p.keywords.forEach((slot, i) => {
+        for (const kw of slot.match) {
+          const k = normalizeForMatch(kw);
+          if (k.length >= 2 && sc.includes(k) && !code.includes(k)) {
+            leaked.push(`${label(p)} スロット#${i + 1} の「${kw}」が場面にある`);
+          }
+        }
+      });
+    }
+    expect(leaked, `\n${leaked.join("\n")}\n`).toEqual([]);
+  });
+
+  /**
+   * ネガティブワード禁止（CLAUDE.md の UX ルール）は、AI が書く講評だけの話ではない。
+   * 場面は**人が書く文章が、そのまま全画面のカードとして出る**唯一の場所なので、
+   * ここを素通しにすると「上司にミスを指摘された」のような文が本番に出る。
+   *
+   * E2E の E-452 も画面の全文を走査しているが、あちらが開くのは
+   * シード問題1件だけ。101問ぶんを見られるのはこちらだけ。
+   */
+  it("I-821 場面に NG語が入っていない", () => {
+    // lib/ai/scorer.ts の NG_WORDS の写し（export されていないため複製）
+    const NG_WORDS = [
+      "弱点", "間違い", "間違っ", "誤り", "誤っ", "初心者", "勉強", "学習",
+      "失敗", "正しい読み方", "不正解", "ダメ", "レベル", "理解不足",
+      "できていません", "苦手", "不足", "足りて", "不十分", "浅い", "誤解",
+    ];
+    const hits: string[] = [];
+    for (const p of problems) {
+      if (!p.scenario) continue;
+      for (const ng of NG_WORDS) {
+        if (p.scenario.includes(ng)) hits.push(`${label(p)} に NG語「${ng}」`);
+      }
+    }
+    expect(hits, `\n${hits.join("\n")}\n`).toEqual([]);
   });
 
   /**

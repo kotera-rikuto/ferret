@@ -139,6 +139,8 @@ export const SEED_PROBLEMS = [
     code: "function applyCoupon(price) {\n  const rate = 0.9;\n  let total = price;\n  total = total * rate;\n  rate = 0.8;\n  return total;\n}",
     context: null,
     prerequisite: null,
+    // 場面なし。**空の問題が今までどおり開けること**をこちらで見る（E-472）
+    scenario: null,
     question: "このコードを実行すると何が起きますか。",
     model_answer:
       "5行目で const で宣言された rate に再代入しているため、TypeError が発生して実行が止まります。",
@@ -169,6 +171,9 @@ export const SEED_PROBLEMS = [
     // 1問目（どちらも null）と見比べて「入っている問題だけ枠が増える」を確かめられる
     context: "> node addTag.js\n{ userId: 'u-1', tags: [ 'signup', 'newsletter' ] }",
     prerequisite: "push は配列の末尾に要素を足すメソッドです。読み方は「プッシュ」。",
+    // 場面あり。開いた直後にカードが重なるので、**この問題を開くテストは
+    // 先にカードを閉じないと本文に触れない**（E-456 / E-472）
+    scenario: "E2E ─ 先輩からこの関数のレビューを頼まれた。",
     question: "この関数の呼び出し元にはどんな影響がありますか。",
     model_answer:
       "引数のオブジェクトをそのまま書き換えているため、呼び出し元の profile も変わります。",
@@ -223,6 +228,20 @@ async function deleteSeeded(db: SupabaseClient) {
       `テスト用の問題を削除できませんでした（本番テーブルに残ります）: ${error.message}`,
     );
   }
+}
+
+/**
+ * 場面のカード（A4）を閉じる。
+ *
+ * 場面が入っている問題は、開いた直後に暗い背景のカードが全面に重なる。
+ * **閉じるまで本文のどこもクリックできない**ので、2問目を触るテストは必ずこれを通す。
+ * 場面が無い問題では何もしない（カードが出ないので待たずに戻る）。
+ */
+export async function dismissScenario(page: Page) {
+  const card = page.locator("[data-scenario-intro]");
+  if ((await card.count()) === 0) return;
+  await page.getByRole("button", { name: "コードを読む" }).click();
+  await expect(card).toHaveCount(0);
 }
 
 /** テスト用の問題を投入する。id は自動採番なので指定しない */
