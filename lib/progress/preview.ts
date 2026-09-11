@@ -61,32 +61,6 @@ export async function listPreviewProblems(
 }
 
 /**
- * LP の「1問目をみてみる」の行き先。読めなければ `null`（ボタンごと出さない）。
- *
- * ⚠️ **押した先が読めない状態でボタンを出さないこと**（票 C13）。
- * 問題が1件も入っていない環境では `null` が返り、ボタンが消える。
- *
- * **失敗しても投げない。** ここは LP（`app/page.tsx`）から呼ばれる ──
- * 検索や記事からの着地点で、**このサイトで唯一「外から来た人が最初に見る画面」。**
- * DB が答えないときに落とすと、ボタン1つのために LP ごと出なくなる。
- * 出ないのはボタンだけでよい。
- *
- * ⚠️ **LP に問い合わせを1回増やしている。** 行き先は `problems.id` なので、
- * 定数では書けない（`PREVIEW_MAX_ORDER` の注）。
- * LP の表示が重くなってきたら、ここを「ビルド時に1回だけ引く」形に移すこと。
- */
-export async function firstPreviewPath(
-  admin: SupabaseClient,
-): Promise<string | null> {
-  try {
-    const [first] = await listPreviewProblems(admin);
-    return first ? `/problems/${first.id}` : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
  * ログインしていない人向けの進行状況。**`loadProgress` と同じ形を返す。**
  *
  * 同じ形にしてあるのは、ステージ選択の画面（`app/stages/page.tsx`）が

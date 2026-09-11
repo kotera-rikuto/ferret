@@ -12,7 +12,6 @@ import {
   PREVIEW_MAX_ORDER,
   isPreviewOrder,
   listPreviewProblems,
-  firstPreviewPath,
   loadPreviewProgress,
 } from "@/lib/progress/preview";
 
@@ -83,11 +82,6 @@ describe("§24 ログイン前に読める範囲", () => {
     expect(problems.map((p) => p.order)).toEqual([1]);
   });
 
-  it("U-914 LP の行き先は開けた先頭の問題。1件も無ければ null（ボタンを出さない）", async () => {
-    expect(await firstPreviewPath(fakeAdmin(ROWS))).toBe("/problems/8");
-    expect(await firstPreviewPath(fakeAdmin([]))).toBeNull();
-  });
-
   it("U-915 未ログインの進行状況は、開けた問題だけが unlocked", async () => {
     const progress = await loadPreviewProgress(fakeAdmin(ROWS, { applyFilter: false }));
 
@@ -106,18 +100,5 @@ describe("§24 ログイン前に読める範囲", () => {
     expect(progress.problems).toEqual([]);
     expect(progress.currentIndex).toBe(-1);
     expect(progress.unlockedIds.size).toBe(0);
-  });
-});
-
-describe("§24 LP を落とさない", () => {
-  it("U-917 行き先が引けなくても投げない（ボタンだけ消える）", async () => {
-    const broken = {
-      from() {
-        throw new Error("DB が答えない");
-      },
-    } as never;
-    // LP は検索や記事からの着地点で、**唯一「外から来た人が最初に見る画面」**。
-    // ボタン1つのために LP ごと出なくなるのは割に合わない
-    await expect(firstPreviewPath(broken)).resolves.toBeNull();
   });
 });
