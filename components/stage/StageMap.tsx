@@ -561,36 +561,49 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                       {isOpen && (
                         <div className="absolute bottom-full left-1/2 mb-3 w-66 -translate-x-1/2 rounded-2xl border-2 border-line bg-panel p-5 shadow-[0_12px_32px_rgba(74,59,40,0.16)]">
                           <h2 className="text-base font-extrabold">{s.title}</h2>
-                          <p className="mt-1 mb-3.5 flex items-center gap-2 text-xs font-bold text-muted">
-                            <span>STAGE {s.order}</span>
+                          <div className="mt-1 mb-3.5 flex flex-col gap-1.5 text-xs font-bold text-muted">
+                            <p className="flex items-center gap-2">
+                              <span>STAGE {s.order}</span>
+                              {isPerfect && (
+                                <span className="rounded-full border-2 border-[#d98a06] px-2 py-0.5 text-[11px] font-extrabold text-brand-deep">
+                                  満点
+                                </span>
+                              )}
+                            </p>
                             {/*
                              * 難易度の星（E15）。**出すのはこの吹き出しの中だけ**
                              * （オーナー判断 2026-09-12・案A）。マップの丸にも常時出すと
-                             * 101個ぶんの星が並ぶうえ、狭い画面では縦にさらに伸びる。
+                             * 100個ぶんの星が並ぶうえ、狭い画面では縦にさらに伸びる。
                              * ここなら「何に挑むのか」が分かるべき直前の1か所で見える。
+                             *
+                             * **「むずかしさ」と名前を付ける**（オーナー判断 2026-09-12）。
+                             * 星だけだと**何の星か分からない** ── 満点・レベル・おすすめ度など
+                             * 星で表しうるものが他にもあるので、絵だけでは読み手が決められない。
+                             *
+                             * **STAGE の行とは分けて2行にしてある。** 同じ行に置くと
+                             * 「STAGE 100」＋「むずかしさ」＋星5つ＋「満点」で
+                             * 吹き出しの中身（264 - 余白40 = 224px）を超えて折り返す。
                              */}
                             {stars !== null && (
-                              <span
-                                className="flex items-center gap-0.5"
-                                // 星の絵は読み上げに乗らないので、数を言葉でも持たせる
-                                aria-label={`難易度 ${stars} / ${DIFFICULTY_MAX}`}
-                              >
-                                {Array.from({ length: DIFFICULTY_MAX }, (_, n) => (
-                                  <IconStar
-                                    key={n}
-                                    size={13}
-                                    filled={n < stars}
-                                    className={n < stars ? "text-brand" : "text-line"}
-                                  />
-                                ))}
-                              </span>
+                              <p className="flex items-center gap-0.5">
+                                <span>むずかしさ：</span>
+                                <span
+                                  className="flex items-center gap-0.5"
+                                  // 星の絵は読み上げに乗らないので、数を言葉でも持たせる
+                                  aria-label={`むずかしさ ${stars} / ${DIFFICULTY_MAX}`}
+                                >
+                                  {Array.from({ length: DIFFICULTY_MAX }, (_, n) => (
+                                    <IconStar
+                                      key={n}
+                                      size={13}
+                                      filled={n < stars}
+                                      className={n < stars ? "text-brand" : "text-line"}
+                                    />
+                                  ))}
+                                </span>
+                              </p>
                             )}
-                            {isPerfect && (
-                              <span className="rounded-full border-2 border-[#d98a06] px-2 py-0.5 text-[11px] font-extrabold text-brand-deep">
-                                満点
-                              </span>
-                            )}
-                          </p>
+                          </div>
                           {/* ひらいている間は押せなくする（二重に押しても行き先は同じだが、
                               反応が無いと何度も押されて、そのたびに描き直しが走る）。
                               **文言だけを差し替えて大きさは変えない** ── 幅が変わると
