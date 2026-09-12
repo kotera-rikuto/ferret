@@ -1,5 +1,5 @@
 -- ステージ81〜90 投入
--- 出典: problems/stage-081-090.data.mjs / 設計: problems/stage-081-100.md
+-- 出典: problems/stage-081-090.data.mjs / 設計: problems/stage-081-090.md
 -- **投入済みの実データから生成したもので、手書きしていない**
 -- id は書かない（GENERATED ALWAYS AS IDENTITY）
 
@@ -7,7 +7,7 @@ begin;
 
 -- ステージ81: JS と TS を並べて読む ─ 型注釈は何を防いでいるか（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   81,
   'JS と TS を並べて読む ─ 型注釈は何を防いでいるか',
@@ -41,12 +41,14 @@ function applyCouponTyped(order: Order, coupon: Coupon): number {
 
 引数の後ろに : 型 と書くと「ここに来てよいのはこの形だけ」という意味になります。関数名の後ろの ): 型 は戻り値の形です。
 
-type 名前 = { … } は、その形に名前を付ける書き方です。'
+type 名前 = { … } は、その形に名前を付ける書き方です。',
+  '同じ処理を型付きで書き直すことになった。
+書き換える前に、2つを並べて読んでみる。'
 );
 
 -- ステージ82: 型注釈と型推論 ─ 書かれた型・書かれない型（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   82,
   '型注釈と型推論 ─ 書かれた型・書かれない型',
@@ -78,12 +80,14 @@ anything は代入も注釈も無いので何でも入れられる扱いにな�
 
 let で宣言したものは後から入れ替えられるので「その種類」まで、const で宣言したものは入れ替えられないので「その値そのもの」まで定まります。
 
-配列は中身から定まります。複数の種類が混ざっていると、それらのどれかを表す形になります。関数の戻り値も、中の return から定まります。'
+配列は中身から定まります。複数の種類が混ざっていると、それらのどれかを表す形になります。関数の戻り値も、中の return から定まります。',
+  '型の付け方をチームで揃えることになった。
+手元の例を上から順に読んでみる。'
 );
 
 -- ステージ83: strict と strictNullChecks ─ なぜ undefined の考慮を求められるのか（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   83,
   'strict と strictNullChecks ─ なぜ undefined の考慮を求められるのか',
@@ -122,12 +126,14 @@ greetStrict のほうは、if (!user) で見つからない場合を返してし
 
 配列の find は、条件に合うものが無いときに「無い」を返します。そのため返ってくるものの型にはそれも含まれます。
 
-if で「無い場合」を手前で返してしまうと、そこから先ではもう片方だけが残ります。これは第3章の早期リターンと同じ形です。'
+if で「無い場合」を手前で返してしまうと、そこから先ではもう片方だけが残ります。これは第3章の早期リターンと同じ形です。',
+  '設定を厳しくする提案が出た。
+何が変わるのかを読んで、判断することになった。'
 );
 
 -- ステージ84: オブジェクト型と省略可能プロパティ、配列の型（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   84,
   'オブジェクト型と省略可能プロパティ、配列の型',
@@ -159,12 +165,14 @@ a と b は通ります。note には ? が付いているので、書いても�
 
 項目名の後ろに ? を付けると「あってもなくてもよい」という意味になります。付いていないものは必ず要ります。
 
-型に無い項目を直接書き足したオブジェクトを渡すと、その場で指摘されます。型[] は「その型が並んだ配列」です。'
+型に無い項目を直接書き足したオブジェクトを渡すと、その場で指摘されます。型[] は「その型が並んだ配列」です。',
+  '商品データの型を引き継いだ。
+宣言が4つ並んでいるので、順に読んでおく。'
 );
 
 -- ステージ85: ユニオン型 ─ 「どれか」を表す型（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   85,
   'ユニオン型 ─ 「どれか」を表す型',
@@ -196,12 +204,14 @@ if (typeof id === "number") の中と else の中では、どちらであるか�
 
 どちらの側か分からない状態では、両方が持っているものだけが使えます。片方にしかないものを使うには、どちらの側かを手前で確かめる必要があります。
 
-typeof 値 === "number" のような判定を通ると、その中では側が確定します。'
+typeof 値 === "number" のような判定を通ると、その中では側が確定します。',
+  'ID の型を引き継いだ。
+扱い方について質問が来たので、読んでおきたい。'
 );
 
 -- ステージ86: リテラル型と as const（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   86,
   'リテラル型と as const',
@@ -233,12 +243,14 @@ frozen は as const を付けているため中身まで固定され、mode は 
 
 オブジェクトを const に入れても、その中身は書き換えられます。そのため中の値は種類のほうで定まります。
 
-as const を付けると、中身も書き換えられないものとして扱われ、値そのものが残ります。'
+as const を付けると、中身も書き換えられないものとして扱われ、値そのものが残ります。',
+  '設定値の型まわりを引き継いだ。
+書き方が2通りあるので、違いを読んでおく。'
 );
 
 -- ステージ87: 絞り込み(narrowing) ─ if を通ると型が変わる（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   87,
   '絞り込み(narrowing) ─ if を通ると型が変わる',
@@ -274,12 +286,14 @@ console.log(normalize("  ok  "));',
 
 if で「この場合」を返してしまうと、そこから先では残りの場合だけになります。=== null や typeof 値 === "number" のような判定がその役をします。
 
-数.toFixed(桁) は小数の桁を揃えた文字列を返します。文字列.trim() は前後の空白を落とします。'
+数.toFixed(桁) は小数の桁を揃えた文字列を返します。文字列.trim() は前後の空白を落とします。',
+  '入力を整える関数を引き継いだ。
+条件で分かれているので、順に追ってみる。'
 );
 
 -- ステージ88: 関数の型 ─ シグネチャから使い方を読む（仕様）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   88,
   '関数の型 ─ シグネチャから使い方を読む',
@@ -311,12 +325,14 @@ pickBy は配列と、要素と番号を受け取って真偽を返す関数を�
 
 <T> は「使うときに決まる型」を表す入れ物です。同じ T が複数の場所に出てきたら、それらは同一でなければなりません。
 
-readonly 型[] は「読むだけの配列」です。Record<string, X> は「文字をキーにして X を持つオブジェクト」です。'
+readonly 型[] は「読むだけの配列」です。Record<string, X> は「文字をキーにして X を持つオブジェクト」です。',
+  '使い方が分からない部品について相談を受けた。
+手元にあるのは宣言だけなので、そこから読む。'
 );
 
 -- ステージ89: any / unknown / never ─ 危険な型・安全な型（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   89,
   'any / unknown / never ─ 危険な型・安全な型',
@@ -349,12 +365,14 @@ any は「照合をやめる」、unknown は「照合を先送りにして、�
 
 unknown もどんな値でも入れられますが、確かめるまで使えません。typeof などで確かめた中では、その形として扱えます。
 
-never は「値が存在しない」ことを表します。到達しないはずの場所を表すのに使われます。'
+never は「値が存在しない」ことを表します。到達しないはずの場所を表すのに使われます。',
+  '型の書き方について、後輩から相談を受けた。
+2つ並んでいるので、一緒に読んでみる。'
 );
 
 -- ステージ90: 型エラーメッセージを読む① ─ どの行の何が食い違っているか（影響）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, context, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, context, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   90,
   '型エラーメッセージを読む① ─ どの行の何が食い違っているか',
@@ -392,7 +410,9 @@ const rows = toRows([{ id: "1", name: "在庫" }]);',
 
 そのあとに続く部分は、期待している側の型がどこで定まったのかを指します。食い違いは2つの場所の関係なので、両方を見ないと直せません。
 
-{ … } を返す関数では、返しているオブジェクトの各項目が、宣言した戻り値の型と1つずつ突き合わされます。'
+{ … } を返す関数では、返しているオブジェクトの各項目が、宣言した戻り値の型と1つずつ突き合わされます。',
+  '型の食い違いを見てほしいと頼まれた。
+手元には、そのときの出力が残っている。'
 );
 
 commit;

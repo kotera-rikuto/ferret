@@ -14,6 +14,8 @@ export const problems = [
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `設定の状態を文言にする処理のレビューを頼まれた。
+条件が2段になっているので、順に追ってみる。`,
     code: `function describeSetting(settings, key) {
   if (settings[key]) {
     return \`\${key} は \${settings[key]} が設定されています\`;
@@ -68,6 +70,8 @@ String(値) は値を文字にします。`,
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `配送ラベルの表示を作り直すことになり、いまの関数を渡された。
+データがそろっていないときどうなるかを先に見ておく。`,
     code: `function shippingLabel(order) {
   const city = order.customer?.address?.city;
   const zip = order.customer.address?.zip;
@@ -116,6 +120,8 @@ a ?? b は、a が null か undefined のときだけ b を使います。`,
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `フォームの入力を整える関数を引き継いだ。
+取り出し方が独特なので、返る形を確かめておく。`,
     code: `function normalizeForm(input) {
   const { title, tags = [], author: writer = "匿名", ...rest } = input;
 
@@ -171,6 +177,8 @@ a = 既定値 を付けると、その名前が obj に無かったときの値�
     language: "js",
     difficulty: 4,
     reading_type: "ズレ",
+    scenario: `プリセットを複製する処理のレビューを頼まれた。
+コメントに書いてある想定どおりかを見てほしいとのこと。`,
     code: `const basePreset = {
   name: "標準",
   notify: { email: true, slack: false },
@@ -226,6 +234,8 @@ console.log(teamPreset.notify.slack, basePreset.notify.slack);`,
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `集計結果を並べて出す処理を引き継いだ。
+出てくる順番について質問が来たので、読んでおきたい。`,
     code: `const counts = { "2026": 4, error: 12, "10": 1, warn: 3 };
 
 for (const [level, count] of Object.entries(counts)) {

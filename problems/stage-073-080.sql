@@ -1,11 +1,13 @@
--- ステージ73〜77・79・80 投入（78 は A1 で投入済みのため含まない）
--- 78 の SQL は problems/stage-015-053-059-078.sql にある。両方流すと order が重複する
+-- ステージ73〜80 投入
+-- 出典: problems/stage-073-080.data.mjs / 設計: problems/stage-073-080.md
+-- **投入済みの実データから生成したもので、手書きしていない**
+-- id は書かない（GENERATED ALWAYS AS IDENTITY）
 
 begin;
 
 -- ステージ73: ES Modules ─ import / export（名前付きとデフォルト）（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   73,
   'ES Modules ─ import / export（名前付きとデフォルト）',
@@ -40,12 +42,14 @@ console.log(toYen([1, 2, 3]));',
 
 読み込む側では、名前を付けて出したものは { } で囲んで、出したときと同じ綴りで受け取ります。export default で出したものは { } の外に書き、その名前は読み込む側が決めます。
 
-import 名前, { … } from "…" は、この2つを1行で書いた形です。'
+import 名前, { … } from "…" は、この2つを1行で書いた形です。',
+  '共通の部品をまとめたファイルを引き継いだ。
+読み込み方が2通りあるので、違いを読んでおく。'
 );
 
 -- ステージ74: CommonJS(require) と ESM が混ざったコードを読む（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   74,
   'CommonJS(require) と ESM が混ざったコードを読む',
@@ -76,12 +80,14 @@ ESM の取り込みは実行が始まる前に決まるので、これは実行�
 
 ESM の import { … } は、読み込む前にどの名前があるかが決まっている必要があります。相手が CommonJS の場合、Node はコードを調べて名前を推測しますが、組み立ててから代入する書き方では見つけられません。
 
-import 名前 from "…" の形なら、相手が渡した値そのものを受け取れます。'
+import 名前 from "…" の形なら、相手が渡した値そのものを受け取れます。',
+  '古くからあるファイルを、新しい書き方の側から使うことになった。
+動かす前に、どうつながるのかを読んでおく。'
 );
 
 -- ステージ75: package.json と npm ─ 依存関係を読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   75,
   'package.json と npm ─ 依存関係を読む',
@@ -116,12 +122,14 @@ zod の 3.22.4 は左端の数字を変えない範囲で新しくなります�
 
 バージョンの前に付く記号には意味があります。^ は左端の数字を保つぶんだけ新しくしてよい、~ は左から2番目までを保つぶんだけ、というきまりです。何も付けなければその1つだけになります。
 
-npm run 名前 は scripts の中身を実行します。A && B は A が成功したときだけ B を走らせます。'
+npm run 名前 は scripts の中身を実行します。A && B は A が成功したときだけ B を走らせます。',
+  '新しく入ったプロジェクトの土台を確認することになった。
+まず設定ファイルから読んでみる。'
 );
 
 -- ステージ76: Node.js 標準モジュール ─ fs / path で書かれたスクリプトを読む（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   76,
   'Node.js 標準モジュール ─ fs / path で書かれたスクリプトを読む',
@@ -154,12 +162,14 @@ basename と extname を通しているのも同じ考えです。入力が相�
 
 node:fs/promises の readFile / writeFile は、結果を Promise で返します。
 
-パスの区切り記号は環境によって違います。/ を使う環境と \ を使う環境があります。'
+パスの区切り記号は環境によって違います。/ を使う環境と \ を使う環境があります。',
+  '変換スクリプトを引き継いだ。
+出力先の組み立て方について、なぜこの形かをチームに共有する。'
 );
 
 -- ステージ77: process.env と設定ファイル ─ 環境ごとの分岐を読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   77,
   'process.env と設定ファイル ─ 環境ごとの分岐を読む',
@@ -190,19 +200,54 @@ console.log(resolveConfig({ NODE_ENV: "development" }));',
 
 a ?? b は、a に値が無いとき（null と undefined）だけ b を使います。a || b は、それに加えて空の文字や 0 のときも b を使います。この2つを取り違えると、0 を指定したのに既定値に戻ってしまいます。
 
-Number(値) は数に直します。env.X === "true" のような比べ方は、文字列として一致するかを見ています。'
+Number(値) は数に直します。env.X === "true" のような比べ方は、文字列として一致するかを見ています。',
+  '環境ごとの設定を決める処理を引き継いだ。
+本番と手元で何が変わるのかを読んでおきたい。'
 );
 
--- ステージ79〜80 投入
--- 出典: problems/stage-073-080.data.mjs / 設計: problems/stage-073-080.md
--- **投入済みの実データから生成したもので、手書きしていない**
--- id は書かない（GENERATED ALWAYS AS IDENTITY）
+-- ステージ78: テストコードを読む① ─ テストから関数の仕様を答える（仕様）
+insert into public.problems
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
+values (
+  78,
+  'テストコードを読む① ─ テストから関数の仕様を答える',
+  'js',
+  3,
+  '仕様',
+  '// zipCode.test.js
+import { describe, it, expect } from "vitest";
+import { normalizeZip } from "./zipCode";
 
-begin;
+describe("normalizeZip", () => {
+  it("ハイフンなしで渡したとき", () => {
+    expect(normalizeZip("1500001")).toBe("150-0001");
+  });
+
+  it("ハイフンありで渡したとき", () => {
+    expect(normalizeZip("150-0001")).toBe("150-0001");
+  });
+
+  it("桁が足りないとき", () => {
+    expect(normalizeZip("15000")).toBe(null);
+    expect(normalizeZip("")).toBe(null);
+  });
+});',
+  'このテストだけを根拠に、normalizeZip がどういう約束（入力と出力のきまり）を持つ関数なのか説明してください。',
+  'normalizeZip は郵便番号を表す文字列を受け取り、150-0001 のようにハイフン入りの形にそろえて返す関数です。
+
+1つ目のテストでは 1500001 のようにハイフンなしの7桁を渡すと 150-0001 が返り、2つ目のテストでは最初からハイフンが入っている 150-0001 を渡しても同じ 150-0001 が返ります。つまりどちらの渡し方でも出力は1つの形にそろいます。3つ目のテストからは、桁が足りないものと空のものには null が返ると読めます。根拠は expect と toBe が期待している値です。
+
+一方で、このテストが保証しているのはここまでです。8桁以上のものや全角の数字、ハイフンの位置が違うものをどう扱うかはテストに無いため、決まっていないと考えるべきです。',
+  '[{"match":["郵便番号","文字列","7桁","zipCode"]},{"match":["ハイフン","150-0001","そろえ","同じ形"]},{"match":["toBe","expect","null","2つ目"]},{"match":["保証","8桁","全角","テストに無い","決まっていな"]}]'::jsonb,
+  '{"core":"渡し方が違ってもハイフン入りの同じ形にそろえて返す関数だという結論を指していれば満たす","depth":"テストに現れない入力（8桁以上・全角の数字・ハイフンの位置が違うものなど）の扱いは保証されていない点に触れていれば満たす","ground":"expect と toBe が期待している戻り値（150-0001 や null）を根拠として挙げていれば満たす","core_reject":["ハイフンを取り除いた形にして返すと読んでいる","桁が足りないときは空の文字列を返すと読んでいる","渡したものをそのまま返す関数だと読んでいる"]}'::jsonb,
+  'Vitest はテストを書くための道具です。`describe` はまとめの見出し、`it` は1つの場合を表し、`expect(値).toBe(期待値)` で「この値はこうなるはず」と書きます。実際の値が期待値と違えば、そのテストは失敗します。',
+  '引き継いだコードから、まだ使ったことのない部品を呼ぶことになった。
+手元にあるのはテストだけなので、そこから読む。'
+);
 
 -- ステージ79: テストコードを読む② ─ 落ちたテストの出力から原因箇所を絞る（影響）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, context, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, context, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   79,
   'テストコードを読む② ─ 落ちたテストの出力から原因箇所を絞る',
@@ -260,12 +305,14 @@ describe("toSlug", () => {
 
 実行結果の ✓ は通ったもの、× は落ちたものです。落ちた行の下には、受け取った値と期待した値が並びます。
 
-文字列.replace(正規表現, 置き換えるもの) をつなげて書くと、前の結果に対して次が働きます。[^\w\s-] は「英数字・下線・空白・ハイフン以外」を表します。'
+文字列.replace(正規表現, 置き換えるもの) をつなげて書くと、前の結果に対して次が働きます。[^\w\s-] は「英数字・下線・空白・ハイフン以外」を表します。',
+  '文字列を整える処理のテストを見てほしいと頼まれた。
+実行結果は手元にある。'
 );
 
 -- ステージ80: 総合演習 ─ ユーティリティ群のうち仕様と食い違う1つを見つける（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   80,
   '総合演習 ─ ユーティリティ群のうち仕様と食い違う1つを見つける',
@@ -306,7 +353,9 @@ sort は新しい配列を作らず、その場で並べ替えて同じ配列を
 
 slice と filter と [...配列] は後者です。sort と push と splice は前者で、返ってくるものも別ではありません。
 
-先頭のコメントのような約束は、機械が守らせてくれるわけではありません。実際の動きと突き合わせて読むこと。'
+先頭のコメントのような約束は、機械が守らせてくれるわけではありません。実際の動きと突き合わせて読むこと。',
+  '共通で使う関数をまとめたファイルのレビューを頼まれた。
+先頭の決まりが守られているかを見てほしいとのこと。'
 );
 
 commit;

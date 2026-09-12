@@ -16,6 +16,8 @@ export const problems = [
     language: "js",
     difficulty: 3,
     reading_type: "ズレ",
+    scenario: `順番待ちの一覧から、先に処理する分を取り出す関数を渡された。
+コメントの想定と合っているかを見てほしいと言われた。`,
     code: `// 先頭から3件を取り出す。もとの待ち行列はそのまま残す
 function takeFirst(queue) {
   const picked = queue.splice(0, 3);
@@ -65,6 +67,8 @@ splice は抜き出した要素を配列にして返します。`,
     language: "js",
     difficulty: 3,
     reading_type: "意図",
+    scenario: `一斉通知の処理を引き継いだ。
+1件ずつ回している部分の狙いを、チームに説明することになった。`,
     code: `function notifyAll(users, send) {
   const failed = [];
 
@@ -120,6 +124,8 @@ console.warn は注意を促す出力です。`,
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `作業手順の表示を作る処理を引き継いだ。
+並び替えを足す前に、いまの作りを読んでおく。`,
     code: `const entries = [
   { name: "在庫確認", done: true },
   { name: "発注", done: false },
@@ -171,6 +177,8 @@ lines の長さはもとと同じ 3 なので、前半の出力は 3 3 になり
     language: "js",
     difficulty: 3,
     reading_type: "ズレ",
+    scenario: `一覧に出す文字列を作る処理を渡された。
+出てくる中身が想定どおりかを確かめてほしいと言われた。`,
     code: `const rows = [
   { sku: "A-100", qty: 2 },
   { sku: "B-200", qty: 0 },
@@ -223,6 +231,8 @@ if に入らなかったときの式には return が無く、評価されるだ
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `在庫の確認処理を引き継いだ。
+返ってくる項目が多いので、1つずつ何を見ているかを読む。`,
     code: `function checkStock(items) {
   const shortage = items.filter((item) => item.stock < item.required);
   const firstShort = items.find((item) => item.stock < item.required);
@@ -278,6 +288,8 @@ a?.b は a が無いときに打ち切り、a ?? b は a が無いときだけ b
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `売上の集計処理を引き継いだ。
+似た書き方が2つ並んでいるので、違いを読んでおきたい。`,
     code: `const sales = [
   { region: "東", amount: 1200 },
   { region: "西", amount: 800 },
@@ -327,6 +339,8 @@ console.log(wrong);`,
     language: "js",
     difficulty: 4,
     reading_type: "ズレ",
+    scenario: `問い合わせをふりわける集計のレビューを頼まれた。
+雛形の扱いがコメントどおりかを見てほしいとのこと。`,
     code: `const tickets = [
   { id: "T-1", status: "open" },
   { id: "T-2", status: "closed" },
@@ -381,6 +395,8 @@ reduce の第2引数に渡した initial は複製されず、そのまま acc �
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `点数を並べ替える処理を引き継いだ。
+並び順の相談が来たので、いまどう並ぶのかを先に読む。`,
     code: `const scores = [10, 9, 100, 25];
 
 const sorted = scores.sort();
@@ -425,6 +441,8 @@ sort は並べ替えた結果をどこに置くか（新しい配列か、もと
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `作業の並び順を決める処理を引き継いだ。
+条件が2つあるので、どちらが先に効くのかを読んでおく。`,
     code: `const tasks = [
   { title: "棚卸し", priority: 2, dueDays: 1 },
   { title: "請求書送付", priority: 1, dueDays: 5 },
@@ -477,6 +495,8 @@ X || Y は X が「なし」とみなせるとき Y を使います。数の 0 �
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `売上の合計を出す処理を引き継いだ。
+つながった処理を、順番に1つずつ追ってみる。`,
     code: `const orders = [
   { id: "A-1", status: "paid", amount: 1200, coupon: 200 },
   { id: "A-2", status: "canceled", amount: 800, coupon: 0 },
@@ -527,6 +547,8 @@ reduce(関数, 0) は 0 から足し始めます。`,
     language: "js",
     difficulty: 4,
     reading_type: "意図",
+    scenario: `注文の明細を1つの一覧にする処理を引き継いだ。
+この形にした狙いを、チームに説明することになった。`,
     code: `const response = {
   orders: [
     { id: "A-1", lines: [{ sku: "X-1", qty: 2 }, { sku: "X-2", qty: 1 }] },

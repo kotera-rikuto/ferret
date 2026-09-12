@@ -15,6 +15,8 @@ export const problems = [
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `入力されたタグを整える処理を引き継いだ。
+手を入れる前に、何が返るのかを読んでおきたい。`,
     code: `function parseTags(line) {
   return line
     .split(",")
@@ -65,6 +67,8 @@ parseTags のほうは、split でできた空の要素を trim と filter が�
     language: "js",
     difficulty: 4,
     reading_type: "ズレ",
+    scenario: `金額の照合をする処理のレビューを頼まれた。
+コメントの想定どおりに動くかを見てほしいとのこと。`,
     code: `// 入力された金額を数にして、合計が期待どおりかを確かめる
 function verifyTotal(inputs, expected) {
   const values = inputs.map((v) => parseInt(v, 10));
@@ -113,6 +117,8 @@ Number(文字列) は全体が数として読めるかを見るので、途中�
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `商品コードの判定に使っているパターンを引き継いだ。
+2つ並んでいるので、違いを読んでおきたい。`,
     code: `const patternA = /[A-Z]{2}-\\d{4}/;
 const patternB = /^[A-Z]{2}-\\d{4}$/;
 
@@ -159,6 +165,8 @@ for (const code of codes) {
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `ログの整形処理を引き継いだ。
+取り出し方が3通りあるので、順に読んでおく。`,
     code: `const log = "order=A-1001 user=U-77 order=A-1002";
 
 const ids = log.match(/order=(A-\\d+)/g);
@@ -206,6 +214,8 @@ masked のほうは replace に g が付いているので該当箇所を残ら�
     language: "js",
     difficulty: 4,
     reading_type: "意図",
+    scenario: `アクセス数の集計について、チームに説明することになった。
+2つのやり方を使い分けている理由を読んでおく。`,
     code: `function summarizeVisits(events) {
   const uniqueUsers = new Set();
   const countByPage = new Map();
@@ -258,6 +268,8 @@ new Map() は、名前と値の組を持つ入れ物です。set(名前, 値) �
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `下書きの保存処理を引き継いだ。
+保存したものを取り出すところまで、順に追ってみる。`,
     code: `const draft = {
   title: "月次レポート",
   savedAt: new Date("2026-08-19T00:00:00Z"),
@@ -311,6 +323,8 @@ console.log("reviewer" in restored);`,
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `締め日を求める処理を引き継いだ。
+月ごとの扱いについて質問が来たので、読んでおきたい。`,
     code: `function closingDate(year, month) {
   const d = new Date(year, month, 0);
   return \`\${d.getFullYear()}-\${d.getMonth() + 1}-\${d.getDate()}\`;
@@ -359,6 +373,8 @@ setMonth(月) は月だけを変えます。日はそのまま残ります。`,
     language: "js",
     difficulty: 5,
     reading_type: "ズレ",
+    scenario: `日ごとの集計キーを作る処理のレビューを頼まれた。
+コメントの想定と合っているかを見てほしいとのこと。`,
     code: `// 受注時刻を日本時間の日付に直し、日ごとの集計キーにする
 function toJstKey(isoString) {
   return new Date(isoString).toISOString().slice(0, 10);

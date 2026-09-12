@@ -18,6 +18,8 @@ export const problems = [
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `設定を読み込む処理を引き継いだ。
+出てくる順番について質問が来たので、読んでおく。`,
     code: `let cachedTheme = "未取得";
 
 function loadSetting(key, done) {
@@ -73,6 +75,8 @@ loadSetting に渡した関数が呼ばれるのは、getTheme が return した
     language: "js",
     difficulty: 5,
     reading_type: "トレース",
+    scenario: `出力の順番をチームに説明することになった。
+短いコードなので、上から順に追ってみる。`,
     code: `console.log("A");
 
 setTimeout(() => console.log("B"), 0);
@@ -120,6 +124,8 @@ setTimeout は 0 を渡しても最後になります。同期の処理がすべ
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `プランごとの上限を返す処理を引き継いだ。
+手を入れる前に、返るものを確かめておく。`,
     code: `function fetchQuota(plan) {
   return new Promise((resolve, reject) => {
     if (plan === "free") {
@@ -180,6 +186,8 @@ Promise は値そのものではなく、いずれ決まる結果を表す入れ
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `つながった処理を引き継いだ。
+どこを通るのかを、順に追ってみる。`,
     code: `Promise.resolve(10)
   .then((n) => n * 2)
   .then((n) => {
@@ -233,6 +241,8 @@ catch が受け止めた時点で流れは正常に戻るので、その戻り�
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `プロフィールの読み込みを引き継いだ。
+出てくる順番を確かめておきたい。`,
     code: `function fetchUser(id) {
   return Promise.resolve({ id, name: "佐藤" });
 }
@@ -285,6 +295,8 @@ await は、その Promise の結果が決まるまでその関数の中の続�
     language: "js",
     difficulty: 4,
     reading_type: "ズレ",
+    scenario: `支払い金額の表示を作り直すことになり、いまの関数を渡された。
+コメントの想定と合っているかを見てほしいと言われた。`,
     code: `async function fetchTotal(userId) {
   return 1200;
 }
@@ -343,6 +355,8 @@ Promise は数として比べられません。文字に埋め込むと、その
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `非同期の書き方を後輩に説明することになった。
+短い例が手元にあるので、これを読む。`,
     code: `async function ok() {
   return "文字列";
 }
@@ -396,6 +410,8 @@ return するものが Promise だった場合は、そのまま入れ子には�
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `例外まわりの書き方を引き継いだ。
+2通り並んでいるので、違いを読んでおく。`,
     code: `function mightFail() {
   return Promise.reject(new Error("通信に失敗"));
 }
@@ -459,6 +475,8 @@ async 関数が Promise を return すると、外から見た結果はその Pr
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `つながった処理のレビューを頼まれた。
+どこで受け止められるのかを見てほしいとのこと。`,
     code: `Promise.resolve("start")
   .then(() => {
     throw new Error("then の中");
@@ -522,6 +540,8 @@ Promise.resolve("start")
     language: "js",
     difficulty: 5,
     reading_type: "ズレ",
+    scenario: `計測データの送信処理を引き継いだ。
+本番のログについて相談が来たので、読んでおきたい。`,
     code: `function postToServer(event) {
   return Promise.reject(new Error("送信先に届きません"));
 }
@@ -573,6 +593,8 @@ then にはうまくいったときの処理しか渡しておらず、うまく
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `複数の処理をまとめて走らせるところを引き継いだ。
+出てくる順番を確かめておきたい。`,
     code: `function task(name, ms, shouldFail) {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -627,6 +649,8 @@ Promise.allSettled([…]) は、成功も失敗も出そろってから、それ
     language: "js",
     difficulty: 4,
     reading_type: "影響",
+    scenario: `処理の速さについて相談が来た。
+書き方を変えてよいかを判断するために、いまの形を読んでおく。`,
     code: `function delay(ms, value) {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
 }
@@ -682,6 +706,8 @@ setTimeout を使った delay(ミリ秒, 値) は、指定した時間が過ぎ�
     language: "js",
     difficulty: 5,
     reading_type: "意図",
+    scenario: `注文一覧の取得まわりを引き継いだ。
+この書き方にした狙いを、あとで共有することになった。`,
     code: `// 注文一覧を取得する。取れなければ空の配列で画面を出す
 async function loadOrders(userId) {
   try {

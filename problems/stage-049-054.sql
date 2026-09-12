@@ -1,11 +1,13 @@
--- ステージ49〜52・54 投入（53 は A1 で投入済みのため含まない）
--- 53 の SQL は problems/stage-015-053-059-078.sql にある。両方流すと order が重複する
+-- ステージ49〜54 投入
+-- 出典: problems/stage-049-054.data.mjs / 設計: problems/stage-049-054.md
+-- **投入済みの実データから生成したもので、手書きしていない**
+-- id は書かない（GENERATED ALWAYS AS IDENTITY）
 
 begin;
 
 -- ステージ49: class 構文 ─ constructor と this（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   49,
   'class 構文 ─ constructor と this',
@@ -42,12 +44,14 @@ this が何を指すかは呼び出し方で決まり、notifier.send(...) の�
 
 this が何を指すかは、書かれた場所ではなく呼ばれ方で決まります。obj.method() の形で呼ぶと obj になります。
 
-class の中身は自動的に厳格な扱いになり、指すものが決まらない場合は undefined のままになります。'
+class の中身は自動的に厳格な扱いになり、指すものが決まらない場合は undefined のままになります。',
+  '通知まわりのクラスを引き継いだ。
+手を入れる前に、上から順に追ってみる。'
 );
 
 -- ステージ50: メソッドとゲッター / セッター（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   50,
   'メソッドとゲッター / セッター',
@@ -88,12 +92,14 @@ onHand のほうは、#onHand を直接触らせずに代入の形のまま検�
 
 get 名前() { … } を書くと、obj.名前 と読んだときにその中身が走ります。set 名前(値) { … } を書くと、obj.名前 = 値 と書いたときにその中身が走ります。使う側から見れば、ふつうのプロパティと区別が付きません。
 
-Math.max(a, b) は大きいほうを返します。throw new Error(…) は例外を発生させます。'
+Math.max(a, b) は大きいほうを返します。throw new Error(…) は例外を発生させます。',
+  '在庫のクラスについて、後輩から相談を受けた。
+なぜこの形にしてあるのかを一緒に読む。'
 );
 
 -- ステージ51: 継承(extends)と super の呼び出し順、static メンバ（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   51,
   '継承(extends)と super の呼び出し順、static メンバ',
@@ -143,12 +149,14 @@ this.label = this.describe() が走るのは親の constructor の中で、そ�
 
 super(…) の中では A の constructor が走ります。B で書いた 名前 = 値 の用意は、super(…) が終わってから行われます。
 
-static 名前 = 値 はそのクラス自身に付く値で、引き継いだ側から見ても同じ1つです。'
+static 名前 = 値 はそのクラス自身に付く値で、引き継いだ側から見ても同じ1つです。',
+  '入力チェックのクラスを引き継いだ。
+親子に分かれているので、順に追ってみる。'
 );
 
 -- ステージ52: プロトタイプチェーンと this の束縛 ─ そのメソッドはどこから来たか（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   52,
   'プロトタイプチェーンと this の束縛 ─ そのメソッドはどこから来たか',
@@ -183,19 +191,44 @@ format は reporter 自身の持ち物ではなく、型紙の側に置かれて
 
 名前があるかを調べる書き方には2種類あります。自分が直接持っているものに限って調べるものと、探しに行った先まで含めて調べるものです。
 
-関数.bind(obj) は this を obj に固定した新しい関数を返します。Object.keys(obj) は自分が直接持っている名前を返します。'
+関数.bind(obj) は this を obj に固定した新しい関数を返します。Object.keys(obj) は自分が直接持っている名前を返します。',
+  'レポート出力のクラスを引き継いだ。
+渡し方が何通りかあるので、それぞれ読んでおく。'
 );
 
--- ステージ54〜54 投入
--- 出典: problems/stage-049-054.data.mjs / 設計: problems/stage-049-054.md
--- **投入済みの実データから生成したもので、手書きしていない**
--- id は書かない（GENERATED ALWAYS AS IDENTITY）
+-- ステージ53: 命名とコメントから意図を読む ─ 中身を見ずに責務を答える（命名）
+insert into public.problems
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
+values (
+  53,
+  '命名とコメントから意図を読む ─ 中身を見ずに責務を答える',
+  'js',
+  3,
+  '命名',
+  '// articles.js ── 記事の公開まわり
 
-begin;
+/** 下書き記事を公開状態に切り替える。すでに公開済みなら何もしない */
+async function publishArticle(articleId) { /* …… */ }
+
+function isPublishable(article) { /* …… */ }
+
+function formatPublishedAt(date) { /* …… */ }',
+  'このファイルは中身を伏せてあります。isPublishable がどういう役目を担う関数だと読めますか。何を受け取って何を返すのかと、そう判断した手がかりがどこにあるのかを説明してください。',
+  'isPublishable は、記事1件を表す article を受け取り、その記事を公開してよい状態かどうかを true か false で返す判定の関数だと読めます。
+
+手がかりは2つあります。ひとつは is で始まる命名で、真偽値を返す判定の関数にはこの付け方をする習わしがあります。もうひとつは publishArticle に付いている「すでに公開済みなら何もしない」という説明で、公開状態に切り替える前に切り替えてよいかを確かめる場所が必要になるため、その判定を担うのが isPublishable だと読めます。
+
+記事の状態を実際に書き換えるのは publishArticle 側で、isPublishable は判定だけを担い、状態は変えないと読むのが自然です。formatPublishedAt は日付を表示用の文字列に整える関数なので役目が別です。',
+  '[{"match":["article","記事"]},{"match":["true","false","真偽","boolean"]},{"match":["命名","コメント","名前の付け方"]},{"match":["何もしない","すでに公開","publishArticle","切り替え"]}]'::jsonb,
+  '{"core":"isPublishable が公開してよい状態かどうかを真偽値で返す判定の関数だと読み取れていれば満たす","depth":"判定だけを担い記事の状態を変えるのは publishArticle 側だという役目の切り分けに触れていれば満たす","ground":"is で始まる命名、または publishArticle に付いている説明を手がかりとして挙げていれば満たす","core_reject":["isPublishable が記事を公開状態に切り替える関数だと読んでいる","isPublishable が公開日時を文字列に整える関数だと読んでいる","isPublishable が公開済みの記事の一覧を返す関数だと読んでいる"]}'::jsonb,
+  '`/** … */` は JSDoc と呼ばれる形式の注釈で、直後の関数の説明を書きます。`async` が付いた関数は、中で保存や通信の完了を待てます。`/* …… */` の部分は、この問題のために中身を隠してあります。',
+  '新しく入ったチームで、記事まわりを担当することになった。
+まずファイルを開いて、全体を眺めてみる。'
+);
 
 -- ステージ54: 影響範囲を読む ─ このメソッドを変えたらどこが壊れるか（影響）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   54,
   '影響範囲を読む ─ このメソッドを変えたらどこが壊れるか',
@@ -237,7 +270,9 @@ summary のほうは文字に埋め込むだけなので、読みやすくなる
 
 配列.join(",") は要素をカンマでつないだ1本の文字にします。要素の中にカンマが入っていても、そのまま並べます。
 
-同じメソッドを複数の場所から呼んでいるときは、呼んでいる側それぞれで何が起きるかを見ます。'
+同じメソッドを複数の場所から呼んでいるときは、呼んでいる側それぞれで何が起きるかを見ます。',
+  '請求書の表示を変える相談が来た。
+変えてよいかを判断するために、まわりを読んでおく。'
 );
 
 commit;

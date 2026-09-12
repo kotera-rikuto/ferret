@@ -28,6 +28,8 @@ export const problems = [
     reading_type: "意図",
     runnable: false,
     notRunnableReason: "型検査の有無を比べる題材なので、実行して確かめるものではない",
+    scenario: `同じ処理を型付きで書き直すことになった。
+書き換える前に、2つを並べて読んでみる。`,
     code: `// before.js（型注釈なし）
 function applyCoupon(order, coupon) {
   return order.amount - coupon.discount;
@@ -83,6 +85,8 @@ type 名前 = { … } は、その形に名前を付ける書き方です。`,
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "推論された型を読む題材なので、実行では確かめられない",
+    scenario: `型の付け方をチームで揃えることになった。
+手元の例を上から順に読んでみる。`,
     code: `let count = 3;
 let label = "在庫";
 const fixed = "在庫";
@@ -136,6 +140,8 @@ let で宣言したものは後から入れ替えられるので「その種類�
     reading_type: "意図",
     runnable: false,
     notRunnableReason: "設定による検査の違いを読む題材なので、実行では確かめられない",
+    scenario: `設定を厳しくする提案が出た。
+何が変わるのかを読んで、判断することになった。`,
     code: `type User = { id: number; nickname?: string };
 
 function findUser(id: number): User | undefined {
@@ -196,6 +202,8 @@ if で「無い場合」を手前で返してしまうと、そこから先で�
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "型が通るかどうかを読む題材なので、実行では確かめられない",
+    scenario: `商品データの型を引き継いだ。
+宣言が4つ並んでいるので、順に読んでおく。`,
     code: `type Item = {
   sku: string;
   qty: number;
@@ -249,6 +257,8 @@ a と b は通ります。note には ? が付いているので、書いても�
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "どのメソッドが使えるかを読む題材なので、実行では確かめられない",
+    scenario: `ID の型を引き継いだ。
+扱い方について質問が来たので、読んでおきたい。`,
     code: `type Id = number | string;
 
 function describe(id: Id) {
@@ -302,6 +312,8 @@ typeof 値 === "number" のような判定を通ると、その中では側が�
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "推論された型を読む題材なので、実行では確かめられない",
+    scenario: `設定値の型まわりを引き継いだ。
+書き方が2通りあるので、違いを読んでおく。`,
     code: `const statusA = "paid";
 let statusB = "paid";
 
@@ -353,6 +365,8 @@ as const を付けると、中身も書き換えられないものとして扱�
     language: "ts",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `入力を整える関数を引き継いだ。
+条件で分かれているので、順に追ってみる。`,
     code: `type Input = string | number | null;
 
 function normalize(value: Input): string {
@@ -410,6 +424,8 @@ if で「この場合」を返してしまうと、そこから先では残り�
     reading_type: "仕様",
     runnable: false,
     notRunnableReason: "型だけを見て使い方を読む題材なので、実装は載せていない",
+    scenario: `使い方が分からない部品について相談を受けた。
+手元にあるのは宣言だけなので、そこから読む。`,
     code: `// 実装は見ずに、この宣言だけから使い方を読む
 
 declare function pickBy<T>(
@@ -463,6 +479,8 @@ readonly 型[] は「読むだけの配列」です。Record<string, X> は「�
     reading_type: "意図",
     runnable: false,
     notRunnableReason: "型の扱いを比べる題材なので、実行では確かめられない",
+    scenario: `型の書き方について、後輩から相談を受けた。
+2つ並んでいるので、一緒に読んでみる。`,
     code: `function handleAny(input: any) {
   return input.toUpperCase();
 }
@@ -517,6 +535,8 @@ never は「値が存在しない」ことを表します。到達しないは�
     reading_type: "影響",
     runnable: false,
     notRunnableReason: "型検査の出力を読む題材なので、実行では確かめられない",
+    scenario: `型の食い違いを見てほしいと頼まれた。
+手元には、そのときの出力が残っている。`,
     code: `type Row = { id: number; label: string };
 
 function toRows(records: { id: string; name: string }[]): Row[] {

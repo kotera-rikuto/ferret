@@ -7,7 +7,7 @@ begin;
 
 -- ステージ60: 同期と非同期 ─ コールバックが「あとで」呼ばれる（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   60,
   '同期と非同期 ─ コールバックが「あとで」呼ばれる',
@@ -43,12 +43,14 @@ loadSetting に渡した関数が呼ばれるのは、getTheme が return した
 
 0 を指定しても「すぐ」ではなく、いま動いている処理がすべて終わってからになります。
 
-関数を引数として渡し、あとから呼んでもらう書き方では、呼ばれる時点が渡した側の実行より後になります。'
+関数を引数として渡し、あとから呼んでもらう書き方では、呼ばれる時点が渡した側の実行より後になります。',
+  '設定を読み込む処理を引き継いだ。
+出てくる順番について質問が来たので、読んでおく。'
 );
 
 -- ステージ61: setTimeout とイベントループ ─ 出力順を並べ替える（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   61,
   'setTimeout とイベントループ ─ 出力順を並べ替える',
@@ -76,12 +78,14 @@ setTimeout は 0 を渡しても最後になります。同期の処理がすべ
 
 予約には2つの列があります。Promise の then や queueMicrotask が入る列と、setTimeout が入る列です。前者のほうが必ず優先されます。
 
-同じ列の中では、予約した順に実行されます。'
+同じ列の中では、予約した順に実行されます。',
+  '出力の順番をチームに説明することになった。
+短いコードなので、上から順に追ってみる。'
 );
 
 -- ステージ62: Promise ─ pending / fulfilled / rejected（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   62,
   'Promise ─ pending / fulfilled / rejected',
@@ -122,12 +126,14 @@ Promise は値そのものではなく、いずれ決まる結果を表す入れ
 
 決まった結果を受け取るには .then(関数) や .catch(関数) を使います。渡した関数は、いま動いている処理が終わってから呼ばれます。
 
-失敗が決まったものを誰も受け止めないと、あとで警告が出ます。.catch() を1つ書いておけば受け止めたことになります。'
+失敗が決まったものを誰も受け止めないと、あとで警告が出ます。.catch() を1つ書いておけば受け止めたことになります。',
+  'プランごとの上限を返す処理を引き継いだ。
+手を入れる前に、返るものを確かめておく。'
 );
 
 -- ステージ63: then / catch / finally のチェーン（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   63,
   'then / catch / finally のチェーン',
@@ -161,12 +167,14 @@ catch が受け止めた時点で流れは正常に戻るので、その戻り�
 
 途中で例外が起きると、以降の .then は行われず、いちばん近い .catch へ移ります。.catch が値を返すと、そこから先は正常な流れに戻ります。
 
-.finally(関数) は成功でも失敗でも最後に実行されます。'
+.finally(関数) は成功でも失敗でも最後に実行されます。',
+  'つながった処理を引き継いだ。
+どこを通るのかを、順に追ってみる。'
 );
 
 -- ステージ64: async / await ─ Promise を上から下に読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   64,
   'async / await ─ Promise を上から下に読む',
@@ -199,12 +207,14 @@ loadProfile(7) を呼ぶと、await の手前までは同期に走ります。�
 
 await は、その Promise の結果が決まるまでその関数の中の続きを止めます。止まっているあいだ、ほかの処理は動けます。
 
-関数を呼んだ側から見ると、await に差しかかった段階で Promise が返ってきます。そこから先の行は、中の続きが終わるのを待たずに進みます。'
+関数を呼んだ側から見ると、await に差しかかった段階で Promise が返ってきます。そこから先の行は、中の続きが終わるのを待たずに進みます。',
+  'プロフィールの読み込みを引き継いだ。
+出てくる順番を確かめておきたい。'
 );
 
 -- ステージ65: await を付け忘れたコードを読む ─ Promise { <pending> } の正体（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   65,
   'await を付け忘れたコードを読む ─ Promise { <pending> } の正体',
@@ -241,12 +251,14 @@ buildLabel のほうは「お支払い [object Promise] 円」と出るので、
 
 await を書くと、その Promise の結果が決まるのを待って、中の値を取り出します。書かなければ Promise 自体が変数に入ります。
 
-Promise は数として比べられません。文字に埋め込むと、その旨を表す決まった文字列になります。'
+Promise は数として比べられません。文字に埋め込むと、その旨を表す決まった文字列になります。',
+  '支払い金額の表示を作り直すことになり、いまの関数を渡された。
+コメントの想定と合っているかを見てほしいと言われた。'
 );
 
 -- ステージ66: async 関数の戻り値は必ず Promise になる（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   66,
   'async 関数の戻り値は必ず Promise になる',
@@ -281,12 +293,14 @@ throw した fail は、その場で例外が飛ぶのではなく、失敗が�
 
 中で return 値 と書いた場合は、その値で成功したものとして扱われます。中で throw した場合は、そのエラーを抱えた Promise になります。呼んだ時点で例外が飛ぶわけではありません。
 
-return するものが Promise だった場合は、そのまま入れ子にはならず、中の結果がそのまま外へ渡ります。'
+return するものが Promise だった場合は、そのまま入れ子にはならず、中の結果がそのまま外へ渡ります。',
+  '非同期の書き方を後輩に説明することになった。
+短い例が手元にあるので、これを読む。'
 );
 
 -- ステージ67: await × try/catch のエラーハンドリング（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   67,
   'await × try/catch のエラーハンドリング',
@@ -330,12 +344,14 @@ withAwait のほうは await があるので、その行で失敗が起きて ca
 
 await を付けずに Promise をそのまま扱うと、その行ではまだ何も起きていません。結果が決まるのはあとなので、その try はもう終わっています。
 
-async 関数が Promise を return すると、外から見た結果はその Promise の結果になります。'
+async 関数が Promise を return すると、外から見た結果はその Promise の結果になります。',
+  '例外まわりの書き方を引き継いだ。
+2通り並んでいるので、違いを読んでおく。'
 );
 
 -- ステージ68: .then() の中で throw したエラーはどこへ行くか（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   68,
   '.then() の中で throw したエラーはどこへ行くか',
@@ -379,12 +395,14 @@ Promise.resolve("start")
 
 1つ目の関数の中で例外が起きた場合は、その then の2つ目ではなく、さらに後ろにある .catch などへ渡ります。
 
-.catch(関数) は .then(undefined, 関数) と同じ意味です。'
+.catch(関数) は .then(undefined, 関数) と同じ意味です。',
+  'つながった処理のレビューを頼まれた。
+どこで受け止められるのかを見てほしいとのこと。'
 );
 
 -- ステージ69: catch されない Promise ─ 本番ログに何が出るか（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   69,
   'catch されない Promise ─ 本番ログに何が出るか',
@@ -416,12 +434,14 @@ then にはうまくいったときの処理しか渡しておらず、うまく
 
 うまくいかないほうに決まった Promise を、どこでも受け取らないままにすると、実行環境がそれを見つけて記録します。Node.js では既定でプロセスを終了させる動きになります。
 
-.then(...) が返すものも Promise なので、その先で受け取ることができます。'
+.then(...) が返すものも Promise なので、その先で受け取ることができます。',
+  '計測データの送信処理を引き継いだ。
+本番のログについて相談が来たので、読んでおきたい。'
 );
 
 -- ステージ70: Promise.all / allSettled / race ─ 1つ失敗したら残りはどうなるか（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   70,
   'Promise.all / allSettled / race ─ 1つ失敗したら残りはどうなるか',
@@ -456,12 +476,14 @@ Promise.all が返すものは最初の失敗で決まりますが、それは�
 
 Promise.allSettled([…]) は、成功も失敗も出そろってから、それぞれの結果を返します。Promise.race([…]) は、いちばん早く決まったものの結果を返します。
 
-いずれも結果の受け取り方を決めるだけで、渡したものの実行そのものには手を出しません。'
+いずれも結果の受け取り方を決めるだけで、渡したものの実行そのものには手を出しません。',
+  '複数の処理をまとめて走らせるところを引き継いだ。
+出てくる順番を確かめておきたい。'
 );
 
 -- ステージ71: 逐次と並列 ─ await をどこに置くかで速度が変わる（影響）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   71,
   '逐次と並列 ─ await をどこに置くかで速度が変わる',
@@ -497,12 +519,14 @@ sequential は前の await が終わってから次の delay を呼び始める�
 
 Promise は作られた時点で処理が始まります。await を書くかどうかは、始めるかどうかではなく、待つ場所を決めているだけです。
 
-setTimeout を使った delay(ミリ秒, 値) は、指定した時間が過ぎてからその値で成功が決まります。'
+setTimeout を使った delay(ミリ秒, 値) は、指定した時間が過ぎてからその値で成功が決まります。',
+  '処理の速さについて相談が来た。
+書き方を変えてよいかを判断するために、いまの形を読んでおく。'
 );
 
 -- ステージ72: fetch で API を叩くコードを読む（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   72,
   'fetch で API を叩くコードを読む',
@@ -536,7 +560,9 @@ res.ok を見ているのは、通信そのものが成功していても中身�
 
 サーバーが何を返したかは res.ok や res.status で確かめます。res.json() は本文を読み取って組み立て直すもので、本文が壊れていると失敗します。
 
-ステージ46（テキストとデータの往復）とステージ57（try の範囲）で見たことが、この1つのコードに同時に出てきます。'
+ステージ46（テキストとデータの往復）とステージ57（try の範囲）で見たことが、この1つのコードに同時に出てきます。',
+  '注文一覧の取得まわりを引き継いだ。
+この書き方にした狙いを、あとで共有することになった。'
 );
 
 commit;

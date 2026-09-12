@@ -7,7 +7,7 @@ begin;
 
 -- ステージ16: アロー関数 ─ 省略記法を元の形に戻す（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   16,
   'アロー関数 ─ 省略記法を元の形に戻す',
@@ -36,12 +36,14 @@ toSummary のほうは波括弧の外側を丸括弧で包んでいるので、�
 
 { 名前: 値 } の形をそのまま返したいときは、この2つの書き分けが衝突します。
 
-.map(関数) は配列の要素を1つずつ関数に渡し、その結果を集めた新しい配列を作ります。'
+.map(関数) は配列の要素を1つずつ関数に渡し、その結果を集めた新しい配列を作ります。',
+  '一覧の表示用データを作る処理を渡された。
+書き方が2種類あるので、それぞれ何が返るのかを読んでおく。'
 );
 
 -- ステージ17: return を書き忘れた関数を読む（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   17,
   'return を書き忘れた関数を読む',
@@ -78,12 +80,14 @@ gold のほうはコメントどおりに動き、4000 になります。食い�
 
 return を書かずに式だけを1行置いても、JavaScript はそれを文として実行するだけで、エラーにはなりません。
 
-Math.round(数) は小数を四捨五入します。1 - rate のように、割引率から「支払う割合」を作る書き方は実務でよく出てきます。'
+Math.round(数) は小数を四捨五入します。1 - rate のように、割引率から「支払う割合」を作る書き方は実務でよく出てきます。',
+  '割引率を決める関数のレビューを頼まれた。
+上のコメントどおりに動くかを見てほしいとのこと。'
 );
 
 -- ステージ18: 引数の受け取り方 ─ デフォルト値と残余引数(rest)（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   18,
   '引数の受け取り方 ─ デフォルト値と残余引数(rest)',
@@ -109,12 +113,14 @@ console.log(buildNotice("接続断", null, "network"));',
 
 ...名前 は「残りの引数をまとめて配列で受け取る」書き方で、残りが1つも無くても配列自体は作られます。
 
-配列.join(",") は要素を区切り文字でつないだ1つの文字列にします。条件 ? A : B は、条件が成立すれば A を、しなければ B を返します。'
+配列.join(",") は要素を区切り文字でつないだ1つの文字列にします。条件 ? A : B は、条件が成立すれば A を、しなければ B を返します。',
+  'お知らせの文面を作る関数を引き継いだ。
+呼び出し方が何通りかあるので、先に読んでおきたい。'
 );
 
 -- ステージ19: 早期リターンで書かれた関数を読む（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   19,
   '早期リターンで書かれた関数を読む',
@@ -146,12 +152,14 @@ values (
 
 !値 は「その値が『なし』とみなせるとき」に成立します。空の文字や null がこれに当たります。
 
-{ ok: false, message: "..." } のように、結果と説明を1つのまとまりにして返す書き方は、呼び出した側で扱いやすくするためによく使われます。'
+{ ok: false, message: "..." } のように、結果と説明を1つのまとまりにして返す書き方は、呼び出した側で扱いやすくするためによく使われます。',
+  '投稿を受け付ける処理に、条件をもう1つ足すことになった。
+いまの書き方の狙いを読んでおく。'
 );
 
 -- ステージ20: スコープ ─ その変数はどこから見えるか（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   20,
   'スコープ ─ その変数はどこから見えるか',
@@ -186,12 +194,14 @@ labels のほうは外側のものがそのまま使われるので、2件ぶん
 
 外側にある名前とぶつかる名前でもう一度宣言すると、その範囲のあいだは新しいほうが使われ、外側のものは隠れます。実行時エラーにはなりません。
 
-配列.push(値) は配列の末尾に値を足します。'
+配列.push(値) は配列の末尾に値を足します。',
+  '集計の関数を引き継いだ。
+手を入れる前に、どう動くのかを順番に追ってみる。'
 );
 
 -- ステージ21: 巻き上げ(hoisting)と一時的死角(TDZ)（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   21,
   '巻き上げ(hoisting)と一時的死角(TDZ)',
@@ -222,12 +232,14 @@ loadConfig();',
 
 var は名前だけが先に置かれ、実際の値が入るのは代入を通過した時点です。function 宣言は中身ごと先に置かれます。let と const は名前こそ把握されますが、宣言の行に来るまで読み書きできません。
 
-typeof 値 は、値の種類を表す文字列を返します。'
+typeof 値 は、値の種類を表す文字列を返します。',
+  '設定を読み込む処理を引き継いだ。
+宣言の並びが独特なので、上から1行ずつ追ってみる。'
 );
 
 -- ステージ22: クロージャ ─ 関数が覚えている変数（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   22,
   'クロージャ ─ 関数が覚えている変数',
@@ -257,12 +269,14 @@ console.log(invoiceNo());',
   '{"core":"orderNo と invoiceNo がそれぞれ別の issued を持つという結論を指していれば満たす","depth":"出力が ORD-001 / ORD-002 / INV-001 になる点、または最後が 003 ではなく 001 から始まる点に触れていれば満たす","ground":"createCounter を呼ぶたびに新しい issued が作られ返された関数がそれを覚えている点に触れていれば満たす","core_reject":["最後の出力が INV-003 になると読んでいる","issued が呼び出しのたびに 0 に戻ると読んでいる","orderNo を2回呼んでも同じ番号が返ると読んでいる"]}'::jsonb,
   '関数の中で作った変数は、ふつうその関数が終わると使えなくなります。ただし、その変数を使う関数を戻り値として外へ出した場合は例外で、外へ出た関数からは引き続き読み書きできます。
 
-String(値) は値を文字にします。文字列.padStart(3, "0") は、3文字になるまで先頭に "0" を足します。'
+String(値) は値を文字にします。文字列.padStart(3, "0") は、3文字になるまで先頭に "0" を足します。',
+  '注文番号を作る処理を引き継いだ。
+実際に何が返るのかを確かめておきたい。'
 );
 
 -- ステージ23: 高階関数 ─ 関数を受け取る・関数を返す（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   23,
   '高階関数 ─ 関数を受け取る・関数を返す',
@@ -308,12 +322,14 @@ withRetry は task を引数で受け取り、その task に再試行を足し�
 
 try { … } catch (e) { … } は、try の中で例外が起きたときに catch へ移ります。throw は例外を発生させます。
 
-const 名前 = 関数(引数) の形は、呼び出した結果を新しい名前に入れています。'
+const 名前 = 関数(引数) の形は、呼び出した結果を新しい名前に入れています。',
+  '外部への通信まわりについて、後輩から相談を受けた。
+なぜこの形にしてあるのかを一緒に読む。'
 );
 
 -- ステージ24: 再帰関数 ─ 自分を呼ぶ関数の止まり方（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   24,
   '再帰関数 ─ 自分を呼ぶ関数の止まり方',
@@ -357,7 +373,9 @@ id 2 のものは自分の下に 2 件持つので 2 を返します。その下
 
 !値 は「その値が『なし』とみなせるとき」に成立します。プロパティが存在しないとき、取り出した結果は undefined になります。
 
-配列.length は要素の数です。'
+配列.length は要素の数です。',
+  'コメントの表示を作り直すことになり、いまの関数を渡された。
+手を入れる前に中身を読んでおく。'
 );
 
 commit;

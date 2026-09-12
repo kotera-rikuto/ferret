@@ -23,6 +23,8 @@ export const problems = [
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "モジュール構文のため、1ファイル単体では動かせない",
+    scenario: `共通の部品をまとめたファイルを引き継いだ。
+読み込み方が2通りあるので、違いを読んでおく。`,
     code: `// lib/format.js
 export const TAX_RATE = 0.1;
 
@@ -79,6 +81,8 @@ import 名前, { … } from "…" は、この2つを1行で書いた形です�
     reading_type: "ズレ",
     runnable: false,
     notRunnableReason: "2つの形式のファイルにまたがるため、1ファイル単体では動かせない",
+    scenario: `古くからあるファイルを、新しい書き方の側から使うことになった。
+動かす前に、どうつながるのかを読んでおく。`,
     code: `// lib/legacy.js（CommonJS）
 const helpers = {};
 
@@ -131,6 +135,8 @@ import 名前 from "…" の形なら、相手が渡した値そのものを受�
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "package.json の中身なので、実行するものではない",
+    scenario: `新しく入ったプロジェクトの土台を確認することになった。
+まず設定ファイルから読んでみる。`,
     code: `{
   "name": "order-batch",
   "scripts": {
@@ -187,6 +193,8 @@ npm run 名前 は scripts の中身を実行します。A && B は A が成功�
     reading_type: "意図",
     runnable: false,
     notRunnableReason: "Node の標準モジュールを取り込むため、この場では動かせない",
+    scenario: `変換スクリプトを引き継いだ。
+出力先の組み立て方について、なぜこの形かをチームに共有する。`,
     code: `import { readFile, writeFile } from "node:fs/promises";
 import { join, basename, extname } from "node:path";
 
@@ -239,6 +247,8 @@ node:fs/promises の readFile / writeFile は、結果を Promise で返しま�
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `環境ごとの設定を決める処理を引き継いだ。
+本番と手元で何が変わるのかを読んでおきたい。`,
     code: `function resolveConfig(env) {
   const isProd = env.NODE_ENV === "production";
 
@@ -291,6 +301,8 @@ Number(値) は数に直します。env.X === "true" のような比べ方は、
     reading_type: "影響",
     runnable: false,
     notRunnableReason: "テストファイルなので、vitest から実行するもの",
+    scenario: `文字列を整える処理のテストを見てほしいと頼まれた。
+実行結果は手元にある。`,
     code: `// lib/slug.js
 export function toSlug(title) {
   return title
@@ -368,6 +380,8 @@ describe("toSlug", () => {
     language: "js",
     difficulty: 5,
     reading_type: "ズレ",
+    scenario: `共通で使う関数をまとめたファイルのレビューを頼まれた。
+先頭の決まりが守られているかを見てほしいとのこと。`,
     code: `// このファイルの関数はすべて「渡された配列を変えずに新しい配列を返す」ことになっている
 
 function head(list, n) {

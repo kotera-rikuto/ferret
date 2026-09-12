@@ -277,6 +277,8 @@ console.log(resolveSettings({ perPage: 5, theme: "dark", isPro: false, exportLim
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `通知の送り先を決める処理を引き継いだ。
+どの条件でどこに送られるのか、先に読んでおきたい。`,
     code: `function notifyChannel(event) {
   const level = event.severity >= 3 ? "high" : event.severity >= 1 ? "middle" : "low";
 
@@ -334,6 +336,8 @@ switch は値が一致した case から実行を始めます。case は実行�
     language: "js",
     difficulty: 2,
     reading_type: "トレース",
+    scenario: `一斉送信をまとめて送る処理を引き継いだ。
+件数を変える相談が来たので、先に中身を読んでおく。`,
     code: `function splitIntoBatches(recipients, size) {
   const batches = [];
 
@@ -384,6 +388,8 @@ i は 0、3、6 と 3ずつ増え、次の 9 は recipients.length の 7 未満�
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `ページをまとめて取ってくる処理のレビューを頼まれた。
+どこまで取りに行くのかを確かめてほしいとのこと。`,
     code: `function fetchPages(totalPages) {
   const fetched = [];
   let page = 1;
@@ -433,6 +439,8 @@ do { … } while (条件) も同じ繰り返しですが、条件を書く位置
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `ログを見ていく処理を引き継いだ。
+手を入れる前に、どこで止まるのかを読んでおきたい。`,
     code: `function findFirstError(logs) {
   let found = null;
   let scanned = 0;

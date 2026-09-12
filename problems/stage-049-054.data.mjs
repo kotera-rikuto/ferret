@@ -15,6 +15,8 @@ export const problems = [
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `通知まわりのクラスを引き継いだ。
+手を入れる前に、上から順に追ってみる。`,
     code: `class Notifier {
   constructor(channel) {
     this.channel = channel;
@@ -71,6 +73,8 @@ class の中身は自動的に厳格な扱いになり、指すものが決ま�
     language: "js",
     difficulty: 4,
     reading_type: "意図",
+    scenario: `在庫のクラスについて、後輩から相談を受けた。
+なぜこの形にしてあるのかを一緒に読む。`,
     code: `class Stock {
   #onHand;
   reserved = 0;
@@ -131,6 +135,8 @@ Math.max(a, b) は大きいほうを返します。throw new Error(…) は例�
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `入力チェックのクラスを引き継いだ。
+親子に分かれているので、順に追ってみる。`,
     code: `class Validator {
   static created = 0;
 
@@ -200,6 +206,8 @@ static 名前 = 値 はそのクラス自身に付く値で、引き継いだ側
     language: "js",
     difficulty: 5,
     reading_type: "トレース",
+    scenario: `レポート出力のクラスを引き継いだ。
+渡し方が何通りかあるので、それぞれ読んでおく。`,
     code: `class Reporter {
   constructor(prefix) {
     this.prefix = prefix;
@@ -257,6 +265,8 @@ format は reporter 自身の持ち物ではなく、型紙の側に置かれて
     language: "js",
     difficulty: 4,
     reading_type: "影響",
+    scenario: `請求書の表示を変える相談が来た。
+変えてよいかを判断するために、まわりを読んでおく。`,
     code: `class Invoice {
   constructor(lines) {
     this.lines = lines;

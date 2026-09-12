@@ -8,6 +8,7 @@ import { calcStreak, toJstDate } from "@/lib/progress/streak";
 import { levelFromXp, totalXp } from "@/lib/progress/level";
 import { peekAiQuota } from "@/lib/ai/quota";
 import { StageMap, type Stage } from "@/components/stage/StageMap";
+import { isHiddenOrder } from "@/lib/stages/chapters";
 import { IconCheck, IconFlame } from "@/components/ui/icons";
 import { AppSidebar } from "@/components/layout/AppSidebar";
 import { MobileHeader } from "@/components/layout/MobileHeader";
@@ -40,21 +41,31 @@ export default async function StagesPage() {
     ? await loadProgress(admin, supabase, user.id)
     : await loadPreviewProgress(admin);
 
-  const stages: Stage[] = problems.map((p, i) => ({
-    id: p.id,
-    order: p.order,
-    title: p.title ?? `Stage ${p.order}`,
-    status: clearedFlags[i]
-      ? "cleared"
-      : i === currentIndex
-        ? "current"
-        : "locked",
-    // 満点の基準は採点側（lib/ai/compose.ts）から読む。画面に数字を書くと、
-    // 基準を変えたときに表示と実際がずれる（クリア閾値で同じことがあった経緯）
-    perfect: (bestScores.get(p.id) ?? 0) >= PERFECT_THRESHOLD,
-  }));
+  // **並べ替えも間引きもする前に status を決める。**
+  // `currentIndex` は `loadProgress` が返した並びの添字なので、
+  // 先に絞ると別の問題が「現在地」になる
+  const stages: Stage[] = problems
+    .map((p, i) => ({
+      id: p.id,
+      order: p.order,
+      title: p.title ?? `Stage ${p.order}`,
+      status: clearedFlags[i]
+        ? ("cleared" as const)
+        : i === currentIndex
+          ? ("current" as const)
+          : ("locked" as const),
+      // 満点の基準は採点側（lib/ai/compose.ts）から読む。画面に数字を書くと、
+      // 基準を変えたときに表示と実際がずれる（クリア閾値で同じことがあった経緯）
+      perfect: (bestScores.get(p.id) ?? 0) >= PERFECT_THRESHOLD,
+    }))
+    // 動作確認用の問題はマップに出さない（2026-09-12・lib/stages/chapters.ts）。
+    // **解放判定からは外していない**ので、URL を直接開けば今までどおり採点できる
+    .filter((s) => !isHiddenOrder(s.order));
 
-  const clearedCount = clearedFlags.filter(Boolean).length;
+  // **数字は間引いた後の一覧から出す。** `clearedFlags` をそのまま数えると、
+  // 画面に出していない問題まで分母に入り、100問クリアしても 100/101 で
+  // 100% にならない
+  const clearedCount = stages.filter((s) => s.status === "cleared").length;
   const progressPercent =
     stages.length === 0 ? 0 : Math.round((clearedCount / stages.length) * 100);
 

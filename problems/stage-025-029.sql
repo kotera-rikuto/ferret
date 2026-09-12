@@ -7,7 +7,7 @@ begin;
 
 -- ステージ25: オブジェクトの読み書き ─ プロパティアクセスと存在チェック(in)（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   25,
   'オブジェクトの読み書き ─ プロパティアクセスと存在チェック(in)',
@@ -42,12 +42,14 @@ label の値は undefined ですが、名前そのものは settings に存在�
 
 "名前" in obj は、そのプロパティが obj にあるかどうかを真偽で返します。中に入っている値そのものは見ません。
 
-String(値) は値を文字にします。'
+String(値) は値を文字にします。',
+  '設定の状態を文言にする処理のレビューを頼まれた。
+条件が2段になっているので、順に追ってみる。'
 );
 
 -- ステージ26: ネストしたオブジェクトを掘る（オプショナルチェーン ?.）（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   26,
   'ネストしたオブジェクトを掘る（オプショナルチェーン ?.）',
@@ -76,12 +78,14 @@ zip を取り出している行は order.customer.address?.zip と書かれて�
 
 守ってくれるのは ?. を書いた位置の1回だけで、その左側で行われる取り出しには効きません。
 
-a ?? b は、a が null か undefined のときだけ b を使います。'
+a ?? b は、a が null か undefined のときだけ b を使います。',
+  '配送ラベルの表示を作り直すことになり、いまの関数を渡された。
+データがそろっていないときどうなるかを先に見ておく。'
 );
 
 -- ステージ27: 分割代入と省略記法 ─ 取り出し方・詰め方（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   27,
   '分割代入と省略記法 ─ 取り出し方・詰め方',
@@ -117,12 +121,14 @@ writer は null のままで「匿名」にはなりません。既定値が使�
 
 a = 既定値 を付けると、その名前が obj に無かったときの値を決められます。a: 別名 と書くと、別の名前で受け取れます。
 
-...名前 を最後に置くと、そこまでに受け取らなかったぶんが新しいオブジェクトにまとまります。Object.keys(obj) はプロパティの名前を配列で返します。'
+...名前 を最後に置くと、そこまでに受け取らなかったぶんが新しいオブジェクトにまとまります。Object.keys(obj) はプロパティの名前を配列で返します。',
+  'フォームの入力を整える関数を引き継いだ。
+取り出し方が独特なので、返る形を確かめておく。'
 );
 
 -- ステージ28: スプレッドのコピーが浅いせいで起きるズレを読む（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   28,
   'スプレッドのコピーが浅いせいで起きるズレを読む',
@@ -158,12 +164,14 @@ console.log(teamPreset.notify.slack, basePreset.notify.slack);',
 
 プロパティの値がさらにオブジェクトだった場合、その値そのもの（どこを指しているか）が写されます。指し先の中身までは作り直されません。
 
-ステージ4・5で扱った「写して渡る値」と「指し先だけが渡る値」の違いが、ここでも効いてきます。'
+ステージ4・5で扱った「写して渡る値」と「指し先だけが渡る値」の違いが、ここでも効いてきます。',
+  'プリセットを複製する処理のレビューを頼まれた。
+コメントに書いてある想定どおりかを見てほしいとのこと。'
 );
 
 -- ステージ29: Object.keys / values / entries でぐるっと回す（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   29,
   'Object.keys / values / entries でぐるっと回す',
@@ -189,7 +197,9 @@ console.log(Object.keys(counts).length);',
 
 Object.keys(obj) は名前だけ、Object.values(obj) は値だけを配列で返します。
 
-オブジェクトのプロパティには決まった並び順があり、記述した順とは限りません。'
+オブジェクトのプロパティには決まった並び順があり、記述した順とは限りません。',
+  '集計結果を並べて出す処理を引き継いだ。
+出てくる順番について質問が来たので、読んでおきたい。'
 );
 
 commit;
