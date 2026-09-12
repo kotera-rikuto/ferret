@@ -123,7 +123,11 @@ describe("§10-1 /stages", () => {
 
   it("I-370 problems は admin、回答履歴は session クライアントで読む", async () => {
     await StagesPage();
-    expect(spy.selects).toContainEqual(["problems", "id, order, title"]);
+    // `difficulty` は星の表示に使う（E15）。model_answer / rubric_items は入らない
+    expect(spy.selects).toContainEqual([
+      "problems",
+      "id, order, title, difficulty",
+    ]);
     // 解放判定とストリークで user_attempts を2回読む。どちらも session 側
     expect(spy.sessionTables).toEqual(["user_attempts", "user_attempts"]);
   });
@@ -519,7 +523,7 @@ describe("§10-5 /review/[id]", () => {
       "RENDERED",
     );
     expect(spy.selects.map(([, columns]) => columns)).not.toContain(
-      "id, order, title",
+      "id, order, title, difficulty",
     );
   });
 

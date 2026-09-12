@@ -19,6 +19,14 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Progress, ProgressProblem } from "@/lib/progress/unlock";
 
 /**
+ * ログイン前に「URL を配る」ためだけに読む問題。**`ProgressProblem` より狭い。**
+ *
+ * `difficulty` を含めていないのは、配り先（sitemap・`/llms.txt`）が使わないため。
+ * 下の `listPreviewProblems` の「欄を増やさない」という約束を、型でも示しておく。
+ */
+export type PreviewProblem = Pick<ProgressProblem, "id" | "order" | "title">;
+
+/**
  * ログイン前に読めるステージ番号（`problems.order`）の上限。**両端を含む。**
  *
  * **1問だけにしてある**（2026-09-11・オーナー判断）。LP の「1問目をみてみる」から
@@ -46,7 +54,7 @@ export function isPreviewOrder(order: number | null | undefined): boolean {
 /** ログイン前に読める問題（`order` 昇順）。読めなければ空 */
 export async function listPreviewProblems(
   admin: SupabaseClient,
-): Promise<ProgressProblem[]> {
+): Promise<PreviewProblem[]> {
   // **`select` の欄を増やさないこと。** `model_answer` と `rubric_items` は
   // ここから先（sitemap・LP のリンク）へ一切渡さない
   const { data } = await admin
@@ -75,9 +83,12 @@ export async function listPreviewProblems(
 export async function loadPreviewProgress(
   admin: SupabaseClient,
 ): Promise<Progress> {
+  // `difficulty` は星の表示に使う（E15）。**ログインの有無で欄を変えない** ──
+  // この関数は `loadProgress` と同じ形を返す約束なので、片方だけ欠けると
+  // 「ログインすると星が出る」という違いが生まれる
   const { data } = await admin
     .from("problems")
-    .select("id, order, title")
+    .select("id, order, title, difficulty")
     .order("order");
 
   const problems: ProgressProblem[] = data ?? [];

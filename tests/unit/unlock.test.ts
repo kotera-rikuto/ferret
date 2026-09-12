@@ -64,6 +64,8 @@ function problems(n: number): ProgressProblem[] {
     id: 100 + i + 1,
     order: i + 1,
     title: `ステージ${i + 1}`,
+    // 解放判定には効かない欄（表示用・E15）。1〜5 を回して現実の値に寄せる
+    difficulty: (i % 5) + 1,
   }));
 }
 
@@ -188,7 +190,10 @@ describe("§9 loadProgress", () => {
     await result;
     expect(admin.tables).toEqual(["problems"]);
     expect(session.tables).toEqual(["user_attempts"]);
-    // model_answer を引いていないこと
-    expect(admin.columns[0]).toBe("id, order, title");
+    // model_answer / rubric_items を引いていないこと。
+    // **欄の並びごと固定する。** 画面（app/stages）にそのまま渡る経路なので、
+    // 模範解答や採点基準が1つ混ざると、問題を解く前に読めてしまう
+    // （`difficulty` は星の表示に使う・E15）
+    expect(admin.columns[0]).toBe("id, order, title, difficulty");
   });
 });

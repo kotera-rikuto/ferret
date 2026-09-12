@@ -11,6 +11,14 @@ export type ProgressProblem = {
   id: number;
   order: number;
   title: string | null;
+  /**
+   * 難易度 1〜5（`ideas/db仕様.md`）。ステージ選択の吹き出しで星の数にする（E15）。
+   *
+   * **null を許す。** 列に NOT NULL 制約が無く、動作確認用の行（`order=999`）のように
+   * 入っていない行がありうる。画面側は 1〜5 の外を「星を出さない」に倒す
+   * （0個の星を並べると「いちばん易しい」に見える）。
+   */
+  difficulty: number | null;
 };
 
 export type Progress = {
@@ -40,7 +48,10 @@ export async function loadProgress(
   userId: string,
 ): Promise<Progress> {
   const [{ data: problems }, { data: attempts }] = await Promise.all([
-    admin.from("problems").select("id, order, title").order("order"),
+    // **`model_answer` と `rubric_items` は引かない。** ここは画面（app/stages）に
+    // そのまま渡る経路で、模範解答や採点基準が混ざると問題を解く前に読めてしまう
+    // （U-433 が欄の並びごと見ている）
+    admin.from("problems").select("id, order, title, difficulty").order("order"),
     session
       .from("user_attempts")
       .select("problem_id, total_score")

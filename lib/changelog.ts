@@ -82,6 +82,13 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: "2026-09-12",
     category: "feature",
+    title: "ステージの難しさが見えるようにしました",
+    body: "ステージの丸を押すと出る窓に、難しさを星の数で出すようにしました。星は5つまでで、多いほど手ごたえがあります。あわせて、最初の3つのステージには「チュートリアル」の印を付けました。",
+    link: { href: "/stages", label: "ステージを見てみる" },
+  },
+  {
+    date: "2026-09-12",
+    category: "feature",
     title: "登録しなくてもステージ1を読めるようにしました",
     body: "ステージ1は、登録もログインもせずに問題とコードをそのまま読めます。採点をするにはフェレットへの登録が必要です。",
     link: { href: "/stages", label: "ステージを見てみる" },

@@ -233,3 +233,30 @@ export function IconPencil({ size = 24, className }: IconProps) {
     </svg>
   );
 }
+
+/**
+ * 難易度の星（ステージ選択の吹き出し・E15）。
+ *
+ * **塗りと枠を同じ形で切り替える。** 「得た数」と「全体」を並べて見せる部品なので、
+ * 抜けている側の形が違うと数が読み取れない（4/5 と 5/5 の差が形の差に見える）。
+ */
+export function IconStar({
+  size = 24,
+  className,
+  filled = false,
+}: IconProps & { filled?: boolean }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? "currentColor" : "none"}
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M12 3.5 14.8 9.2 21 10.1l-4.5 4.4 1.1 6.1-5.6-2.9-5.6 2.9 1.1-6.1L3 10.1l6.2-.9z" />
+    </svg>
+  );
+}
