@@ -35,12 +35,51 @@ export default async function StagesPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // 解放状態の計算は問題画面・採点APIと共通の関数に寄せてある。
-  // 表示（ここ）と実際のガードが同じ答えを出すことを保証するため
   const admin = createAdminClient();
-  const { problems, bestScores, clearedFlags, currentIndex } = user
-    ? await loadProgress(admin, supabase, user.id)
-    : await loadPreviewProgress(admin);
+
+  /*
+   * **3つまとめて同時に投げる**（E14・2026-09-12）。
+   *
+   * どれも `user.id` しか要らず、互いの結果を使わない。以前は上から順に
+   * `await` していたので、DB との往復（本番の実測で1回あたり約0.2秒）が
+   * **3回ぶん直列に積み上がっていた。** 同時に投げれば一番遅い1回で済む。
+   *
+   * ⚠️ **ここに「前の結果を見てから決める」問い合わせを足さないこと。**
+   * 足すなら、この `Promise.all` の外（後ろ）に置く。中に混ぜると
+   * 依存関係が見えなくなり、次に触った人が順番を壊す。
+   *
+   * ⚠️ **未ログインのぶんを `Promise.resolve` で埋めているのは、
+   * 問い合わせを1回も出さないため。** 回答ログも採点の残数も `user_id` に
+   * 紐づくもので、ログインしていない人には該当する行が無い（空が返るだけの
+   * 無駄な往復になる）。採点の残数は登録の向こう側なので枠ごと出さない。
+   */
+  const [progress, attemptDates, quota] = await Promise.all([
+    // 解放状態の計算は問題画面・採点APIと共通の関数に寄せてある。
+    // 表示（ここ）と実際のガードが同じ答えを出すことを保証するため
+    user
+      ? loadProgress(admin, supabase, user.id)
+      : loadPreviewProgress(admin),
+
+    // ストリークの材料。session クライアント経由なので RLS で自分の行に絞られる
+    user
+      ? supabase
+          .from("user_attempts")
+          .select("created_at")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false })
+          .limit(366)
+          .then(({ data }) => data ?? [])
+      : Promise.resolve<{ created_at: string }[]>([]),
+
+    // きょうの AI 採点の残数。**強制と同じ値を読む**（lib/ai/quota.ts）。
+    // 別のクエリで数えると「0 なのに採点できる」「残っているのに止まる」という
+    // 矛盾表示になる。だから残数の表示だけを先に作らないことになっていた
+    // （design/移植残タスク.md §3）。日付の境目も SQL 側の JST で揃う。
+    // 読めなかったときは null が返るので、枠そのものを出さない
+    user ? peekAiQuota(admin, user.id) : Promise.resolve(null),
+  ]);
+
+  const { problems, bestScores, clearedFlags, currentIndex } = progress;
 
   // **並べ替えも間引きもする前に status を決める。**
   // `currentIndex` は `loadProgress` が返した並びの添字なので、
@@ -83,31 +122,11 @@ export default async function StagesPage() {
   // 解放判定のために読んだ最高点をそのまま使えるので、問い合わせは増えない
   const level = levelFromXp(totalXp(bestScores.values()));
 
-  // ストリークは回答ログから毎回導出する（カウンタを別に持たない。lib/progress/streak.ts）。
-  // session クライアント経由なので RLS で自分の行に絞られる
-  // **未ログインでは問い合わせごと出さない。** 回答ログは user_id で絞るもので、
-  // ログインしていない人には該当する行が存在しない（空で0日になるが、
-  // 無駄な往復を1回増やすことになる）
-  const { data: attemptDates } = user
-    ? await supabase
-        .from("user_attempts")
-        .select("created_at")
-        .eq("user_id", user.id)
-        .order("created_at", { ascending: false })
-        .limit(366)
-    : { data: null };
+  // ストリークは回答ログから毎回導出する（カウンタを別に持たない。lib/progress/streak.ts）
   const streak = calcStreak(
-    (attemptDates ?? []).map((a) => toJstDate(a.created_at)),
+    attemptDates.map((a) => toJstDate(a.created_at)),
     toJstDate(new Date()),
   );
-
-  // きょうの AI 採点の残数。**強制と同じ値を読む**（lib/ai/quota.ts）。
-  // 別のクエリで数えると「0 なのに採点できる」「残っているのに止まる」という
-  // 矛盾表示になる。だから残数の表示だけを先に作らないことになっていた
-  // （design/移植残タスク.md §3）。日付の境目も SQL 側の JST で揃う。
-  // 読めなかったときは null が返るので、枠そのものを出さない
-  // 未ログインでは採点そのものが登録の向こう側なので、残数の枠を出さない
-  const quota = user ? await peekAiQuota(admin, user.id) : null;
 
   return (
     <div className="mx-auto grid min-h-screen w-full max-w-[1280px] grid-cols-1 gap-8 px-6 lg:grid-cols-[280px_minmax(0,1fr)_280px]">

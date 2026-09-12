@@ -27,37 +27,50 @@ export default async function ResultPage({
   const problemId = Number(id);
   if (!Number.isInteger(problemId) || problemId <= 0) notFound();
 
-  // この問題に対する自分の最新の回答を取得する。
-  // session クライアント経由なので RLS で自分の行だけに絞られる
-  const { data: attempt } = await supabase
-    .from("user_attempts")
-    // contradiction は見せ方の分岐に使う（読み違いのときは点数を主役から降ろす・E6）。
-    // ai_praise / ai_next_focus は2枠表示に使う。この欄が無かった頃の行は
-    // どちらも NULL なので、つなげた ai_feedback を1枠で出す（E2）
-    .select(
-      "id, total_score, keyword_score, deep_score, ai_feedback, ai_praise, ai_next_focus, contradiction",
-    )
-    .eq("problem_id", problemId)
-    // 判定保留（レート上限時に層1のみで採点した回）は合否を出さない
-    .eq("is_provisional", false)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  /*
+   * **2つまとめて同時に投げる**（E14・2026-09-12）。
+   *
+   * 下の一覧（XP の材料）は上の1件を待つ必要がない ── どちらも `user.id` と
+   * `problemId` だけで決まる。以前は上から順に `await` していたので、
+   * DB との往復（本番の実測で1回あたり約0.2秒）が2回ぶん直列になっていた。
+   *
+   * 回答が1件も無ければ下の一覧は捨てることになるが、**それは問題画面へ
+   * 戻される回だけ**（このリザルトを開く通常の道のりでは必ず1件ある）。
+   * 捨てる回のために、毎回の往復を1回増やすほうが割に合わない。
+   */
+  const [{ data: attempt }, { data: scored }] = await Promise.all([
+    // この問題に対する自分の最新の回答。
+    // session クライアント経由なので RLS で自分の行だけに絞られる
+    supabase
+      .from("user_attempts")
+      // contradiction は見せ方の分岐に使う（読み違いのときは点数を主役から降ろす・E6）。
+      // ai_praise / ai_next_focus は2枠表示に使う。この欄が無かった頃の行は
+      // どちらも NULL なので、つなげた ai_feedback を1枠で出す（E2）
+      .select(
+        "id, total_score, keyword_score, deep_score, ai_feedback, ai_praise, ai_next_focus, contradiction",
+      )
+      .eq("problem_id", problemId)
+      // 判定保留（レート上限時に層1のみで採点した回）は合否を出さない
+      .eq("is_provisional", false)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+
+    // XP は users.xp に貯めず、回答ログから毎回導出する（lib/progress/level.ts）。
+    // ストリークと同じ方針で、カウンタ更新の失敗によるズレを構造的に無くしている。
+    //
+    // ここも session クライアントで読む。service_role にすると、
+    // RLS が壊れたときに他人の行まで数えて XP が増える方向に転ぶ。
+    // session なら「自分の行が読めなくなる＝XP が少なく出る」側に倒れる
+    supabase
+      .from("user_attempts")
+      .select("id, problem_id, total_score")
+      .eq("user_id", user.id)
+      .eq("is_provisional", false),
+  ]);
 
   // 未回答の問題のリザルトに直接来た場合は問題画面へ戻す
   if (!attempt) redirect(`/problems/${id}`);
-
-  // XP は users.xp に貯めず、回答ログから毎回導出する（lib/progress/level.ts）。
-  // ストリークと同じ方針で、カウンタ更新の失敗によるズレを構造的に無くしている。
-  //
-  // ここも session クライアントで読む。service_role にすると、
-  // RLS が壊れたときに他人の行まで数えて XP が増える方向に転ぶ。
-  // session なら「自分の行が読めなくなる＝XP が少なく出る」側に倒れる
-  const { data: scored } = await supabase
-    .from("user_attempts")
-    .select("id, problem_id, total_score")
-    .eq("user_id", user.id)
-    .eq("is_provisional", false);
 
   const rows = scored ?? [];
 

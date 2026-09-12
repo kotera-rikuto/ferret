@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { chapterOf } from "@/lib/stages/chapters";
 import {
@@ -283,9 +283,27 @@ export function StageMap({ stages }: { stages: Stage[] }) {
     // `rowH` を依存に足して2回走らせていた。もう要らない（E11）
   }, [scrollToCurrent]);
 
+  /**
+   * 問題画面をひらく。
+   *
+   * **`startTransition` で包んであるのは、押した直後に反応を返すため**（E14・2026-09-12）。
+   * 問題画面（`app/problems/[id]`）には `loading.tsx` を置いていない
+   * （置くとサーバーの返事が 307 から 200 に変わる。オーナー判断 2026-09-12）ので、
+   * **ここは Next.js の仕組みでは何も出ない** ── サーバーが描き終わるまで
+   * このポップオーバーが出たまま固まる（本番の実測で 1.3 秒）。
+   *
+   * 包むと `pending` が「押した瞬間 → 問題画面が出る瞬間」の間だけ true になるので、
+   * ボタンの文言をその間だけ差し替えられる。**遷移そのものは速くならない。**
+   * 速さではなく「押せたことが分かる」ほうを直している。
+   */
+  const [pending, startTransition] = useTransition();
+
   function handleStart() {
     if (!selected) return;
-    router.push(`/problems/${selected.id}`);
+    const id = selected.id;
+    startTransition(() => {
+      router.push(`/problems/${id}`);
+    });
   }
 
   return (
@@ -573,15 +591,27 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                               </span>
                             )}
                           </p>
+                          {/* ひらいている間は押せなくする（二重に押しても行き先は同じだが、
+                              反応が無いと何度も押されて、そのたびに描き直しが走る）。
+                              **文言だけを差し替えて大きさは変えない** ── 幅が変わると
+                              ポップオーバーごと動いて、押し間違いになる */}
                           <button
                             onClick={handleStart}
+                            disabled={pending}
+                            aria-busy={pending}
                             className={`w-full rounded-2xl py-3 text-[15px] font-extrabold tracking-wide active:translate-y-[3px] active:border-b-2 ${
+                              pending ? "opacity-70" : ""
+                            } ${
                               s.status === "cleared"
                                 ? "border-2 border-line border-b-5 bg-panel text-muted"
                                 : "border-b-5 border-brand-deep bg-brand text-white"
                             }`}
                           >
-                            {s.status === "cleared" ? "もう一度読む" : "挑む"}
+                            {pending
+                              ? "ひらいています"
+                              : s.status === "cleared"
+                                ? "もう一度読む"
+                                : "挑む"}
                           </button>
                           <span className="absolute -bottom-2 left-1/2 -ml-1.75 size-3.5 rotate-45 border-r-2 border-b-2 border-line bg-panel" />
                         </div>
