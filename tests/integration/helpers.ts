@@ -161,6 +161,16 @@ function makeChain(
   return chain;
 }
 
+/**
+ * 「問題の一覧」を引くときの列。**どれも1件取得ではない。**
+ * `loadProgress`（解放判定・星を出すので `difficulty` まで引く）と
+ * `app/review`（一覧。星は出さない）で欄が違う。
+ */
+const PROBLEM_LIST_COLUMNS = new Set([
+  "id, order, title",
+  "id, order, title, difficulty",
+]);
+
 /** service_role クライアント。problems と user_attempts の両方を読む */
 function makeAdmin(state: DbState, spy: DbSpy) {
   return {
@@ -173,11 +183,14 @@ function makeAdmin(state: DbState, spy: DbSpy) {
           if (table === "problems") {
             // 解放判定の一覧（loadProgress）だけがこの列で引く。
             // 採点用の詳細（model_answer 入り）と画面用の詳細（code 入り）は
-            // どちらも「1件取得」なので、一覧かどうかで振り分ける
-            result =
-              columns === "id, order, title"
-                ? { data: state.problemList, error: null }
-                : { data: state.problemDetail, error: null };
+            // どちらも「1件取得」なので、一覧かどうかで振り分ける。
+            //
+            // **2通りあるのは一覧の側に難易度が要るため**（E15）。
+            // `loadProgress` は星を出すので `difficulty` まで引くが、
+            // 振り返りの一覧（app/review）は星を出さないので引かない
+            result = PROBLEM_LIST_COLUMNS.has(columns)
+              ? { data: state.problemList, error: null }
+              : { data: state.problemDetail, error: null };
           } else if (columns === "created_at") {
             result = { data: state.rateRows, error: state.rateError };
           } else {

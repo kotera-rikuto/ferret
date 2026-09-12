@@ -374,7 +374,7 @@ describe("§2 認証・解放判定・問題の取得", () => {
     const list = spy.selects.find(
       ([table, cols]) => table === "problems" && !cols.includes("model_answer"),
     );
-    expect(list?.[1]).toBe("id, order, title");
+    expect(list?.[1]).toBe("id, order, title, difficulty");
   });
 
   it("I-134b 認証はセッション、問題の読み取りは admin クライアント", async () => {

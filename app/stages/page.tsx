@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadProgress } from "@/lib/progress/unlock";
 import { loadPreviewProgress } from "@/lib/progress/preview";
+import { isTutorialOrder } from "@/lib/stages/tutorial";
 import { PERFECT_THRESHOLD } from "@/lib/ai/compose";
 import { calcStreak, toJstDate } from "@/lib/progress/streak";
 import { levelFromXp, totalXp } from "@/lib/progress/level";
@@ -57,6 +58,15 @@ export default async function StagesPage() {
       // 満点の基準は採点側（lib/ai/compose.ts）から読む。画面に数字を書くと、
       // 基準を変えたときに表示と実際がずれる（クリア閾値で同じことがあった経緯）
       perfect: (bestScores.get(p.id) ?? 0) >= PERFECT_THRESHOLD,
+      // 難易度は DB の値をそのまま渡す。1〜5 の外の扱い（星を出さない）は
+      // 表示側（StageMap の starsOf）に寄せてある
+      difficulty: p.difficulty,
+      // **肩慣らしの範囲をここで計算しない。** 判定は lib/stages/tutorial.ts の1か所。
+      // ステージ番号の比較をここに書くと、範囲を直したときに画面だけ古い印を出し続ける
+      // ── しかも出しすぎた側には何の症状も出ない（同じ理由の見張りが
+      // tests/integration/architecture.test.ts の I-404 と U-927。
+      // **比較の式はコメントにも書かないこと。** どちらも本文と区別せずに探す）
+      tutorial: isTutorialOrder(p.order),
     }))
     // 動作確認用の問題はマップに出さない（2026-09-12・lib/stages/chapters.ts）。
     // **解放判定からは外していない**ので、URL を直接開けば今までどおり採点できる

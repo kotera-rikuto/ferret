@@ -122,6 +122,63 @@ describe("§12-3 マップの道", () => {
     );
   });
 
+  /**
+   * 肩慣らしの帯（E15）がノードの高さの対応を崩していないこと。
+   *
+   * **帯を流れの中に置くと丸がその高さぶん下がる。** 道（SVG）の端は
+   * 「ノードの上端から `CIRCLE_MID`」で引いているので、丸と道が静かにずれる
+   * ── 線が少し外れるだけなので、画面は正常に見える。
+   *
+   * あわせて **1つ上の行のラベルと重ならない**ことを数字で見る。
+   * 狭い画面でラベルが重なる事故は E11 で実際に起きていて、
+   * `--row-h` はその実測から決まっている。帯を足すと必要な高さが増える。
+   */
+  it("U-928 肩慣らしの帯が流れから外れ、1つ上の行のラベルと重ならない", () => {
+    const at = SOURCE.indexOf("{s.tutorial && (");
+    expect(at, "肩慣らしの帯の markup が見つからない").toBeGreaterThan(0);
+    const m = SOURCE.slice(at).match(/className="([^"]+)"/);
+    expect(m, "帯の className が読めない").not.toBeNull();
+    const cls = m![1];
+
+    // 流れから外す。ここが static に戻ると丸が下がり、道の端が中心から外れる
+    expect(cls, "帯が absolute になっていない（丸が押し下げられる）").toContain(
+      "absolute",
+    );
+    // 丸より上に描く。丸は後ろの DOM なので、z が無いと帯が隠れる
+    expect(cls, "帯が丸の下に潜る（z-10 が無い）").toContain("z-10");
+
+    // 帯の上端はノードの上端から何 px 上か（`-top-2` = 8px）
+    const top = cls.match(/-top-(\d+(?:\.\d+)?)/);
+    expect(top, "帯の縦位置（-top-N）が読めない").not.toBeNull();
+    const lift = Number(top![1]) * 4;
+
+    // 必要な行の高さ。どちらも「1つ上のノードの下端」を帯の上端が越えないこと:
+    //  - 上が現在地（下端 = NODE_H）で、この行は持ち上がらない
+    //  - 上が通常のノード（下端 = 丸76 + すきま8 + ラベル76 = 160）で、
+    //    この行が現在地として 8px 持ち上がっている
+    // 現在地はマップに1つだけなので、この2つが同時に起きることはない
+    const nodeH = constOf("NODE_H");
+    const need = Math.max(nodeH + lift, 160 + lift + 8);
+
+    const rows = SOURCE.match(/const ROW_H_CLASS = "([^"]+)";/)![1];
+    for (const [, value] of rows.matchAll(/--row-h:(\d+)px/g)) {
+      expect(
+        Number(value),
+        `行の高さ ${value}px では、肩慣らしの帯が1つ上の行のラベルに重なる（${need}px 必要）`,
+      ).toBeGreaterThanOrEqual(need);
+    }
+  });
+
+  /** 星の総数は難易度の上限（ideas/db仕様.md: 1〜5）と揃える */
+  it("U-929 難易度の星は5個で、1〜5 の外は星ごと出さない", () => {
+    expect(constOf("DIFFICULTY_MAX")).toBe(5);
+    // 0個の星を5個並べると「いちばん易しい」に見えるので、
+    // 値が無いときは星そのものを出さない
+    expect(SOURCE, "starsOf が範囲外を null に倒していない").toMatch(
+      /difficulty >= 1 && difficulty <= DIFFICULTY_MAX \? difficulty : null/,
+    );
+  });
+
   it("U-822 区切りの帯は道より上に描かれ、見出しに地の色が敷かれている", () => {
     const divider = dividerClassName();
     // 道は節の SVG から溢れて帯の高さを跨ぐ。帯が下だと線が見出しの上を通る

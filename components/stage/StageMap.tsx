@@ -9,6 +9,7 @@ import {
   IconChevronDown,
   IconLock,
   IconPaw,
+  IconStar,
 } from "@/components/ui/icons";
 import { Mascot } from "@/components/ui/Mascot";
 
@@ -25,7 +26,46 @@ export type Stage = {
    * すべて満点ノードを取りこぼす。独立した欄にして「クリア済みに一枚重ねる」形にしてある。
    */
   perfect: boolean;
+  /**
+   * 難易度（`problems.difficulty`）。**1〜5 をそのまま星の数にする**
+   * （E15・オーナー判断 2026-09-12）。3〜5 に寄せ直すことはしない ──
+   * ★1 が1問しか無いのは A3 で最初の問題を素直にした結果なので、
+   * **そのまま出すほうが「ここは易しい」が星の数で伝わる。**
+   *
+   * 1〜5 の外（未設定・想定外）は `starsOf` が null に倒して星ごと出さない。
+   */
+  difficulty: number | null;
+  /**
+   * 肩慣らしの範囲（`lib/stages/tutorial.ts`）か。
+   *
+   * **`perfect` と同じ理由で `status` の4つ目の値にしない。**
+   * 肩慣らしの問題は「未開放」にも「現在地」にも「クリア済み」にもなる。
+   * `status` に入れると、`status === "cleared"` で書かれている判定
+   * （道の実線・ボタンの文言・見た目）がすべてこのステージを取りこぼす。
+   *
+   * **判定はここでしない。** 範囲は `lib/stages/tutorial.ts` の1か所で決まり、
+   * ここには真偽値だけが届く（画面に `order <= 3` を書かないため）。
+   */
+  tutorial: boolean;
 };
+
+/**
+ * 星の総数。難易度の上限（`ideas/db仕様.md`: 1〜5）と揃えてある。
+ * **満点／クリアの閾値と違って採点には効かない**ので、ここに数字を置いてよい。
+ */
+const DIFFICULTY_MAX = 5;
+
+/**
+ * 塗る星の数。**1〜5 の外は null を返して星ごと出さない。**
+ *
+ * 0個の星を5個並べると「いちばん易しい」に見えるので、
+ * 「値が無い」を「いちばん易しい」に倒さないこと。
+ * 動作確認用の行（`order=999`）のように `difficulty` が入っていない行が実在する。
+ */
+function starsOf(difficulty: number | null): number | null {
+  if (difficulty === null || !Number.isInteger(difficulty)) return null;
+  return difficulty >= 1 && difficulty <= DIFFICULTY_MAX ? difficulty : null;
+}
 
 /**
  * 1行ぶんの高さは **CSS 変数 `--row-h`**（下の `ROW_H_CLASS`）。TS の定数ではない。
@@ -400,6 +440,7 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                   const isOpen = selected?.id === s.id;
                   // 満点はクリア済みの上に重ねる装飾なので、両方が立っているときだけ出す
                   const isPerfect = s.status === "cleared" && s.perfect;
+                  const stars = starsOf(s.difficulty);
                   return (
                     <div
                       key={s.id}
@@ -423,6 +464,36 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                             }`}
                           />
                         </>
+                      )}
+
+                      {/*
+                       * 肩慣らしの印（E15・オーナー判断 2026-09-12「丸の上に小さい帯」）。
+                       *
+                       * **流れから外して（`absolute`）丸の上端に重ねる。**
+                       * 流れの中に置くと丸がその高さぶん下がり、**道（SVG）の端が
+                       * 丸の中心（`CIRCLE_MID`）から外れる** ── 道の位置は
+                       * 「ノードの上端から 38px」で引いているので、間に何か挟むと全部ずれる。
+                       * だから `NODE_H`（168）も `--row-h` も変えていない。
+                       *
+                       * **丸に重ねるのは「スタート」の吹き出しを避けるため。**
+                       * 現在地の吹き出しは丸の 48px 上から 36px ぶんを占めていて、
+                       * 丸との間は 12px しか空いていない（帯は 20px で入らない）。
+                       * **ステージ1は新規ユーザーにとって「現在地かつ肩慣らし」**なので、
+                       * この2つは必ず同じノードに同居する。吹き出しの上へ積むと
+                       * 必要な行の高さが 224 を超え、E11 で決めた `--row-h` が崩れる。
+                       *
+                       * **1つ上の行のラベルとは重ならない。** 帯の上端は行頭から
+                       * `-8`（現在地はさらに `-8`）なので、必要な行の高さは
+                       * 「1つ上のノードの下端 160 + 16」＝ **176 以上**。
+                       * 狭い画面 224・lg 以上 180 のどちらも満たす（375px で実測・下記）。
+                       *
+                       * 文言は「チュートリアル」（オーナー判断）。
+                       * 「初心者向け」のような言い方は使わない（CLAUDE.md）。
+                       */}
+                      {s.tutorial && (
+                        <span className="pointer-events-none absolute -top-2 z-10 rounded-full border-2 border-brand bg-panel px-2 py-0.5 text-[10px] leading-3 font-extrabold tracking-wide text-brand whitespace-nowrap">
+                          チュートリアル
+                        </span>
                       )}
 
                       <button
@@ -474,6 +545,28 @@ export function StageMap({ stages }: { stages: Stage[] }) {
                           <h2 className="text-base font-extrabold">{s.title}</h2>
                           <p className="mt-1 mb-3.5 flex items-center gap-2 text-xs font-bold text-muted">
                             <span>STAGE {s.order}</span>
+                            {/*
+                             * 難易度の星（E15）。**出すのはこの吹き出しの中だけ**
+                             * （オーナー判断 2026-09-12・案A）。マップの丸にも常時出すと
+                             * 101個ぶんの星が並ぶうえ、狭い画面では縦にさらに伸びる。
+                             * ここなら「何に挑むのか」が分かるべき直前の1か所で見える。
+                             */}
+                            {stars !== null && (
+                              <span
+                                className="flex items-center gap-0.5"
+                                // 星の絵は読み上げに乗らないので、数を言葉でも持たせる
+                                aria-label={`難易度 ${stars} / ${DIFFICULTY_MAX}`}
+                              >
+                                {Array.from({ length: DIFFICULTY_MAX }, (_, n) => (
+                                  <IconStar
+                                    key={n}
+                                    size={13}
+                                    filled={n < stars}
+                                    className={n < stars ? "text-brand" : "text-line"}
+                                  />
+                                ))}
+                              </span>
+                            )}
                             {isPerfect && (
                               <span className="rounded-full border-2 border-[#d98a06] px-2 py-0.5 text-[11px] font-extrabold text-brand-deep">
                                 満点
