@@ -67,6 +67,20 @@
   --animate-bob: bob 1.2s ease-in-out infinite;
   --animate-pop: pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
   --animate-blink: blink 1.2s ease-in-out infinite;
+
+  /*
+   * 読み込み中の骨組み（E14・2026-09-12）。各画面の loading.tsx から使う。
+   *
+   * **Tailwind 既定の `animate-pulse` を使わないこと。** あちらの @keyframes は
+   * このファイルに無いので、下の prefers-reduced-motion の一覧に載せても
+   * `tests/unit/mascot-motion.test.ts` の U-811 は見張ってくれない
+   * （あの検査はこのファイルの @keyframes を数え上げて突き合わせている）。
+   * 自前で持てば、動きを足した人が一覧に足し忘れたときに落ちる。
+   *
+   * 薄くしきらない（0.45 止まり）のは、消える瞬間に「何も無い画面」を
+   * 見せないため。骨組みが消えたように見えると、読み込みが止まったように映る。
+   */
+  --animate-skeleton: skeleton 1.4s ease-in-out infinite;
   --animate-fall: fall 2.6s ease-in 0.15s forwards;
 
   /*
@@ -254,6 +268,17 @@
     }
   }
 
+  /* 読み込み中の骨組み。薄くなって戻るだけ（位置は動かさない） */
+  @keyframes skeleton {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
   /* LP の見出し：わずかに下から上がってくる。動くのは1回だけ */
   @keyframes rise {
     from {
@@ -406,7 +431,8 @@ body {
   .animate-mascot-glint,
   .animate-mascot-cheer,
   .animate-mascot-tail-flick,
-  .animate-rise {
+  .animate-rise,
+  .animate-skeleton {
     animation: none !important;
   }
 
