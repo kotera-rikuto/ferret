@@ -122,11 +122,17 @@ test.describe("§14 ログイン前に読める範囲", () => {
     await expect(page.getByRole("button", { name: "ログアウト" })).toHaveCount(0);
 
     // シード問題（範囲外）は鍵のまま。押してもポップオーバーが開かない
+    //
+    // **押す前に「見えたか」を自分で待つ**（E14・2026-09-12）。
+    // ステージ選択には `loading.tsx` があるので、骨組みが出ているあいだも
+    // **本物のマップは DOM にいる**（React が隠したまま持っている）。
+    // `click({ force: true })` は Playwright の待ち合わせを飛ばすため、
+    // 待たないと「DOM にはあるが表示されていない」ボタンを押しにいって落ちる
+    // （`force` を外せない ── 押せないボタンを押すのがこのケースの中身）。
+    const locked = stageNode(page, problems[0].order).locator("button").first();
+    await expect(locked).toBeVisible();
     expect(await stageState(page, problems[0].order)).toBe("locked");
-    await stageNode(page, problems[0].order)
-      .locator("button")
-      .first()
-      .click({ force: true });
+    await locked.click({ force: true });
     await expect(page.getByRole("button", { name: "挑む" })).toHaveCount(0);
   });
 

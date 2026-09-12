@@ -81,6 +81,12 @@ export type ChangelogEntry = {
 export const CHANGELOG: readonly ChangelogEntry[] = [
   {
     date: "2026-09-12",
+    category: "fix",
+    title: "画面の切り替わりで待たせないようにしました",
+    body: "ステージ選択とリザルトを開いたとき、押したその場で読み込み中の画面が出るようになりました。中身が届くまでのあいだ、前の画面のまま止まって見えることがなくなります。",
+  },
+  {
+    date: "2026-09-12",
     category: "feature",
     title: "登録しなくてもステージ1を読めるようにしました",
     body: "ステージ1は、登録もログインもせずに問題とコードをそのまま読めます。採点をするにはフェレットへの登録が必要です。",
