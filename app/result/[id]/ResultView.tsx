@@ -340,56 +340,72 @@ export function ResultView({
   /*
    * 結果を画像で共有する（G1）。**クリアした回にだけ出す。**
    *
-   * 畳んである理由は2つ。共有はリザルトの主役ではない（主ボタンは1本のまま）のと、
-   * **開くまで絵を作らせない**ため ── 絵は1枚ごとにサーバーで描いており、
-   * 開かない人のぶんまで毎回描く必要がない（`loading="lazy"` も同じ狙い）。
-   * `<details>` なので JavaScript を足していない。
+   * **畳まずにカードとして前面に出す**（2026-09-12・オーナー判断）。
+   * 最初は主ボタンの下に `<details>` で小さく置いていたが、
+   * 「位置が微妙で目立たない」と指摘されて作り替えた。
    *
-   * **並びは「保存 → 投稿」。** X に画像を自動で添付する方法は存在せず、
+   * 置き場所は**「フェレットのメモ」の直後・主ボタンの手前。**
+   * 褒められた直後がいちばん人に見せたくなる瞬間で、
+   * 主ボタン（つぎのステージへ）の下は**読まれずに押されて終わる。**
+   *
+   * 地は `bg-deep`（ページの地より一段沈んだ面）。**明暗どちらのテーマにも
+   * 定義がある token なので、暗い配色でも「沈んだ面」のままになる** ──
+   * ここで固定の灰色を置くと、暗いテーマで浮き上がって逆に浮く。
+   *
+   * **主ボタンと色で競合させない。** 「つぎのステージへ」がブランド色の塗りなので、
+   * こちらの主役は `ink` の塗り（X の見た目にも寄る）にしてある。
+   * 同じ橙を2つ並べると、どちらへ進めばいいのか分からなくなる。
+   *
+   * **並びは「画像を保存 → X に投稿する」。** X に画像を自動で添付する方法は存在せず、
    * 投稿画面に入るのは本文だけなので、**先に保存しないと絵の無い投稿になる。**
-   * 順番がそのまま手順の説明を兼ねている（だから説明文を置いていない）。
+   * 読む順がそのまま手順になっている（だから説明文を置いていない）。
    */
   const shareUrl = `/api/share/${attemptId}`;
   const shareBlock = (
-    <details className="w-full rounded-2xl border-2 border-line bg-panel px-5 py-3">
-      <summary className="cursor-pointer list-none text-center text-[13px] font-extrabold text-muted hover:text-ink">
-        結果を画像で共有する
-      </summary>
-      <div className="mt-4 flex flex-col items-center gap-3.5">
-        {/* alt に点数を入れない。読み上げの主役は「何の絵か」で、
-            点数は同じ画面の上にもっと大きく出ている。
+    <section className="flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-line bg-bg-deep px-5 py-5">
+      <h2 className="text-[15px] font-extrabold">この結果をシェアしませんか？</h2>
 
-            **next/image を使わないこと。** あちらは画像を Next.js の最適化を
-            通して配り、結果を**キャッシュする。** この絵は本人の点数なので、
-            サーバー側で `Cache-Control: private, no-store` を付けて
-            「途中に残さない」と言っている ── 最適化を挟むと、その指示の外で
-            絵が保存されることになる（しかも URL はユーザーごとに違うだけで
-            誰でも同じ形をしている）。 */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={shareUrl}
-          loading="lazy"
-          alt="クリアした結果のカード"
-          className="w-full rounded-xl border-2 border-line"
-        />
-        <div className="flex items-center justify-center gap-7 text-[13px] font-extrabold">
-          {/* 同一オリジンなので download が効く（別オリジンだと無視されて開くだけになる） */}
-          <a href={shareUrl} download="ferret.png" className="text-muted hover:text-ink">
-            画像を保存
-          </a>
-          {/* noreferrer は遷移元（/result/12）を X に渡さないため。
-              Referrer-Policy でパスは落ちるが、明示しておく */}
-          <a
-            href={shareIntentUrl(totalScore)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-ink underline underline-offset-4 hover:text-brand-deep"
-          >
-            X に投稿する
-          </a>
-        </div>
+      {/* alt に点数を入れない。読み上げの主役は「何の絵か」で、
+          点数は同じ画面の上にもっと大きく出ている。
+
+          **next/image を使わないこと。** あちらは画像を Next.js の最適化を
+          通して配り、結果を**キャッシュする。** この絵は本人の点数なので、
+          サーバー側で `Cache-Control: private, no-store` を付けて
+          「途中に残さない」と言っている ── 最適化を挟むと、その指示の外で
+          絵が保存されることになる（しかも URL はユーザーごとに違うだけで
+          誰でも同じ形をしている）。
+
+          `loading="lazy"` は畳むのをやめた後も残してある。カードはたいてい
+          画面の外から始まるので、そこまで来ない人のぶんは描かずに済む */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={shareUrl}
+        loading="lazy"
+        alt="クリアした結果のカード"
+        className="w-full rounded-xl border-2 border-line"
+      />
+
+      <div className="flex w-full gap-3">
+        {/* 同一オリジンなので download が効く（別オリジンだと無視されて開くだけになる） */}
+        <a
+          href={shareUrl}
+          download="ferret.png"
+          className="flex-1 rounded-xl border-2 border-line bg-panel py-2.5 text-center text-[13px] font-extrabold active:translate-y-[1px]"
+        >
+          画像を保存
+        </a>
+        {/* noreferrer は遷移元（/result/12）を X に渡さないため。
+            Referrer-Policy でパスは落ちるが、明示しておく */}
+        <a
+          href={shareIntentUrl(totalScore)}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex-1 rounded-xl bg-ink py-2.5 text-center text-[13px] font-extrabold text-bg active:translate-y-[1px]"
+        >
+          X に投稿する
+        </a>
       </div>
-    </details>
+    </section>
   );
 
   return (
@@ -451,6 +467,9 @@ export function ResultView({
           </>
         )}
 
+        {/* 共有カード。**主ボタンより前**（褒められた直後に置く・オーナー判断） */}
+        {cleared && shareBlock}
+
         {/* 主ボタンは1本。もう一方はテキストリンクに格下げして迷いを減らす */}
         <div className="mt-1.5 flex w-full flex-col gap-3.5">
           {cleared ? (
@@ -469,7 +488,6 @@ export function ResultView({
                   ふりかえる
                 </Link>
               </div>
-              {shareBlock}
             </>
           ) : (
             <>
