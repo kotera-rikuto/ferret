@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { Mascot } from "@/components/ui/Mascot";
 import { MascotMotion } from "@/components/ui/MascotMotion";
@@ -70,6 +70,14 @@ const REPORT_FORMS: Record<
     sentNote: "「問題の誤りを報告」を受け取りました。ありがとうございます",
   },
 };
+
+/**
+ * 共有のモーダルを開くまでの待ち時間。
+ *
+ * **点数のカウントアップ（900ms）と XP バーの動き（レベルが上がった回は 1,760ms まで）
+ * が終わってから開く。** 覆うのが早いと、自分の点数が動くところを見られない。
+ */
+const SHARE_OPEN_DELAY_MS = 1900;
 
 /** 紙吹雪の色（ブランド系の3色） */
 const CONFETTI_COLORS = ["#f59e0b", "#fbbf24", "#c47000"];
@@ -159,6 +167,50 @@ export function ResultView({
       setReports((prev) => ({ ...prev, [kind]: "idle" }));
     }
   }
+
+  /*
+   * 共有のモーダル（G1・2026-09-12）。
+   *
+   * **演出が終わってから開く。** 点数のカウントアップ（900ms）と XP バーが
+   * 動いている最中に覆うと、自分の点数が動くところを見られないまま隠すことになる。
+   * レベルが上がった回は XP バーが2段階で動く（〜1,760ms）ので、その後に来る値にしてある。
+   */
+  const [shareOpen, setShareOpen] = useState(false);
+  const shareDialogRef = useRef<HTMLDivElement>(null);
+  const closeShare = useCallback(() => setShareOpen(false), []);
+
+  useEffect(() => {
+    if (!cleared) return;
+    const timer = setTimeout(() => setShareOpen(true), SHARE_OPEN_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [cleared]);
+
+  useEffect(() => {
+    if (!shareOpen) return;
+
+    // Esc で閉じられないと、幕の外を押すことを知らない人が閉じ込められる
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") closeShare();
+    }
+    document.addEventListener("keydown", onKey);
+
+    // 後ろの画面が一緒に動くと、どちらを操作しているのか分からなくなる
+    const overflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    // **焦点をモーダルの中へ移す。** これが無いとキーボードだけの人は
+    // 焦点が後ろの画面に残ったまま覆われ、見えない場所を操作することになる。
+    //
+    // 移す先を閉じるボタンではなく**入れ物そのもの**にしてあるのは、
+    // 押してもいない「×」に focus の輪が付いて見えるため
+    // （`tabIndex={-1}` は「輪を受け取れるが Tab の順路には入らない」印）。
+    shareDialogRef.current?.focus();
+
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = overflow;
+    };
+  }, [shareOpen, closeShare]);
 
   // スコアのカウントアップ。演出であって真値は totalScore（サーバー由来）
   const [countUp, setCountUp] = useState(0);
@@ -340,57 +392,54 @@ export function ResultView({
   /*
    * 結果を画像で共有する（G1）。**クリアした回にだけ出す。**
    *
-   * **畳まずにカードとして前面に出す**（2026-09-12・オーナー判断）。
-   * 最初は主ボタンの下に `<details>` で小さく置いていたが、
-   * 「位置が微妙で目立たない」と指摘されて作り替えた。
+   * **画面の中央に出し、後ろ全体を暗くする**（2026-09-12・オーナー判断）。
+   * 経緯は2段階ある ── 最初は主ボタンの下に `<details>` で畳んでいて
+   * 「位置が微妙で目立たない」、次に列の中へカードとして並べたら
+   * 「並べるんじゃなくてポップアップ的に」。
+   * **列に積むかぎり、他の枠と同じ重みにしか見えない**というのが指摘の芯。
    *
-   * 置き場所は**「フェレットのメモ」の直後・主ボタンの手前。**
-   * 褒められた直後がいちばん人に見せたくなる瞬間で、
-   * 主ボタン（つぎのステージへ）の下は**読まれずに押されて終わる。**
+   * **出すのは演出が終わってから**（`SHARE_OPEN_DELAY_MS`）。
+   * 点数のカウントアップと XP バーが動いている最中に覆うと、
+   * **自分の点数が動くところを見られないまま隠す**ことになる。
    *
-   * 地は `bg-deep`（ページの地より一段沈んだ面）。**明暗どちらのテーマにも
-   * 定義がある token なので、暗い配色でも「沈んだ面」のままになる** ──
-   * ここで固定の灰色を置くと、暗いテーマで浮き上がって逆に浮く。
+   * **閉じた後の戻り道を必ず残す**（下の `shareReopen`）。
+   * 一度きりの表示にすると、閉じた人はもう二度と共有できない。
    *
-   * **主ボタンと色で競合させない。** 「つぎのステージへ」がブランド色の塗りなので、
-   * こちらの主役は `ink` の塗り（X の見た目にも寄る）にしてある。
-   * 同じ橙を2つ並べると、どちらへ進めばいいのか分からなくなる。
-   *
-   * **並びは「画像を保存 → X に投稿する」。** X に画像を自動で添付する方法は存在せず、
-   * 投稿画面に入るのは本文だけなので、**先に保存しないと絵の無い投稿になる。**
-   * 読む順がそのまま手順になっている（だから説明文を置いていない）。
+   * 動きは既存の `animate-pop` を使い回す。**新しい `@keyframes` を足すと
+   * `prefers-reduced-motion` への追記も要る**（CLAUDE.md・U-811）。
+   * 使い回せば、動きを減らす設定への対応が自動でついてくる。
    */
   const shareUrl = `/api/share/${attemptId}`;
-  const shareBlock = (
-    <section className="flex w-full flex-col items-center gap-4 rounded-2xl border-2 border-line bg-bg-deep px-5 py-5">
-      <h2 className="text-[15px] font-extrabold">この結果をシェアしませんか？</h2>
 
+  const shareCardBody = (
+    <>
       {/* alt に点数を入れない。読み上げの主役は「何の絵か」で、
-          点数は同じ画面の上にもっと大きく出ている。
+          点数は同じ画面にもっと大きく出ている。
 
           **next/image を使わないこと。** あちらは画像を Next.js の最適化を
           通して配り、結果を**キャッシュする。** この絵は本人の点数なので、
           サーバー側で `Cache-Control: private, no-store` を付けて
           「途中に残さない」と言っている ── 最適化を挟むと、その指示の外で
-          絵が保存されることになる（しかも URL はユーザーごとに違うだけで
-          誰でも同じ形をしている）。
+          絵が保存されることになる。
 
-          `loading="lazy"` は畳むのをやめた後も残してある。カードはたいてい
-          画面の外から始まるので、そこまで来ない人のぶんは描かずに済む */}
+          モーダルは開いたときだけ描画するので、**開かない人のぶんの絵は作られない**
+          （絵は1枚ごとにサーバーで描いている）。 */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={shareUrl}
-        loading="lazy"
         alt="クリアした結果のカード"
         className="w-full rounded-xl border-2 border-line"
       />
 
+      {/* **並びは「画像を保存 → X に投稿する」。** X に画像を自動で添付する方法は
+          存在せず、投稿画面に入るのは本文だけなので、先に保存しないと絵の無い投稿になる。
+          読む順がそのまま手順になっている（だから説明文を置いていない） */}
       <div className="flex w-full gap-3">
         {/* 同一オリジンなので download が効く（別オリジンだと無視されて開くだけになる） */}
         <a
           href={shareUrl}
           download="ferret.png"
-          className="flex-1 rounded-xl border-2 border-line bg-panel py-2.5 text-center text-[13px] font-extrabold active:translate-y-[1px]"
+          className="flex-1 rounded-xl border-2 border-line bg-bg-deep py-2.5 text-center text-[13px] font-extrabold active:translate-y-[1px]"
         >
           画像を保存
         </a>
@@ -405,7 +454,51 @@ export function ResultView({
           X に投稿する
         </a>
       </div>
-    </section>
+    </>
+  );
+
+  const shareModal = shareOpen ? (
+    // 後ろ全体を暗くする幕。**紙吹雪も覆う**（あちらは fixed inset-0 で z-index が無い）
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-6"
+      // 幕そのものを押したら閉じる。カードの中の押下は下で止める
+      onClick={closeShare}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="share-title"
+    >
+      <div
+        ref={shareDialogRef}
+        tabIndex={-1}
+        className="flex w-full max-w-sm animate-pop flex-col items-center gap-4 rounded-3xl border-2 border-line bg-panel p-6 outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex w-full items-center justify-between gap-3">
+          <h2 id="share-title" className="text-[15px] font-extrabold">
+            この結果をシェアしませんか？
+          </h2>
+          <button
+            onClick={closeShare}
+            aria-label="閉じる"
+            className="-mr-1 shrink-0 rounded-lg px-2 py-1 text-lg font-extrabold text-muted hover:text-ink"
+          >
+            ×
+          </button>
+        </div>
+        {shareCardBody}
+      </div>
+    </div>
+  ) : null;
+
+  /* 閉じた後の戻り道。**これが無いと、閉じた人は二度と共有できない。**
+     ここは控えめでよい ── 目立たせる役目はモーダル側が持っている */
+  const shareReopen = (
+    <button
+      onClick={() => setShareOpen(true)}
+      className="text-muted underline underline-offset-4 hover:text-ink"
+    >
+      結果をシェア
+    </button>
   );
 
   return (
@@ -467,9 +560,6 @@ export function ResultView({
           </>
         )}
 
-        {/* 共有カード。**主ボタンより前**（褒められた直後に置く・オーナー判断） */}
-        {cleared && shareBlock}
-
         {/* 主ボタンは1本。もう一方はテキストリンクに格下げして迷いを減らす */}
         <div className="mt-1.5 flex w-full flex-col gap-3.5">
           {cleared ? (
@@ -487,6 +577,7 @@ export function ResultView({
                 <Link href={`/review/${problemId}`} className="text-muted hover:text-ink">
                   ふりかえる
                 </Link>
+                {shareReopen}
               </div>
             </>
           ) : (
@@ -592,6 +683,8 @@ export function ResultView({
           </div>
         )}
       </main>
+
+      {shareModal}
     </div>
   );
 }
