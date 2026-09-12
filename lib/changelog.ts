@@ -146,6 +146,29 @@ export const CHANGELOG: readonly ChangelogEntry[] = [
   },
 ];
 
+/**
+ * 「まだ見ていない更新があるか」を端末に覚えておくための鍵（`localStorage`）。
+ *
+ * 暗い配色（`lib/theme.ts` の `ferret-theme`）と同じ仕組み。**ログインは要らない**代わりに、
+ * 覚えているのは**そのブラウザだけ** ── 別の端末では改めて1回出る。
+ * 更新情報は誰が見ても同じ中身なので、サーバーに持たせる理由がない。
+ */
+export const CHANGELOG_SEEN_STORAGE_KEY = "ferret-changelog-seen";
+
+/**
+ * いまの更新情報の「版」。**これが変わったときだけ印を出す。**
+ *
+ * 日付だけでは足りない。**同じ日に2件以上足すことがある**（2026-09-12 に3件足した）ので、
+ * 日付だけを覚えていると2件目以降が「見たことになっている」状態で通り過ぎる。
+ * 件数を足しておけば、同じ日でも増えれば別の版になる。
+ *
+ * 逆に、**すでにある文章を直しただけでは版は変わらない** ── 印は「増えた」ことを
+ * 伝えるためのもので、言い回しの修正で全員に印を出す必要はない。
+ */
+export function changelogMarker(): string {
+  return `${CHANGELOG[0]?.date ?? ""}#${CHANGELOG.length}`;
+}
+
 /** LP（トップページ）に出す件数。全件は `/changelog` にある */
 export const CHANGELOG_ON_LP = 3;
 
