@@ -7,7 +7,7 @@ begin;
 
 -- ステージ55: throw と Error オブジェクト（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   55,
   'throw と Error オブジェクト',
@@ -51,12 +51,14 @@ e instanceof Error も false です。1周目のほうは ValidationError / quan
 
 投げる値は Error でなくても構いません。ただし name や message は Error が用意しているものなので、別の種類の値を投げるとそれらは存在しません。
 
-class B extends Error は Error を土台にした自分用の種類を作る書き方で、super(…) に渡した文が message になります。値 instanceof クラス名 は、その値がそのクラスを土台にしているかを真偽で返します。'
+class B extends Error は Error を土台にした自分用の種類を作る書き方で、super(…) に渡した文が message になります。値 instanceof クラス名 は、その値がそのクラスを土台にしているかを真偽で返します。',
+  '入力チェックのまわりを引き継いだ。
+手を入れる前に、何が起きるのかを読んでおく。'
 );
 
 -- ステージ56: try / catch / finally ─ 実行順を追う（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   56,
   'try / catch / finally ─ 実行順を追う',
@@ -101,12 +103,14 @@ finally は try や catch が return を決めたあとにも走ります。そ�
 
 try や catch の中で return を書いた場合でも、その値が外へ渡される手前で finally が実行されます。
 
-finally の中に return を書くこともできます。その場合どちらの値が返るかは、順序を追って考えること。'
+finally の中に return を書くこともできます。その場合どちらの値が返るかは、順序を追って考えること。',
+  '読み込み処理を引き継いだ。
+通る順番をチームに説明することになった。'
 );
 
 -- ステージ57: 握りつぶされた catch を読む ─ エラーが消えるコード（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   57,
   '握りつぶされた catch を読む ─ エラーが消えるコード',
@@ -144,12 +148,14 @@ try の範囲に applyTheme の呼び出しまで入っているためです。J
 
 JSON.parse(文字列) は、形が壊れていると例外を投げます。
 
-catch で受けた値を使わずに別の値を返すと、その失敗はどこにも残らず、呼び出した側からは成功したときと同じに見えます。'
+catch で受けた値を使わずに別の値を返すと、その失敗はどこにも残らず、呼び出した側からは成功したときと同じに見えます。',
+  '設定の読み込み処理を渡された。
+上のコメントと中身がそろっているかを見てほしいと言われた。'
 );
 
 -- ステージ58: バリデーション ─ 壊れた値が来る前提のコードを読む（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   58,
   'バリデーション ─ 壊れた値が来る前提のコードを読む',
@@ -193,7 +199,9 @@ function normalizeOrder(input) {
 
 Number(値) は数に直そうとします。数として読めないときの結果は NaN になり、Number.isFinite(値) はそれを含めて「ふつうの数か」を確かめます。
 
-検査の結果を例外で知らせるか戻り値で知らせるかは設計の選択で、呼ぶ側の書き方が変わります。'
+検査の結果を例外で知らせるか戻り値で知らせるかは設計の選択で、呼ぶ側の書き方が変わります。',
+  '注文データの取り込みについて、チームに説明することになった。
+この書き方にした狙いを読んでおく。'
 );
 
 commit;

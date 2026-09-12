@@ -16,6 +16,8 @@ export const problems = [
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `入力チェックのまわりを引き継いだ。
+手を入れる前に、何が起きるのかを読んでおく。`,
     code: `class ValidationError extends Error {
   constructor(field) {
     super(\`\${field} が不正です\`);
@@ -79,6 +81,8 @@ class B extends Error は Error を土台にした自分用の種類を作る書
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `読み込み処理を引き継いだ。
+通る順番をチームに説明することになった。`,
     code: `function loadRecord(id) {
   try {
     if (id < 0) {
@@ -143,6 +147,8 @@ finally の中に return を書くこともできます。その場合どちら�
     language: "js",
     difficulty: 4,
     reading_type: "ズレ",
+    scenario: `設定の読み込み処理を渡された。
+上のコメントと中身がそろっているかを見てほしいと言われた。`,
     code: `// 設定が壊れていたら既定値で動かす
 function loadUserPrefs(raw, applyTheme) {
   try {
@@ -200,6 +206,8 @@ catch で受けた値を使わずに別の値を返すと、その失敗はど�
     language: "js",
     difficulty: 4,
     reading_type: "意図",
+    scenario: `注文データの取り込みについて、チームに説明することになった。
+この書き方にした狙いを読んでおく。`,
     code: `const REQUIRED = ["id", "amount", "placedAt"];
 
 function normalizeOrder(input) {

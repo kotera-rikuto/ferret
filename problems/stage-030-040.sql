@@ -7,7 +7,7 @@ begin;
 
 -- ステージ30: 破壊するメソッド・破壊しないメソッド ─ push / slice / splice（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   30,
   '破壊するメソッド・破壊しないメソッド ─ push / slice / splice',
@@ -37,12 +37,14 @@ batch の中身自体はコメントどおりで [ ''u1'', ''u2'', ''u3'' ] に�
 
 配列.slice(始まり, 終わり) は後者、配列.splice(始まり, 個数) は前者です。名前は1文字しか違いませんが働きが違います。
 
-splice は抜き出した要素を配列にして返します。'
+splice は抜き出した要素を配列にして返します。',
+  '順番待ちの一覧から、先に処理する分を取り出す関数を渡された。
+コメントの想定と合っているかを見てほしいと言われた。'
 );
 
 -- ステージ31: forEach ─ 副作用でまわすループ（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   31,
   'forEach ─ 副作用でまわすループ',
@@ -78,12 +80,14 @@ try を各件の中に置いてあるのも同じ理由です。1件が失敗し
 
 try { … } catch (e) { … } は、try の中で例外が起きたときに catch へ移ります。e.message は例外に添えられた説明です。
 
-console.warn は注意を促す出力です。'
+console.warn は注意を促す出力です。',
+  '一斉通知の処理を引き継いだ。
+1件ずつ回している部分の狙いを、チームに説明することになった。'
 );
 
 -- ステージ32: map ─ 形を変えて新しい配列を作る（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   32,
   'map ─ 形を変えて新しい配列を作る',
@@ -114,12 +118,14 @@ lines の長さはもとと同じ 3 なので、前半の出力は 3 3 になり
 
 コールバックは2つ目の引数として、その要素が何番目かを 0 から数えた数で受け取れます。
 
-条件 ? A : B は、条件が成立すれば A を、しなければ B を返します。'
+条件 ? A : B は、条件が成立すれば A を、しなければ B を返します。',
+  '作業手順の表示を作る処理を引き継いだ。
+並び替えを足す前に、いまの作りを読んでおく。'
 );
 
 -- ステージ33: map のコールバックが値を返していないコードを読む（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   33,
   'map のコールバックが値を返していないコードを読む',
@@ -152,12 +158,14 @@ if に入らなかったときの式には return が無く、評価されるだ
 
 矢印の後ろに { を書いた形では、返したい値を return で明示する必要があります。式を1行置いただけでは返りません。
 
-ステージ17 で扱った「return の書き忘れ」と同じことが起きうる場所です。'
+ステージ17 で扱った「return の書き忘れ」と同じことが起きうる場所です。',
+  '一覧に出す文字列を作る処理を渡された。
+出てくる中身が想定どおりかを確かめてほしいと言われた。'
 );
 
 -- ステージ34: filter / find / some / every ─ 絞り込みと確認（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   34,
   'filter / find / some / every ─ 絞り込みと確認',
@@ -193,12 +201,14 @@ every は「条件に合わないものが1つも無いか」を見るので、�
 
 some は条件に合うものが1つでもあるか、every は全部が条件に合うかを真偽で返します。
 
-a?.b は a が無いときに打ち切り、a ?? b は a が無いときだけ b を使います。'
+a?.b は a が無いときに打ち切り、a ?? b は a が無いときだけ b を使います。',
+  '在庫の確認処理を引き継いだ。
+返ってくる項目が多いので、1つずつ何を見ているかを読む。'
 );
 
 -- ステージ35: reduce ─ 畳み込みの途中経過を読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   35,
   'reduce ─ 畳み込みの途中経過を読む',
@@ -228,12 +238,14 @@ console.log(wrong);',
 
 初期値は省略できます。ただし省略した場合の振る舞いは省略しない場合と違うので、書かれているかどうかを確かめてから読むこと。
 
-数とオブジェクトを + でつなぐと、文字列としてつながります。'
+数とオブジェクトを + でつなぐと、文字列としてつながります。',
+  '売上の集計処理を引き継いだ。
+似た書き方が2つ並んでいるので、違いを読んでおきたい。'
 );
 
 -- ステージ36: reduce 応用 ─ 集計とグループ化（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   36,
   'reduce 応用 ─ 集計とグループ化',
@@ -268,12 +280,14 @@ reduce の第2引数に渡した initial は複製されず、そのまま acc �
 
 配列.push(値) は末尾に足す操作で、新しい配列を作りません。
 
-ステージ4・5で扱った「写して渡る値」と「指し先だけが渡る値」の違いが、ここでも効いてきます。'
+ステージ4・5で扱った「写して渡る値」と「指し先だけが渡る値」の違いが、ここでも効いてきます。',
+  '問い合わせをふりわける集計のレビューを頼まれた。
+雛形の扱いがコメントどおりかを見てほしいとのこと。'
 );
 
 -- ステージ37: sort ─ 比較関数が返す −1 / 0 / 1（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   37,
   'sort ─ 比較関数が返す −1 / 0 / 1',
@@ -299,12 +313,14 @@ console.log(scores === sorted);',
 
 sort は並べ替えた結果をどこに置くか（新しい配列か、もとの配列か）に注意して読むこと。
 
-配列.push(値) は末尾に足します。=== は左右が同じものかどうかを見ます。'
+配列.push(値) は末尾に足します。=== は左右が同じものかどうかを見ます。',
+  '点数を並べ替える処理を引き継いだ。
+並び順の相談が来たので、いまどう並ぶのかを先に読む。'
 );
 
 -- ステージ38: オブジェクト配列を複数キーで並べ替えるコードを読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   38,
   'オブジェクト配列を複数キーで並べ替えるコードを読む',
@@ -337,12 +353,14 @@ a - b は、a が小さいほど負の数になります。
 
 X || Y は X が「なし」とみなせるとき Y を使います。数の 0 もここでは「なし」の側です。
 
-[...配列] は写しを作ります。'
+[...配列] は写しを作ります。',
+  '作業の並び順を決める処理を引き継いだ。
+条件が2つあるので、どちらが先に効くのかを読んでおく。'
 );
 
 -- ステージ39: メソッドチェーン ─ filter → map → reduce の流れを追う（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   39,
   'メソッドチェーン ─ filter → map → reduce の流れを追う',
@@ -373,12 +391,14 @@ filter の時点で canceled の A-2 が外れて2件になり、map で 1000 �
 
 途中で件数も中身も変わるので、どの段階の配列に対する処理なのかを追いながら読みます。
 
-reduce(関数, 0) は 0 から足し始めます。'
+reduce(関数, 0) は 0 から足し始めます。',
+  '売上の合計を出す処理を引き継いだ。
+つながった処理を、順番に1つずつ追ってみる。'
 );
 
 -- ステージ40: ネストした API レスポンスを掘る ─ flat / flatMap と実データの整形（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   40,
   'ネストした API レスポンスを掘る ─ flat / flatMap と実データの整形',
@@ -408,7 +428,9 @@ const allLines = response.orders.flatMap((order) =>
 
 配列.flatMap(関数) は map してから flat() を1回かけたのと同じ働きです。
 
-{ ...obj, 追加: 値 } は obj の中身を写した新しいオブジェクトを作り、そこに項目を足します。'
+{ ...obj, 追加: 値 } は obj の中身を写した新しいオブジェクトを作り、そこに項目を足します。',
+  '注文の明細を1つの一覧にする処理を引き継いだ。
+この形にした狙いを、チームに説明することになった。'
 );
 
 commit;

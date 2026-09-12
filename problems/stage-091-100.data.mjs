@@ -24,6 +24,8 @@ export const problems = [
     reading_type: "影響",
     runnable: false,
     notRunnableReason: "型検査の出力を読む題材なので、実行では確かめられない",
+    scenario: `長い出力を渡されて、読み解いてほしいと言われた。
+何を言っているのかを順に追ってみる。`,
     code: `type Event =
   | { kind: "click"; x: number; y: number }
   | { kind: "keydown"; key: string }
@@ -86,6 +88,8 @@ TS2345 は「渡した引数が受け取り側の型に入らない」ことを�
     reading_type: "意図",
     runnable: false,
     notRunnableReason: "型の組み立て方を比べる題材なので、実行では確かめられない",
+    scenario: `型の切り出し方について、チームに説明することになった。
+なぜこの分け方にしたのかを読んでおく。`,
     code: `type Timestamps = {
   createdAt: string;
   updatedAt: string;
@@ -146,6 +150,8 @@ interface 名前<T> の <T> は、使うときに決まる型を表します。`
     language: "ts",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `共通で使う小さな関数を引き継いだ。
+呼び出しが3つあるので、それぞれ読んでおく。`,
     code: `function firstOr<T>(list: T[], fallback: T): T {
   return list.length > 0 ? list[0] : fallback;
 }
@@ -195,6 +201,8 @@ T は使うときに決まる入れ物で、渡した引数から埋められま
     reading_type: "トレース",
     runnable: false,
     notRunnableReason: "型だけを組み立てる題材なので、実行では確かめられない",
+    scenario: `設定まわりの型を引き継いだ。
+元の値から作られているので、順に追ってみる。`,
     code: `const defaults = {
   perPage: 20,
   theme: "light",
@@ -249,6 +257,8 @@ Partial<T> は全部を省略可能に、Readonly<T> は全部を書き換え不
     language: "ts",
     difficulty: 5,
     reading_type: "トレース",
+    scenario: `API の結果を扱う型を引き継いだ。
+判定のところを、手を入れる前に読んでおく。`,
     code: `type ApiOk = { ok: true; data: string[] };
 type ApiErr = { ok: false; message: string };
 type ApiResult = ApiOk | ApiErr;
@@ -304,6 +314,8 @@ isOk の戻り値に書いてある r is ApiOk は、「この関数が true を
     language: "ts",
     difficulty: 5,
     reading_type: "トレース",
+    scenario: `画面の状態を管理する型を引き継いだ。
+分岐が4つあるので、順に読んでおきたい。`,
     code: `type State =
   | { status: "idle" }
   | { status: "loading"; startedAt: number }
@@ -364,6 +376,8 @@ switch や if でその項目を確かめると、その中では1つの候補�
     language: "ts",
     difficulty: 5,
     reading_type: "トレース",
+    scenario: `非同期まわりで1語だけ違う2つを渡された。
+何が変わるのかを見てほしいと言われた。`,
     code: `async function fetchCount(): Promise<number> {
   return 42;
 }
@@ -419,6 +433,8 @@ await はその包みを開けて中の値を取り出します。付けなけ�
     reading_type: "意図",
     runnable: false,
     notRunnableReason: "型検査の扱いを読む題材なので、実行では確かめられない",
+    scenario: `設定の読み込みまわりについて、チームに説明することになった。
+2か所ある書き方の事情を読んでおく。`,
     code: `type Config = { apiBase: string; retries: number };
 
 // 起動時に1回だけ読み込む。読み込む前に使われることはない
@@ -475,6 +491,8 @@ JSON.parse の結果は、型の上では「何か分からないもの」です
     reading_type: "仕様",
     runnable: false,
     notRunnableReason: "型定義だけのファイルなので、実行するものではない",
+    scenario: `新しく使うことになった部品の使い方を、チームに共有することになった。
+手元にあるのは型定義だけ。`,
     code: `// node_modules/@example/queue/index.d.ts
 
 export interface JobOptions {
@@ -536,6 +554,8 @@ readonly が付いた項目は、受け取った側から書き換えられま�
     reading_type: "仕様",
     runnable: false,
     notRunnableReason: "外部のライブラリを取り込むため、この場では動かせない",
+    scenario: `注文データの取り込みまわりを引き継いだ。
+1つの定義で何を決めているのかを読んでおきたい。`,
     code: `import { z } from "zod";
 
 const OrderSchema = z.object({

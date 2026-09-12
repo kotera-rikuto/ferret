@@ -31,10 +31,31 @@ export const CHAPTERS: Chapter[] = [
 ];
 
 /**
- * order が属する章。範囲外（動作確認用の order=999 など）は null を返し、
+ * order が属する章。範囲外（E2E のシード order=9001 など）は null を返し、
  * 画面側は章バナーなしで描画する。ここで例外を投げると、
  * 検証用の問題を1件入れただけでマップ全体が落ちる。
  */
 export function chapterOf(order: number): Chapter | null {
   return CHAPTERS.find((c) => order >= c.from && order <= c.to) ?? null;
+}
+
+/**
+ * ステージ選択のマップに出さない order（オーナー判断 2026-09-12）。
+ *
+ * 999 は動作確認用に入れてある問題で、**学習者にとっては中身のない1件**。
+ * 100問の最後に「ここから とくべつステージ」という帯つきで並んでいて、
+ * 進捗の分母も 101 になっていた（100問クリアしても 100/101 で 100% にならない）。
+ *
+ * **消すのはマップの表示だけ**（オーナー判断）。`loadProgress` からは外さないので、
+ * `/problems/<999のid>` は今までどおり開けて採点もできる ── 動作確認の裏口として残す。
+ *
+ * ⚠️ **E2E のシード（9001 / 9002）はここに入れない。** あちらは
+ * `tests/e2e/stages.spec.ts` が**マップ上の鍵の状態を見て**解放判定を確かめており、
+ * 隠すとその検査が対象を見失う。本番の DB には存在しないので、隠す必要もない。
+ */
+const HIDDEN_ORDERS: ReadonlySet<number> = new Set([999]);
+
+/** マップに出さない問題か */
+export function isHiddenOrder(order: number): boolean {
+  return HIDDEN_ORDERS.has(order);
 }

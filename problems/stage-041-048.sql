@@ -7,7 +7,7 @@ begin;
 
 -- ステージ41: 文字列メソッド ─ 分解・結合・整形・検索（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   41,
   '文字列メソッド ─ 分解・結合・整形・検索',
@@ -38,12 +38,14 @@ parseTags のほうは、split でできた空の要素を trim と filter が�
 
 文字列.trim() は前後の空白を落とした新しい文字列を返します。
 
-文字列.replace(探すもの, 置き換えるもの) は新しい文字列を返します。探すもの側に文字列を書いたときと正規表現を書いたときで、置き換わる範囲が変わります（正規表現は次のステージ）。'
+文字列.replace(探すもの, 置き換えるもの) は新しい文字列を返します。探すもの側に文字列を書いたときと正規表現を書いたときで、置き換わる範囲が変わります（正規表現は次のステージ）。',
+  '入力されたタグを整える処理を引き継いだ。
+手を入れる前に、何が返るのかを読んでおきたい。'
 );
 
 -- ステージ42: 数値の罠 ─ Number / parseInt / NaN と浮動小数点の誤差（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   42,
   '数値の罠 ─ Number / parseInt / NaN と浮動小数点の誤差',
@@ -72,12 +74,14 @@ parseInt は数として解釈できない文字に当たった時点で止ま�
 
 Number(文字列) は全体が数として読めるかを見るので、途中で打ち切ることはありません。
 
-コンピュータは 0.1 や 0.2 のような値を2進数で近似して持つため、書いたとおりの値にはなりません。'
+コンピュータは 0.1 や 0.2 のような値を2進数で近似して持つため、書いたとおりの値にはなりません。',
+  '金額の照合をする処理のレビューを頼まれた。
+コメントの想定どおりに動くかを見てほしいとのこと。'
 );
 
 -- ステージ43: 正規表現の基本 ─ パターンを声に出して読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   43,
   '正規表現の基本 ─ パターンを声に出して読む',
@@ -104,12 +108,14 @@ for (const code of codes) {
 
 [A-Z]{2} は「大文字が2つ」、\d{4} は「数字が4つ」です。正規表現.test(文字列) は、その形が見つかるかどうかを真偽で返します。
 
-^ は文字列のはじまり、$ は終わりを表します。これらを書くかどうかで、test が「どこかにあるか」を見るのか「これがすべてか」を見るのかが変わります。'
+^ は文字列のはじまり、$ は終わりを表します。これらを書くかどうかで、test が「どこかにあるか」を見るのか「これがすべてか」を見るのかが変わります。',
+  '商品コードの判定に使っているパターンを引き継いだ。
+2つ並んでいるので、違いを読んでおきたい。'
 );
 
 -- ステージ44: 正規表現の実務パターン ─ 抽出と置換（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   44,
   '正規表現の実務パターン ─ 抽出と置換',
@@ -137,12 +143,14 @@ masked のほうは replace に g が付いているので該当箇所を残ら�
 
 文字列.match(正規表現) は、g があるときと無いときで返るものの形が変わります。g が無いときは、当てはまった文字列に加えて ( ) で囲んだ部分も配列に入り、[1] から順に取り出せます。
 
-文字列.replace(正規表現, 置き換えるもの) は、g があれば該当箇所を残らず置き換えます。'
+文字列.replace(正規表現, 置き換えるもの) は、g があれば該当箇所を残らず置き換えます。',
+  'ログの整形処理を引き継いだ。
+取り出し方が3通りあるので、順に読んでおく。'
 );
 
 -- ステージ45: Map / Set ─ オブジェクト・配列との使い分け（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   45,
   'Map / Set ─ オブジェクト・配列との使い分け',
@@ -175,12 +183,14 @@ countByPage のほうを選んでいるのは、名前を入れた順に保ち�
 
 new Map() は、名前と値の組を持つ入れ物です。set(名前, 値) で入れ、get(名前) で取り出します。ふつうのオブジェクトと違って、名前は文字のほかにどんな値でも使え、入れた順が保たれます。
 
-[...entries()] は、[名前, 値] の組を並べた配列にします。'
+[...entries()] は、[名前, 値] の組を並べた配列にします。',
+  'アクセス数の集計について、チームに説明することになった。
+2つのやり方を使い分けている理由を読んでおく。'
 );
 
 -- ステージ46: JSON.stringify / JSON.parse ─ 文字列とデータの往復（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   46,
   'JSON.stringify / JSON.parse ─ 文字列とデータの往復',
@@ -214,12 +224,14 @@ console.log("reviewer" in restored);',
 
 テキストで表せるのは、名前と値の組・並び・数・真偽・空を表すものだけです。それ以外のものは、テキストにする段階で形を変えられるか、項目ごと落とされます。
 
-戻す側は、もとが何だったかを知りません。テキストに書かれている形のまま組み立てます。'
+戻す側は、もとが何だったかを知りません。テキストに書かれている形のまま組み立てます。',
+  '下書きの保存処理を引き継いだ。
+保存したものを取り出すところまで、順に追ってみる。'
 );
 
 -- ステージ47: Date ─ 日付計算のコードを読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   47,
   'Date ─ 日付計算のコードを読む',
@@ -249,12 +261,14 @@ console.log(base.getMonth() + 1, base.getDate());',
 
 日の指定は、その月に存在しない値を書いても実行時エラーになりません。範囲を外れたぶんは前後の月へ送られます。
 
-setMonth(月) は月だけを変えます。日はそのまま残ります。'
+setMonth(月) は月だけを変えます。日はそのまま残ります。',
+  '締め日を求める処理を引き継いだ。
+月ごとの扱いについて質問が来たので、読んでおきたい。'
 );
 
 -- ステージ48: タイムゾーン ─ JST と UTC がズレるコードを読む（ズレ）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   48,
   'タイムゾーン ─ JST と UTC がズレるコードを読む',
@@ -286,7 +300,9 @@ A-1 のほうはどちらで見ても18日なので、ずれていません。�
 
 toISOString() が返す表記は、どの環境で動かしても世界標準時のものです。実行している場所の時間帯には合わせません。
 
-日本の時間帯は世界標準時より進んでいるので、同じ瞬間を指していても日付が変わることがあります。'
+日本の時間帯は世界標準時より進んでいるので、同じ瞬間を指していても日付が変わることがあります。',
+  '日ごとの集計キーを作る処理のレビューを頼まれた。
+コメントの想定と合っているかを見てほしいとのこと。'
 );
 
 commit;

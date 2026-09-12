@@ -192,7 +192,7 @@ console.log(resolveSettings({ perPage: 5, theme: "dark", isPro: false, exportLim
 
 -- ステージ11: 三項演算子と switch ─ 分岐の省略形を展開して読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   11,
   '三項演算子と switch ─ 分岐の省略形を展開して読む',
@@ -230,12 +230,14 @@ console.log(notifyChannel({ severity: 0 }));',
   '{"core":"severity が 5 のときも チャット が返るという結論を指していれば満たす","depth":"3回の戻り値が チャット / チャット / メール になる点、または三項演算子が high と middle と low の3段に展開できる点に触れていれば満たす","ground":"high の case に break が無く続く middle の代入まで実行される点に触れていれば満たす","core_reject":["severity が 5 のときは 電話 が返ると読んでいる","break が無いので メール まで実行されると読んでいる","severity が 2 のとき high と判定されると読んでいる"]}'::jsonb,
   '条件 ? A : B は三項演算子といい、条件が成立すれば A、しなければ B を値として返します。: の後ろにもう一度同じ形を書くと、段を増やせます。
 
-switch は値が一致した case から実行を始めます。case は実行を始める位置を示すもので、そこで区切られているわけではありません。'
+switch は値が一致した case から実行を始めます。case は実行を始める位置を示すもので、そこで区切られているわけではありません。',
+  '通知の送り先を決める処理を引き継いだ。
+どの条件でどこに送られるのか、先に読んでおきたい。'
 );
 
 -- ステージ12: for 文 ─ ループが何回まわるか数える（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   12,
   'for 文 ─ ループが何回まわるか数える',
@@ -266,12 +268,14 @@ i は 0、3、6 と 3ずつ増え、次の 9 は recipients.length の 7 未満�
   '{"core":"ループが3回まわるという結論を指していれば満たす","depth":"2つ目の出力が u7 だけの配列になる点、または slice が範囲を超えても残りだけを取る点に触れていれば満たす","ground":"i が size ずつ増えて recipients.length 未満の間だけ条件が成立する点に触れていれば満たす","core_reject":["ループが7回まわると読んでいる","ループが2回で終わり u7 が捨てられると読んでいる","i が1ずつ増えると読んでいる"]}'::jsonb,
   'for (初期化; 条件; 更新) は、条件が成立するあいだ中身を実行し、1周ごとに更新の式を走らせます。+= は今の値に足して入れ直す書き方です。
 
-配列.slice(始まり, 終わり) は、始まりの位置から終わりの手前までを取り出した新しい配列を返します。終わりの位置は取り出す範囲に含みません。'
+配列.slice(始まり, 終わり) は、始まりの位置から終わりの手前までを取り出した新しい配列を返します。終わりの位置は取り出す範囲に含みません。',
+  '一斉送信をまとめて送る処理を引き継いだ。
+件数を変える相談が来たので、先に中身を読んでおく。'
 );
 
 -- ステージ13: while / do-while ─ 終了条件から逆算する（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   13,
   'while / do-while ─ 終了条件から逆算する',
@@ -302,12 +306,14 @@ fetchPages(3) のほうは [1, 2, 3] を返します。page が 4 になった�
 
 do { … } while (条件) も同じ繰り返しですが、条件を書く位置が中身の後ろにあります。
 
-<= は「以下」を意味します。配列.push(値) は配列の末尾に値を足します。'
+<= は「以下」を意味します。配列.push(値) は配列の末尾に値を足します。',
+  'ページをまとめて取ってくる処理のレビューを頼まれた。
+どこまで取りに行くのかを確かめてほしいとのこと。'
 );
 
 -- ステージ14: break と continue ─ 抜ける位置で結果が変わる（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   14,
   'break と continue ─ 抜ける位置で結果が変わる',
@@ -351,7 +357,9 @@ scanned は3になります。info の行では continue で以降の判定を�
 
 continue はその回の残りを飛ばして次の回へ進みます。break は繰り返しそのものをやめます。
 
-繰り返しが入れ子になっているときは、それぞれの for が別々の繰り返しとして数えられます。'
+繰り返しが入れ子になっているときは、それぞれの for が別々の繰り返しとして数えられます。',
+  'ログを見ていく処理を引き継いだ。
+手を入れる前に、どこで止まるのかを読んでおきたい。'
 );
 
 commit;

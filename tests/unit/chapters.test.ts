@@ -10,7 +10,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { CHAPTERS, chapterOf } from "@/lib/stages/chapters";
+import { CHAPTERS, chapterOf, isHiddenOrder } from "@/lib/stages/chapters";
 
 describe("§12-1 章の定義", () => {
   it("U-560 全14章ある（構成案 v3）", () => {
@@ -97,6 +97,24 @@ describe("§12-2 chapterOf", () => {
     expect(chapterOf(9001)).toBeNull();
     expect(chapterOf(0)).toBeNull();
     expect(chapterOf(-1)).toBeNull();
+  });
+
+  /**
+   * マップに出さない問題（2026-09-12）。
+   *
+   * **E2E のシード（9000番台）を巻き込まないこと**が要点。
+   * あちらは `tests/e2e/stages.spec.ts` がマップ上の鍵の状態を見て
+   * 解放判定を確かめているので、隠すと検査が対象を見失う。
+   */
+  it("U-934 動作確認用の 999 だけをマップから外す", () => {
+    expect(isHiddenOrder(999)).toBe(true);
+    // 実コンテンツは1件も隠さない
+    for (let order = 1; order <= 100; order++) {
+      expect(isHiddenOrder(order), `order=${order} が隠れている`).toBe(false);
+    }
+    // E2E のシードは隠さない
+    expect(isHiddenOrder(9001)).toBe(false);
+    expect(isHiddenOrder(9002)).toBe(false);
   });
 
   it("U-584 整数でない値でも落ちない", () => {

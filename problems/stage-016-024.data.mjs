@@ -14,6 +14,8 @@ export const problems = [
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `一覧の表示用データを作る処理を渡された。
+書き方が2種類あるので、それぞれ何が返るのかを読んでおく。`,
     code: `const orders = [
   { id: "A-1", amount: 1200 },
   { id: "A-2", amount: 800 },
@@ -62,6 +64,8 @@ toSummary のほうは波括弧の外側を丸括弧で包んでいるので、�
     language: "js",
     difficulty: 3,
     reading_type: "ズレ",
+    scenario: `割引率を決める関数のレビューを頼まれた。
+上のコメントどおりに動くかを見てほしいとのこと。`,
     code: `// 会員ランクごとに割引率を返す。該当しなければ 0
 function resolveDiscount(user) {
   if (user.rank === "gold") {
@@ -118,6 +122,8 @@ Math.round(数) は小数を四捨五入します。1 - rate のように、割�
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `お知らせの文面を作る関数を引き継いだ。
+呼び出し方が何通りかあるので、先に読んでおきたい。`,
     code: `function buildNotice(title, level = "info", ...tags) {
   return \`[\${level}] \${title} \${tags.length > 0 ? tags.join(",") : "タグなし"}\`;
 }
@@ -163,6 +169,8 @@ console.log(buildNotice("接続断", null, "network"));`,
     language: "js",
     difficulty: 3,
     reading_type: "意図",
+    scenario: `投稿を受け付ける処理に、条件をもう1つ足すことになった。
+いまの書き方の狙いを読んでおく。`,
     code: `function acceptSubmission(form, session) {
   if (!session) {
     return { ok: false, message: "ログインが必要です" };
@@ -214,6 +222,8 @@ console.log(buildNotice("接続断", null, "network"));`,
     language: "js",
     difficulty: 3,
     reading_type: "トレース",
+    scenario: `集計の関数を引き継いだ。
+手を入れる前に、どう動くのかを順番に追ってみる。`,
     code: `function summarize(entries) {
   let total = 0;
   const labels = [];
@@ -268,6 +278,8 @@ labels のほうは外側のものがそのまま使われるので、2件ぶん
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `設定を読み込む処理を引き継いだ。
+宣言の並びが独特なので、上から1行ずつ追ってみる。`,
     code: `function loadConfig() {
   console.log(typeof readEnv);
   console.log(cachedAt);
@@ -318,6 +330,8 @@ typeof 値 は、値の種類を表す文字列を返します。`,
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `注文番号を作る処理を引き継いだ。
+実際に何が返るのかを確かめておきたい。`,
     code: `function createCounter(prefix) {
   let issued = 0;
 
@@ -367,6 +381,8 @@ String(値) は値を文字にします。文字列.padStart(3, "0") は、3文�
     language: "js",
     difficulty: 4,
     reading_type: "意図",
+    scenario: `外部への通信まわりについて、後輩から相談を受けた。
+なぜこの形にしてあるのかを一緒に読む。`,
     code: `// どちらも外部への通信。つながらないときは例外を投げる
 function callProfileApi(userId) {
   return { id: userId, name: "佐藤" };
@@ -432,6 +448,8 @@ const 名前 = 関数(引数) の形は、呼び出した結果を新しい名�
     language: "js",
     difficulty: 4,
     reading_type: "トレース",
+    scenario: `コメントの表示を作り直すことになり、いまの関数を渡された。
+手を入れる前に中身を読んでおく。`,
     code: `function countReplies(comment) {
   if (!comment.replies) {
     return 0;

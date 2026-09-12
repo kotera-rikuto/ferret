@@ -1,5 +1,5 @@
 -- ステージ91〜100 投入
--- 出典: problems/stage-091-100.data.mjs / 設計: problems/stage-081-100.md
+-- 出典: problems/stage-091-100.data.mjs / 設計: problems/stage-091-100.md
 -- **投入済みの実データから生成したもので、手書きしていない**
 -- id は書かない（GENERATED ALWAYS AS IDENTITY）
 
@@ -7,7 +7,7 @@ begin;
 
 -- ステージ91: 型エラーメッセージを読む② ─ 長いユニオン型のエラーを絞り込む（影響）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, context, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, context, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   91,
   '型エラーメッセージを読む② ─ 長いユニオン型のエラーを絞り込む',
@@ -48,12 +48,14 @@ handle({ kind: "keydown", code: "Enter" });',
 
 どれとも合わなかった場合、型検査は候補を1つ選んで、それとの違いを示します。選ばれるのは必ずしも近いものではありません。
 
-TS2345 は「渡した引数が受け取り側の型に入らない」ことを表します。そのあとに続く行が、どの項目でつまずいたかを示します。'
+TS2345 は「渡した引数が受け取り側の型に入らない」ことを表します。そのあとに続く行が、どの項目でつまずいたかを示します。',
+  '長い出力を渡されて、読み解いてほしいと言われた。
+何を言っているのかを順に追ってみる。'
 );
 
 -- ステージ92: type と interface と交差型(&) ─ 使い分けと合成（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   92,
   'type と interface と交差型(&) ─ 使い分けと合成',
@@ -94,12 +96,14 @@ Repository を2回書いているのは別の理由です。**同じ名前の in
 
 interface 名前 { … } も形に名前を付けますが、同じ名前で複数回書くと、それらは1つにまとめられます。type にはこの性質がありません。
 
-interface 名前<T> の <T> は、使うときに決まる型を表します。'
+interface 名前<T> の <T> は、使うときに決まる型を表します。',
+  '型の切り出し方について、チームに説明することになった。
+なぜこの分け方にしたのかを読んでおく。'
 );
 
 -- ステージ93: ジェネリクス ─ <T> が何に置き換わるか読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   93,
   'ジェネリクス ─ <T> が何に置き換わるか読む',
@@ -127,12 +131,14 @@ T は使うときに決まる入れ物で、渡した引数から埋められま
 
 同じ T が引数と戻り値の複数の場所に出てきたら、それらはすべて同一になります。呼び出したときの引数から埋められます。
 
-条件 ? A : B は、条件が成立すれば A を、しなければ B を返します。'
+条件 ? A : B は、条件が成立すれば A を、しなければ B を返します。',
+  '共通で使う小さな関数を引き継いだ。
+呼び出しが3つあるので、それぞれ読んでおく。'
 );
 
 -- ステージ94: keyof / typeof と Utility Types ─ 既存の型から型を作る（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   94,
   'keyof / typeof と Utility Types ─ 既存の型から型を作る',
@@ -167,12 +173,14 @@ Partial は全部を省略可能にしたもの、Readonly は全部を書き換
 
 keyof 型 は、その型が持つ項目名を集めた型になります。
 
-Partial<T> は全部を省略可能に、Readonly<T> は全部を書き換え不可にします。Pick<T, "a" | "b"> は挙げた名前だけを残し、Omit<T, "a"> は挙げた名前を取り除きます。'
+Partial<T> は全部を省略可能に、Readonly<T> は全部を書き換え不可にします。Pick<T, "a" | "b"> は挙げた名前だけを残し、Omit<T, "a"> は挙げた名前を取り除きます。',
+  '設定まわりの型を引き継いだ。
+元の値から作られているので、順に追ってみる。'
 );
 
 -- ステージ95: 型ガードとユーザー定義型ガード(is)（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   95,
   '型ガードとユーザー定義型ガード(is)',
@@ -208,12 +216,14 @@ isOk の戻り値に書いてある r is ApiOk は、「この関数が true を
 
 関数の戻り値に 引数名 is 型 と書くと、その関数が true を返したときに引数がその型であると伝えられます。中身が本当にそう判定しているかは、書いた側の責任です。
 
-配列.join(",") は要素をカンマでつないだ文字列にします。'
+配列.join(",") は要素をカンマでつないだ文字列にします。',
+  'API の結果を扱う型を引き継いだ。
+判定のところを、手を入れる前に読んでおく。'
 );
 
 -- ステージ96: 判別可能なユニオン型で書かれた状態管理を読む（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   96,
   '判別可能なユニオン型で書かれた状態管理を読む',
@@ -254,12 +264,14 @@ switch が見ている status は、4つの候補すべてが持っていて値�
 
 switch や if でその項目を確かめると、その中では1つの候補に絞られます。絞られたあとは、その候補にしかない項目も読めます。
 
-ステージ11 で扱った switch と同じ構文ですが、そこでは通る枝を追っていました。'
+ステージ11 で扱った switch と同じ構文ですが、そこでは通る枝を追っていました。',
+  '画面の状態を管理する型を引き継いだ。
+分岐が4つあるので、順に読んでおきたい。'
 );
 
 -- ステージ97: 非同期の型 ─ Promise<T> と await の戻り値（トレース）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   97,
   '非同期の型 ─ Promise<T> と await の戻り値',
@@ -293,12 +305,14 @@ good では await が包みを開けるので、n は number になり n * 2 が
 
 await はその包みを開けて中の値を取り出します。付けなければ包みのまま変数に入ります。
 
-ステージ65 で同じ書き忘れを扱いました。そこでは実行するまで分かりませんでした。'
+ステージ65 で同じ書き忘れを扱いました。そこでは実行するまで分かりませんでした。',
+  '非同期まわりで1語だけ違う2つを渡された。
+何が変わるのかを見てほしいと言われた。'
 );
 
 -- ステージ98: as と ! ─ なぜここでアサーションが必要なのか（意図）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   98,
   'as と ! ─ なぜここでアサーションが必要なのか',
@@ -333,12 +347,14 @@ loaded! は、値が null でないと書き手が知っているためです。
 
 値! は「これは null でも undefined でもない」と言い切る書き方です。これも確かめてはいません。
 
-JSON.parse の結果は、型の上では「何か分からないもの」です。そのため受け取り側で決める必要があります。'
+JSON.parse の結果は、型の上では「何か分からないもの」です。そのため受け取り側で決める必要があります。',
+  '設定の読み込みまわりについて、チームに説明することになった。
+2か所ある書き方の事情を読んでおく。'
 );
 
 -- ステージ99: 型定義ファイル(.d.ts)を読む ─ 型だけを見て API の使い方を説明する（仕様）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   99,
   '型定義ファイル(.d.ts)を読む ─ 型だけを見て API の使い方を説明する',
@@ -378,12 +394,14 @@ onFailed は失敗したときに呼ばれる関数を受け取り、**戻り値
 
 readonly が付いた項目は、受け取った側から書き換えられません。項目名の後ろの ? は省略できることを表します。
 
-戻り値が (…) => … の形をしている関数は、関数を返します。Promise<T> は「いずれ T になるもの」です。'
+戻り値が (…) => … の形をしている関数は、関数を返します。Promise<T> は「いずれ T になるもの」です。',
+  '新しく使うことになった部品の使い方を、チームに共有することになった。
+手元にあるのは型定義だけ。'
 );
 
 -- ステージ100: zod のスキーマを読む ─ 型とバリデーションが同居するコード（仕様）
 insert into public.problems
-  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite)
+  ("order", title, language, difficulty, reading_type, code, question, model_answer, keywords, rubric_items, prerequisite, scenario)
 values (
   100,
   'zod のスキーマを読む ─ 型とバリデーションが同居するコード',
@@ -420,7 +438,9 @@ parse は合わなければ例外を投げます。safeParse は投げずに、�
 
 書いた形からは、対応する TypeScript の型を取り出せます。z.infer<typeof スキーマ> がその書き方です。
 
-.optional() は省略できること、.default(値) は渡されなかったときに入る値を表します。unknown は「何か分からないもの」で、確かめるまで使えません。'
+.optional() は省略できること、.default(値) は渡されなかったときに入る値を表します。unknown は「何か分からないもの」で、確かめるまで使えません。',
+  '注文データの取り込みまわりを引き継いだ。
+1つの定義で何を決めているのかを読んでおきたい。'
 );
 
 commit;
