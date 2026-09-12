@@ -12,10 +12,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { readFileSync as readSource } from "node:fs";
 import {
   CHANGELOG,
   CHANGELOG_CATEGORY_LABELS,
   CHANGELOG_ON_LP,
+  CHANGELOG_SEEN_STORAGE_KEY,
+  changelogMarker,
   formatChangelogDate,
   latestChangelog,
   type ChangelogCategory,
@@ -149,6 +152,60 @@ describe("§20 表示の下ごしらえ", () => {
     expect(shown.length).toBeLessThanOrEqual(CHANGELOG_ON_LP);
     expect(shown.length).toBeLessThanOrEqual(CHANGELOG.length);
     expect(shown[0]).toBe(CHANGELOG[0]);
+  });
+});
+
+describe("§20 まだ見ていない更新の印（NEW）", () => {
+  const src = () =>
+    readSource(
+      fileURLToPath(
+        new URL("../../components/changelog/NewMark.tsx", import.meta.url),
+      ),
+      "utf8",
+    );
+
+  /**
+   * **日付だけを覚える形に戻さないこと。**
+   * 同じ日に2件以上足すことがある（2026-09-12 に3件足した）。日付だけだと、
+   * 1件目を見た時点で残りも「見たこと」になり、**増えたのに印が出ない。**
+   */
+  it("U-930 版は日付と件数の両方から作る（同じ日に足しても変わる）", () => {
+    const marker = changelogMarker();
+    expect(marker).toBe(`${CHANGELOG[0].date}#${CHANGELOG.length}`);
+    expect(marker).toContain("#");
+    // 件数が1件増えた版は、いまの版と別物になること
+    expect(`${CHANGELOG[0].date}#${CHANGELOG.length + 1}`).not.toBe(marker);
+  });
+
+  it("U-931 覚える鍵が他の設定と重ならない", () => {
+    // 暗い配色は `ferret-theme`。同じ鍵を使うとどちらかが消える
+    expect(CHANGELOG_SEEN_STORAGE_KEY).toBe("ferret-changelog-seen");
+    expect(CHANGELOG_SEEN_STORAGE_KEY).not.toBe("ferret-theme");
+  });
+
+  /**
+   * **サーバーの HTML に印を入れないこと。**
+   * 誰が読んだかを知っているのは端末だけなので、サーバーが出すと
+   * 読み終わった人にも一瞬 NEW が見えて直後に消える。
+   */
+  it("U-932 印はブラウザ側だけで出す（サーバーの答えは「読んだ」）", () => {
+    const code = src();
+    expect(code.startsWith('"use client";')).toBe(true);
+    // useSyncExternalStore の第3引数（サーバー側の答え）が marker ＝ 印を出さない側
+    expect(code).toContain("useSyncExternalStore");
+    expect(code).toContain("() => marker");
+  });
+
+  /**
+   * `localStorage` は環境によって読み書きで例外を投げる（プライベートモードなど）。
+   * **落ちないこと**と、**読めないときは出さない側に倒すこと**を固定する。
+   */
+  it("U-933 localStorage の読み書きは try で囲んである", () => {
+    const code = src();
+    const reads = code.split("localStorage.").length - 1;
+    expect(reads).toBeGreaterThan(0);
+    expect(code.split("try {").length - 1).toBeGreaterThanOrEqual(2);
+    expect(code).toContain("catch");
   });
 });
 

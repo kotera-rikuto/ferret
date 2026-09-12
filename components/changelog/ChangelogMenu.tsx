@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { IconChevronDown } from "@/components/ui/icons";
 import { ChangelogList } from "@/components/changelog/ChangelogList";
-import { latestChangelog } from "@/lib/changelog";
+import { NewMark } from "@/components/changelog/NewMark";
+import { changelogMarker, latestChangelog } from "@/lib/changelog";
 
 /**
  * 上部バーの「更新情報」。押すと最新ぶんの見出しが下に開く（tasks/E12・オーナー指摘 2026-08-26）。
@@ -31,6 +32,13 @@ export function ChangelogMenu() {
         aria-label="更新情報を開く"
       >
         更新情報
+        {/*
+          まだ見ていない更新があるときだけ出る **NEW**（オーナー判断 2026-09-12）。
+          **ここだけがブラウザ側で動く部品。** 誰が読んだかを覚えているのは端末で、
+          サーバーは知らない ── だから出す/出さないの判断はサーバーに書けない。
+          この部品はサーバーでは何も描かないので、上部バー自体はサーバー部品のまま。
+        */}
+        <NewMark marker={changelogMarker()} />
         <IconChevronDown
           size={14}
           className="shrink-0 text-brand-deep transition-transform duration-200 group-open:rotate-180 motion-reduce:transition-none"
